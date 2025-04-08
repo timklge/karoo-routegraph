@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ExtensionInfo
+    displayName="@string/extension_name"
+    icon="@drawable/trip"
+    id="karoo-routegraph"
+    scansDevices="false"
+    mapLayer="true">
+
+    <DataType
+        description="@string/routegraph_description"
+        displayName="@string/routegraph"
+        graphical="true"
+        icon="@drawable/chart"
+        typeId="routegraph" />
+
+    <DataType
+        description="@string/verticalroutegraph_description"
+        displayName="@string/verticalroutegraph"
+        graphical="true"
+        icon="@drawable/trip"
+        typeId="verticalroutegraph" />
+
+    <DataType
+        description="@string/distance_to_poi_description"
+        displayName="@string/distance_to_poi"
+        graphical="false"
+        icon="@drawable/trip"
+        typeId="distancetopoi" />
+
+    <DataType
+        description="@string/elevation_to_poi_description"
+        displayName="@string/elevation_to_poi"
+        graphical="false"
+        icon="@drawable/trip"
+        typeId="elevationtopoi" />
+</ExtensionInfo>

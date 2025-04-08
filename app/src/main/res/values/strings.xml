@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">RouteGraph</string>
+    <string name="extension_name">RouteGraph</string>
+    <string name="routegraph">Route Graph</string>
+    <string name="routegraph_description">Full route elevation profile with POIs</string>
+    <string name="verticalroutegraph">Vertical Route Graph</string>
+    <string name="verticalroutegraph_description">Full route elevation profile with POIs</string>
+    <string name="distance_to_poi">Distance to POI</string>
+    <string name="distance_to_poi_description">Distance to the next POI</string>
+    <string name="elevation_to_poi">Elevation to POI</string>
+    <string name="elevation_to_poi_description">Elevation to the next POI</string>
+</resources>

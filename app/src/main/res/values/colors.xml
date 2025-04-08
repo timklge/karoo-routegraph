@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#FFE900</color>
+    <color name="colorPrimaryDark">#CBBA00</color>
+    <color name="colorPrimaryDarkBg">#80CBBA00</color>
+
+    <color name="white">#ffffff</color>
+    <color name="whiteBg">#B3FFFFFF</color>
+    <color name="gray">#808080</color>
+    <color name="black">#000000</color>
+    <color name="blackBg">#B3000000</color>
+
+    <color name="yellow">#FFE900</color>
+    <color name="bgblue">#214559</color>
+
+    <color name="elevBg">#40000000</color>
+    <color name="elevDarkBg">#40ffffff</color>
+    <color name="elevate0">#FF009688</color>
+    <color name="elevate1">#FF009688</color>
+    <color name="elevate2">#FFE900</color>
+    <color name="elevate3">#FC6100</color>
+    <color name="elevate4">#FF5252</color>
+</resources>

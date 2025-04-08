@@ -1,0 +1,370 @@
+package de.timklge.karooroutegraph
+
+import android.util.Log
+import androidx.annotation.DrawableRes
+import com.mapbox.geojson.LineString
+import com.mapbox.geojson.Point
+import com.mapbox.turf.TurfConstants
+import com.mapbox.turf.TurfMeasurement
+import de.timklge.karooroutegraph.datatypes.VerticalRouteGraphDataType
+import de.timklge.karooroutegraph.datatypes.DistanceToNextPOIDataType
+import de.timklge.karooroutegraph.datatypes.ElevationToNextPOIDataType
+import de.timklge.karooroutegraph.datatypes.RouteGraphDataType
+import de.timklge.karooroutegraph.screens.RouteGraphSettings
+import identifyClimbs
+import io.hammerhead.karooext.extension.KarooExtension
+import io.hammerhead.karooext.internal.Emitter
+import io.hammerhead.karooext.models.DataType
+import io.hammerhead.karooext.models.HideSymbols
+import io.hammerhead.karooext.models.MapEffect
+import io.hammerhead.karooext.models.OnGlobalPOIs
+import io.hammerhead.karooext.models.OnLocationChanged
+import io.hammerhead.karooext.models.OnMapZoomLevel
+import io.hammerhead.karooext.models.OnNavigationState
+import io.hammerhead.karooext.models.ShowSymbols
+import io.hammerhead.karooext.models.StreamState
+import io.hammerhead.karooext.models.Symbol
+import io.hammerhead.karooext.models.UserProfile
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.transformLatest
+import kotlinx.coroutines.launch
+import org.koin.android.ext.android.inject
+import kotlin.math.pow
+import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.minutes
+
+class GradientIndicator(val id: String, val distance: Float, val gradientPercent: Float, @DrawableRes val drawableRes: Int){
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as GradientIndicator
+
+        if (id != other.id) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = id.hashCode()
+        return result
+    }
+
+    override fun toString(): String {
+        return "GradientIndicator(id='$id', distance=$distance, $gradientPercent)"
+    }
+}
+
+class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.VERSION_NAME) {
+    companion object {
+        const val TAG = "karoo-routegraph"
+    }
+
+    private val karooSystem: KarooSystemServiceProvider by inject()
+    private val routeGraphViewModelProvider: RouteGraphViewModelProvider by inject()
+    private val valhallaAPIElevationProvider: ValhallaAPIElevationProvider by inject()
+    private val displayViewModelProvider: RouteGraphDisplayViewModelProvider by inject()
+
+    private var serviceJob: Job? = null
+
+    override val types by lazy {
+        listOf(
+            RouteGraphDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, displayViewModelProvider, applicationContext),
+            VerticalRouteGraphDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, displayViewModelProvider, applicationContext),
+            DistanceToNextPOIDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, applicationContext),
+            ElevationToNextPOIDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, applicationContext)
+        )
+    }
+
+    private fun calculateBoundingBox(lat: Double, lng: Double, zoomLevel: Double): BoundingBox {
+        val halfMapSpan = 180.0 / (2.0.pow(zoomLevel))
+        val minLat = lat - halfMapSpan
+        val maxLat = lat + halfMapSpan
+        val minLng = lng - halfMapSpan
+        val maxLng = lng + halfMapSpan
+        return BoundingBox(minLat, maxLat, minLng, maxLng)
+    }
+
+    data class BoundingBox(val minLat: Double, val maxLat: Double, val minLng: Double, val maxLng: Double){
+        fun contains(lat: Double, lng: Double): Boolean {
+            return lat in minLat..maxLat && lng in minLng..maxLng
+        }
+    }
+
+    override fun startMap(emitter: Emitter<MapEffect>) {
+        var lastDrawnSymbols = mutableSetOf<GradientIndicator>()
+        var currentSymbols: MutableSet<GradientIndicator>
+
+        Log.d(TAG, "Starting map effect")
+        emitter.onNext(HideSymbols(lastDrawnSymbols.map { it.id }))
+        lastDrawnSymbols.clear()
+
+        emitter.onNext(HideSymbols(lastDrawnSymbols.map { "incline-${it.distance}" }))
+        lastDrawnSymbols = mutableSetOf()
+
+        val gradientIndicatorJob = CoroutineScope(Dispatchers.IO).launch {
+            val zoomLevelFlow = karooSystem.stream<OnMapZoomLevel>()
+
+            data class StreamData(
+                val settings: RouteGraphSettings,
+                val location: OnLocationChanged,
+                val mapZoom: OnMapZoomLevel,
+                val viewModel: RouteGraphViewModel
+            )
+
+            combine(applicationContext.streamSettings(karooSystem.karooSystemService), karooSystem.stream<OnLocationChanged>(), zoomLevelFlow, routeGraphViewModelProvider.viewModelFlow) { settings, location, mapZoom, viewModel ->
+                StreamData(settings, location, mapZoom, viewModel)
+            }.collect { (settings, location, mapZoom, viewModel) ->
+                if (settings.showGradientIndicatorsOnMap) {
+                    val boundingBox =
+                        calculateBoundingBox(location.lat, location.lng, mapZoom.zoomLevel)
+                    val mapDiagonal = TurfMeasurement.distance(
+                        Point.fromLngLat(boundingBox.minLng, boundingBox.minLat),
+                        Point.fromLngLat(boundingBox.maxLng, boundingBox.maxLat),
+                        TurfConstants.UNIT_METERS
+                    )
+                    Log.d(TAG, "Location: $location, MapZoom: $mapZoom, Diagonal: $mapDiagonal")
+
+                    val distanceAlongRoute = viewModel.distanceAlongRoute ?: 0.0f
+                    val startDistance =
+                        (distanceAlongRoute - mapDiagonal).toFloat().coerceAtLeast(0.0f)
+                    val endDistance = (distanceAlongRoute + mapDiagonal).toFloat()
+
+                    if (viewModel.sampledElevationData != null) {
+                        Log.d(TAG, "Range: $startDistance - $endDistance")
+                    val steps = ((mapDiagonal / 8.0) / viewModel.sampledElevationData.interval).roundToInt().coerceIn(1, 100)
+
+                        currentSymbols = viewModel.sampledElevationData.getGradientIndicators(
+                            steps) { distance ->
+                        val targetPosition = TurfMeasurement.along(
+                            viewModel.knownRoute!!,
+                            distance.toDouble(),
+                            TurfConstants.UNIT_METERS
+                        )
+
+                        boundingBox.contains(targetPosition.latitude(), targetPosition.longitude())
+                    }.toMutableSet()
+                    } else {
+                        currentSymbols = mutableSetOf()
+                    }
+
+                    val removedSymbols = lastDrawnSymbols - currentSymbols
+
+                    if (removedSymbols.isNotEmpty()) {
+                        Log.d(TAG, "Removing symbols: $removedSymbols")
+                        emitter.onNext(HideSymbols(removedSymbols.map { it.id }))
+                    }
+
+                    if (currentSymbols.isNotEmpty()) {
+                        Log.d(TAG, "Drawing symbols: $currentSymbols")
+
+                    val icons =currentSymbols.mapNotNull { inclindeIndicator ->
+                            val knownRoute = viewModel.knownRoute ?: return@mapNotNull null
+
+                            val position = TurfMeasurement.along(
+                                knownRoute,
+                                inclindeIndicator.distance.toDouble(),
+                                TurfConstants.UNIT_METERS
+                            )
+
+                            val nextPosition = TurfMeasurement.along(
+                                viewModel.knownRoute,
+                                inclindeIndicator.distance.toDouble() + 10.0,
+                                TurfConstants.UNIT_METERS
+                            )
+
+                            val bearing = TurfMeasurement.bearing(
+                                position,
+                                nextPosition
+                            )
+
+                            val normal = bearing + 90.0
+
+                            val offsetPosition = TurfMeasurement.destination(
+                                position,
+                                (mapDiagonal / 12.0).coerceIn(10.0, 100.0),
+                                normal,
+                                TurfConstants.UNIT_METERS
+                            )
+
+                            Symbol.Icon(
+                                id = inclindeIndicator.id,
+                                lat = offsetPosition.latitude(),
+                                lng = offsetPosition.longitude(),
+                                iconRes = inclindeIndicator.drawableRes,
+                                orientation = 0.0f
+                            )
+                        }
+    emitter.onNext(ShowSymbols(icons))
+                }
+
+                    lastDrawnSymbols = currentSymbols
+                } else {
+                    emitter.onNext(HideSymbols(lastDrawnSymbols.map { it.id }))
+                    lastDrawnSymbols = mutableSetOf()
+                }
+            }
+        }
+
+        emitter.setCancellable {
+            emitter.onNext(HideSymbols(lastDrawnSymbols.map { "incline-${it.distance}" }))
+
+            Log.d(TAG, "Stopping map effect")
+
+            gradientIndicatorJob.cancel()
+        }
+    }
+
+    data class NavigationStreamState(val state: OnNavigationState.NavigationState,
+                                     val userProfile: UserProfile,
+                                     val pois: OnGlobalPOIs,
+                                     val locationAndRemainingRouteDistance: LocationAndRemainingRouteDistance)
+
+    data class LocationAndRemainingRouteDistance(val lat: Double?, val lon: Double?, val remainingRouteDistance: Double?)
+
+    private fun streamLocationAndRemainingRouteDistance(): Flow<LocationAndRemainingRouteDistance> = flow {
+        val locationFlow = karooSystem.stream<OnLocationChanged>()
+            .distinctUntilChanged()
+            .map { it.lat to it.lng }
+
+        val remainingRouteDistanceFlow = karooSystem.streamDataFlow(DataType.Type.DISTANCE_TO_DESTINATION)
+            .distinctUntilChanged()
+            .map { (it as? StreamState.Streaming)?.dataPoint?.values?.get(DataType.Field.DISTANCE_TO_DESTINATION) ?: 0.0 }
+
+        emit(LocationAndRemainingRouteDistance(null, null, null))
+
+        locationFlow.combine(remainingRouteDistanceFlow) { (lat, lon), remainingRouteDistance ->
+            LocationAndRemainingRouteDistance(lat, lon, remainingRouteDistance)
+        }.throttle(5_000).collect {
+            emit(it)
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun startGraphUpdater(){
+        Log.d(TAG, "Starting graph updater")
+
+        var knownRoute: LineString? = null
+        var knownRouteElevation: SampledElevationData? = null
+        var poiDistances: Map<Symbol.POI, List<NearestPoint>>? = null
+
+        serviceJob = CoroutineScope(Dispatchers.IO).launch {
+            combine(
+                karooSystem.stream<OnNavigationState>(),
+                karooSystem.stream<UserProfile>(),
+                streamLocationAndRemainingRouteDistance(),
+                karooSystem.stream<OnGlobalPOIs>()
+            ) { navigationState, userProfile, locationAndRemainingRouteDistance, pois ->
+                NavigationStreamState(navigationState.state, userProfile, pois, locationAndRemainingRouteDistance)
+            }.distinctUntilChanged()
+            .transformLatest { value ->
+                while(true){
+                    emit(value)
+                    delay(1.minutes)
+                }
+            }
+            .collect { (navigationStateEvent, userProfile, globalPOIs, locationAndRemainingRouteDistance) ->
+                val isImperial = userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
+                val pois = globalPOIs.pois + (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.pois.orEmpty()
+                val routeDistance = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.routeDistance
+                val distanceAlongRoute = if (locationAndRemainingRouteDistance.remainingRouteDistance != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute){
+                    navigationStateEvent.routeDistance - locationAndRemainingRouteDistance.remainingRouteDistance
+                } else null
+
+                Log.d(TAG, "Received navigation state: $navigationStateEvent")
+
+                val routeLineString = if (navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute){
+                    val polyline = navigationStateEvent.routePolyline
+
+                    LineString.fromPolyline(polyline, 5)
+                } else {
+                    null
+                }
+
+                val routeChanged =  if (knownRoute == null || routeLineString != knownRoute){
+                    knownRoute = routeLineString
+                    knownRouteElevation = null
+
+                    true
+                } else false
+
+                if (routeChanged){
+                    Log.i(TAG, "Route changed, recalculating POI distances")
+
+                    if (routeLineString != null){
+                        poiDistances = calculatePoiDistances(routeLineString, pois)
+
+                        val poiDistancesDebug = poiDistances?.map { (key, value) ->
+                            "${key.name} (${key.type}): $value"
+                        }?.joinToString(", ")
+                        Log.d(TAG, "POI distances: $poiDistancesDebug")
+                    }
+                    knownRoute = routeLineString
+                }
+
+
+                when(navigationStateEvent){
+                    is OnNavigationState.NavigationState.NavigatingRoute -> {
+                        Log.d(TAG, "Navigating ${navigationStateEvent.name}")
+                    }
+                    is OnNavigationState.NavigationState.NavigatingToDestination -> {
+                        Log.d(TAG, "Navigating to destination")
+                    }
+                    is OnNavigationState.NavigationState.Idle -> {
+                        Log.d(TAG, "Navigation idle")
+                    }
+                }
+
+                val viewModel = routeGraphViewModelProvider.viewModelFlow.first().copy(routeDistance = routeDistance?.toFloat(),
+                    distanceAlongRoute = distanceAlongRoute?.toFloat(),
+                    knownRoute = knownRoute,
+                    poiDistances = poiDistances,
+                    sampledElevationData = knownRouteElevation,
+                    isImperial = isImperial)
+                routeGraphViewModelProvider.update(viewModel)
+
+                // Request elevation data
+                if (knownRouteElevation == null && routeLineString != null && routeDistance != null){
+                    Log.i(TAG, "Route changed, recalculating elevation data")
+
+                    try {
+                        val elevations = valhallaAPIElevationProvider.requestValhallaElevations(routeLineString)
+
+                        Log.i(TAG, "Elevation data: $elevations")
+                        knownRouteElevation = elevations
+
+                        val climbs = elevations.identifyClimbs()
+                        Log.i(TAG, "Identified climbs: $climbs")
+
+                        routeGraphViewModelProvider.update(viewModel.copy(sampledElevationData = elevations, climbs = climbs))
+                    } catch(e: Exception){
+                        Log.e(TAG, "Failed to sample route elevation")
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+
+        startGraphUpdater()
+    }
+
+    override fun onDestroy() {
+        serviceJob?.cancel()
+        serviceJob = null
+
+        super.onDestroy()
+    }
+}
