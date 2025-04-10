@@ -6,12 +6,13 @@ enum class ClimbCategory(
     val minGradient: Float,
     val minLength: Float,
     val number: Int,
+    val importance: Int,
     @ColorRes val colorRes: Int,
 ) {
-    CAT1(0.08f, 1000f, 1, R.color.elevate4),
-    CAT2(0.06f, 750f, 2, R.color.elevate3),
-    CAT3(0.04f, 500f, 3, R.color.elevate2),
-    CAT4(0.02f, 250f, 4, R.color.elevate1);
+    CAT1(0.08f, 1000f, 1, 10, R.color.elevate4),
+    CAT2(0.06f, 750f, 2, 5, R.color.elevate3),
+    CAT3(0.04f, 500f, 3, 2, R.color.elevate2),
+    CAT4(0.02f, 250f, 4, 1, R.color.elevate1);
 
     companion object {
         fun categorize(gradient: Float, length: Float): ClimbCategory? {
@@ -41,6 +42,10 @@ data class Climb(
             startDistance = minOf(startDistance, other.startDistance),
             endDistance = maxOf(endDistance, other.endDistance)
         )
+    }
+
+    fun totalGain(sampledElevationData: SampledElevationData): Double {
+        return sampledElevationData.getTotalClimb(startDistance, endDistance)
     }
 }
 

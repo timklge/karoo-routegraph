@@ -23,7 +23,6 @@ import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
-import androidx.glance.layout.fillMaxWidth
 import androidx.glance.text.Text
 import de.timklge.karooroutegraph.ChangeZoomLevelAction
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
@@ -54,7 +53,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import java.util.Locale
-import java.util.UUID
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -76,8 +74,6 @@ class VerticalRouteGraphDataType(
 
     override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
         Log.d(TAG, "Starting route view with $emitter")
-
-        val instanceId = UUID.randomUUID().toString()
 
         val configJob = CoroutineScope(Dispatchers.Default).launch {
             emitter.onNext(UpdateGraphicConfig(showHeader = false))
@@ -225,7 +221,7 @@ class VerticalRouteGraphDataType(
                 }
 
                 if (viewModel.sampledElevationData == null) {
-                    emitter.onNext(ShowCustomStreamState("No elevation data downloaded", if (isNightMode()) Color.WHITE else Color.BLACK))
+                    emitter.onNext(ShowCustomStreamState("No elevation data downloaded. Retrying...", if (isNightMode()) Color.WHITE else Color.BLACK))
                     Log.d(TAG, "Not drawing route graph: No route loaded")
                     emitter.updateView(glance.compose(context, DpSize.Unspecified) { Box(modifier = GlanceModifier.fillMaxSize()){} }.remoteViews)
                     return@collect
@@ -281,6 +277,10 @@ class VerticalRouteGraphDataType(
                 filledPath.lineTo(graphBounds.top, firstProgressPixels)
                 filledPath.close()
 
+                data class TextDrawCommand(val x: Float, val y: Float, val text: String, val paint: Paint, val importance: Int = 10)
+
+                val textDrawCommands = mutableListOf<TextDrawCommand>()
+
                 if (viewModel.climbs != null){
                     // Sort climbs so that harder climbs will be drawn on top if they overlap
                     val climbsSortedByCategory = viewModel.climbs.sortedByDescending { it.category.number }
@@ -296,10 +296,10 @@ class VerticalRouteGraphDataType(
                             }
                         }
 
-                        climbStartProgressPixels = climbStartProgressPixels.coerceIn(graphBounds.top, graphBounds.bottom)
-                        climbEndProgressPixels = climbEndProgressPixels.coerceIn(graphBounds.top, graphBounds.bottom)
+                        val clampedClimbStartProgressPixels = climbStartProgressPixels.coerceIn(graphBounds.top, graphBounds.bottom)
+                        val clampedClimbEndProgressPixels = climbEndProgressPixels.coerceIn(graphBounds.top, graphBounds.bottom)
 
-                        val clipRect = RectF(graphBounds.left, climbStartProgressPixels, graphBounds.bottom, climbEndProgressPixels)
+                        val clipRect = RectF(graphBounds.left, clampedClimbStartProgressPixels, graphBounds.bottom, clampedClimbEndProgressPixels)
 
                         canvas.withClip(clipRect){
                             canvas.withClip(filledPath) {
@@ -308,6 +308,11 @@ class VerticalRouteGraphDataType(
                                 }
                             }
                         }
+
+                        val climbGain = distanceToString(climb.totalGain(viewModel.sampledElevationData).toFloat(), userProfile, true)
+                        val climbLength = distanceToString(climb.length, userProfile, false)
+
+                        textDrawCommands.add(TextDrawCommand(graphBounds.right + 75, climbStartProgressPixels + 15f, "⛰ $climbGain, $climbLength", textPaint, climb.category.importance))
                     }
                 }
 
@@ -331,9 +336,6 @@ class VerticalRouteGraphDataType(
                 }
 
                 if (viewModel.poiDistances != null && viewModel.routeDistance != null){
-                    var nextTextPos = 0f
-
-                    val textDrawCommands = mutableListOf<() -> Unit>()
                     viewModel.poiDistances.entries.flatMap { (poi, distances) ->
                         distances.map { poi to it }.filter { it.second.distanceFromRouteStart in viewRange }
                     }.sortedBy { (_, distance) ->
@@ -346,12 +348,7 @@ class VerticalRouteGraphDataType(
                         canvas.drawLine(graphBounds.left, progressPixels, config.viewSize.first.toFloat(), progressPixels, backgroundStrokePaintDashed)
                         canvas.drawLine(graphBounds.left, progressPixels, config.viewSize.first.toFloat(), progressPixels, poiLinePaintDashed)
 
-                        val minTextPos = maxOf(30f, nextTextPos)
-                        val textPosY = (progressPixels + 15f).coerceAtLeast(minTextPos)
-
-                        textDrawCommands.add {
-                            canvas.drawText(text, graphBounds.right + 75, textPosY, textPaintBold)
-                        }
+                        textDrawCommands.add(TextDrawCommand(graphBounds.right + 75, progressPixels + 15f, text, textPaintBold, 11))
 
                         if (viewModel.distanceAlongRoute != null && nearestPoint.distanceFromRouteStart > viewModel.distanceAlongRoute){
                             val distanceMeters = nearestPoint.distanceFromRouteStart - viewModel.distanceAlongRoute
@@ -362,12 +359,7 @@ class VerticalRouteGraphDataType(
                                 distanceStr += " ${distanceToString(elevationMetersRemaining.toFloat(), userProfile, true)}"
                             }
 
-                            textDrawCommands.add {
-                                canvas.drawText(distanceStr, graphBounds.right + 75, textPosY + 30f, textPaint)
-                            }
-                            nextTextPos = textPosY + 70f
-                        } else {
-                            nextTextPos = textPosY + 40f
+                            textDrawCommands.add(TextDrawCommand(graphBounds.right + 75, progressPixels + 15f, distanceStr, textPaint, 11))
                         }
                     }
 
@@ -376,11 +368,30 @@ class VerticalRouteGraphDataType(
                         config.viewSize.first.toFloat(), config.viewSize.second.toFloat(),
                         backgroundFillPaintInv
                     )
-
-                    textDrawCommands.forEach { it() }
                 }
 
-                // Ticks on progress (Y) axis
+                val occupiedRanges = mutableListOf<ClosedFloatingPointRange<Float>>()
+                val textHeight = 40f
+
+                textDrawCommands
+                    .filter { it.y < config.viewSize.second }
+                    .sortedWith(compareByDescending<TextDrawCommand> { it.importance }.thenBy { it.y })
+                    .forEach { cmd ->
+                        var currentY = cmd.y
+                        // While there is an overlap and text still fits, shift text down.
+                        while (occupiedRanges.any { range -> currentY < range.endInclusive && (currentY + textHeight) > range.start }
+                            && currentY + textHeight < config.viewSize.second) {
+                            val maxConflictEnd = occupiedRanges
+                                .filter { range -> currentY < range.endInclusive && (currentY + textHeight) > range.start }
+                                .maxOf { it.endInclusive }
+                            currentY = maxConflictEnd
+                        }
+                        if (currentY + textHeight <= config.viewSize.second) {
+                            canvas.drawText(cmd.text, cmd.x, currentY, cmd.paint)
+                            occupiedRanges.add(currentY..(currentY + textHeight))
+                        }
+                    }
+
                 val unitFactor = if (!viewModel.isImperial) 1000.0f else 1609.344f
                 val ticks = if (config.gridSize.first == 60) 5 else 2
                 val tickInterval = (viewDistanceEnd - viewDistanceStart) / ticks
@@ -411,6 +422,7 @@ class VerticalRouteGraphDataType(
 
                 val result = glance.compose(context, DpSize.Unspecified) {
                     Box(modifier = GlanceModifier.fillMaxSize().clickable(actionRunCallback(ChangeZoomLevelAction::class.java))) {
+                        Image(ImageProvider(bitmap), "Route Graph", modifier = GlanceModifier.fillMaxSize())
                         Image(ImageProvider(bitmap), "Route Graph", modifier = GlanceModifier.fillMaxSize())
                     }
                 }
@@ -447,3 +459,4 @@ class VerticalRouteGraphDataType(
         }
     }
 }
+

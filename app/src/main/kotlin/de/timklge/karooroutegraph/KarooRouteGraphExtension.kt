@@ -142,18 +142,17 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
                     if (viewModel.sampledElevationData != null) {
                         Log.d(TAG, "Range: $startDistance - $endDistance")
-                    val steps = ((mapDiagonal / 8.0) / viewModel.sampledElevationData.interval).roundToInt().coerceIn(1, 100)
+                        val steps = ((mapDiagonal / 8.0) / viewModel.sampledElevationData.interval).roundToInt().coerceIn(1, 100)
 
-                        currentSymbols = viewModel.sampledElevationData.getGradientIndicators(
-                            steps) { distance ->
-                        val targetPosition = TurfMeasurement.along(
-                            viewModel.knownRoute!!,
-                            distance.toDouble(),
-                            TurfConstants.UNIT_METERS
-                        )
+                        currentSymbols = viewModel.sampledElevationData.getGradientIndicators(steps) { distance ->
+                            val targetPosition = TurfMeasurement.along(
+                                viewModel.knownRoute!!,
+                                distance.toDouble(),
+                                TurfConstants.UNIT_METERS
+                            )
 
-                        boundingBox.contains(targetPosition.latitude(), targetPosition.longitude())
-                    }.toMutableSet()
+                            boundingBox.contains(targetPosition.latitude(), targetPosition.longitude())
+                        }.toMutableSet()
                     } else {
                         currentSymbols = mutableSetOf()
                     }

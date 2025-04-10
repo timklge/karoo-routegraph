@@ -218,7 +218,7 @@ class RouteGraphDataType(
                 }
 
                 if (viewModel.sampledElevationData == null) {
-                    emitter.onNext(ShowCustomStreamState("No elevation data downloaded", if (isNightMode()) Color.WHITE else Color.BLACK))
+                    emitter.onNext(ShowCustomStreamState("No elevation data downloaded. Retrying...", if (isNightMode()) Color.WHITE else Color.BLACK))
                     Log.d(TAG, "Not drawing route graph: No route loaded")
                     emitter.updateView(glance.compose(context, DpSize.Unspecified) { Box(modifier = GlanceModifier.fillMaxSize()){} }.remoteViews)
                     return@collect
