@@ -4,7 +4,7 @@
 [![GitHub Downloads (specific asset, all releases)](https://img.shields.io/github/downloads/timklge/karoo-routegraph/app-release.apk)](https://github.com/timklge/karoo-routegraph/releases)
 [![GitHub License](https://img.shields.io/github/license/timklge/karoo-routegraph)](https://github.com/timklge/karoo-routegraph/blob/master/LICENSE)
 
-This extension for Karoo devices adds a graphical data field showing a graph of the current route,
+This extension for Karoo devices adds a graphical data field showing the elevation profile of the current route,
 including route-specific POIs that you have set up, global POIs and climbs.
 
 Please note that currently, this app requires an active internet connection to fetch elevation data, which
