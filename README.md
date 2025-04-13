@@ -5,7 +5,7 @@
 [![GitHub License](https://img.shields.io/github/license/timklge/karoo-routegraph)](https://github.com/timklge/karoo-routegraph/blob/master/LICENSE)
 
 This extension for Karoo devices adds a graphical data field showing a graph of the current route,
-including POIs / checkpoints / refueling stops.
+including route-specific POIs that you have set up, global POIs and climbs.
 
 Please note that currently, this app requires an active internet connection to fetch elevation data, which
 is downloaded from [valhalla1.openstreetmap.de](https://valhalla1.openstreetmap.de). This is a public API
