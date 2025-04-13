@@ -156,6 +156,7 @@ fun MainScreen(onFinish: () -> Unit) {
             confirmButton = { Button(onClick = {
                 coroutineScope.launch {
                     saveSettings(ctx, RouteGraphSettings(
+                        showGradientIndicatorsOnMap = showGradientIndicatorsOnMap,
                         welcomeDialogAccepted = true
                     ))
                 }
@@ -170,7 +171,7 @@ fun MainScreen(onFinish: () -> Unit) {
 
                     Spacer(Modifier.padding(10.dp))
 
-                    Text("Please note that this currently, this app will download elevation profiles from a public API hosted by german FOSSGIS e. V.")
+                    Text("Please note that currently, this app will download elevation profiles from a public API hosted by german FOSSGIS e. V.")
                 }
             }
         )

@@ -204,7 +204,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                                 orientation = 0.0f
                             )
                         }
-    emitter.onNext(ShowSymbols(icons))
+                        emitter.onNext(ShowSymbols(icons))
                 }
 
                     lastDrawnSymbols = currentSymbols
