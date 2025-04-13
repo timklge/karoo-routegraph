@@ -42,8 +42,8 @@ elevation profile data field of the Karoo, but adds markers for route-specific a
 between the full route and the upcoming 2km, 20km, 50km and 100km of the route.
 - Vertical Route Graph (see second screenshot): Similar to the route graph, but flipped so that the vertical axis depicts the route distance. The name of POIs, the remaining distance and elevation
 to them as well as climb lengths and total climb elevations are shown next to the elevation profile.
-- Distance to POI: Shows the distance to the next POI / checkpoint / refueling stop along the route. Note that this is the distance along the route and not the straight-line distance.
-- Elevation to POI: Shows the remaining climbing to the next POI / checkpoint / refueling stop along the route. Note that this is the elevation along the route and not the straight-line elevation.
+- Distance to POI: Shows the distance to the next POI along the route. Note that this is the distance along the route and not the straight-line distance.
+- Elevation to POI: Shows the remaining climbing to the next POI along the route. Note that this is the elevation along the route and not the straight-line elevation.
 
 ## Open issues
 
