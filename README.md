@@ -49,7 +49,6 @@ to them as well as climb lengths and total climb elevations are shown next to th
 
 - Because karoo extensions can currently not access the route elevation data directly, once you load a route, the extension will attempt 
 to fetch the elevation profile from the Valhalla API hosted by FOSSGIS e. V. Your karoo thus needs an active internet connection.
-- Indicated climbs currently do not match the climbs identified by the Karoo itself.
 - Because karoo extensions can currently not access the climb segments identified by the Karoo, the extension will
 try to identify climbs using an alternate algorithm, so they will not perfectly match up with the Karoo Climber feature.
 - "Show gradient indicators on the map" feature is not available yet.
