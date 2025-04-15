@@ -15,7 +15,6 @@ import androidx.core.graphics.withClip
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
-import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
 import androidx.glance.appwidget.GlanceRemoteViews
@@ -32,6 +31,7 @@ import de.timklge.karooroutegraph.RouteGraphViewModel
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.SparseElevationData
 import de.timklge.karooroutegraph.ZoomLevel
+import de.timklge.karooroutegraph.getInclineIndicator
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.DataTypeImpl
 import io.hammerhead.karooext.internal.ViewEmitter
@@ -42,7 +42,6 @@ import io.hammerhead.karooext.models.ViewConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
@@ -272,31 +271,59 @@ class RouteGraphDataType(
                 filledPath.lineTo(firstPixelFromLeft, graphBounds.bottom)
                 filledPath.close()
 
-                if (viewModel.climbs != null){
-                    // Sort climbs so that harder climbs will be drawn on top if they overlap
-                    val climbsSortedByCategory = viewModel.climbs.sortedByDescending { it.category.number }
+                if (displayViewModel.zoomLevel != ZoomLevel.TWO_UNITS){
+                    if (viewModel.climbs != null){
+                        // Sort climbs so that harder climbs will be drawn on top if they overlap
+                        val climbsSortedByCategory = viewModel.climbs.sortedByDescending { it.category.number }
 
-                    climbsSortedByCategory.forEach { climb ->
-                        var climbStartPixelsFromLeft = remap(climb.startDistance, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
-                        var climbEndPixelsFromLeft = remap(climb.endDistance, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
+                        climbsSortedByCategory.forEach { climb ->
+                            var climbStartPixelsFromLeft = remap(climb.startDistance, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
+                            var climbEndPixelsFromLeft = remap(climb.endDistance, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
 
-                        if (climbEndPixelsFromLeft > climbStartPixelsFromLeft){
-                            while(climbEndPixelsFromLeft - climbStartPixelsFromLeft < 6){
-                                climbStartPixelsFromLeft -= 1
-                                climbEndPixelsFromLeft += 1
+                            if (climbEndPixelsFromLeft > climbStartPixelsFromLeft){
+                                while(climbEndPixelsFromLeft - climbStartPixelsFromLeft < 6){
+                                    climbStartPixelsFromLeft -= 1
+                                    climbEndPixelsFromLeft += 1
+                                }
+                            }
+
+                            climbStartPixelsFromLeft = climbStartPixelsFromLeft.coerceIn(graphBounds.left, graphBounds.right)
+                            climbEndPixelsFromLeft = climbEndPixelsFromLeft.coerceIn(graphBounds.left, graphBounds.right)
+
+                            val clipRect = RectF(climbStartPixelsFromLeft, graphBounds.top, climbEndPixelsFromLeft, graphBounds.bottom)
+
+                            canvas.withClip(clipRect){
+                                canvas.withClip(filledPath) {
+                                    categoryPaints[climb.category]?.let { paint ->
+                                        canvas.drawRect(clipRect, paint)
+                                    }
+                                }
                             }
                         }
+                    }
+                } else {
+                    for (i in 0 until viewModel.sampledElevationData.elevations.size-1){
+                        val distance = i * viewModel.sampledElevationData.interval
+                        if (distance !in viewRange) continue
 
-                        climbStartPixelsFromLeft = climbStartPixelsFromLeft.coerceIn(graphBounds.left, graphBounds.right)
-                        climbEndPixelsFromLeft = climbEndPixelsFromLeft.coerceIn(graphBounds.left, graphBounds.right)
+                        val incline = (viewModel.sampledElevationData.elevations[i+1] - viewModel.sampledElevationData.elevations[i]) / viewModel.sampledElevationData.interval
+                        val inclineIndicator = getInclineIndicator(incline * 100) ?: continue
 
-                        val clipRect = RectF(climbStartPixelsFromLeft, graphBounds.top, climbEndPixelsFromLeft, graphBounds.bottom)
+                        val inclineColor = applicationContext.getColor(inclineIndicator)
+
+                        val clipRect = RectF(
+                            remap(distance, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right),
+                            graphBounds.top,
+                            remap(distance + viewModel.sampledElevationData.interval, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right),
+                            graphBounds.bottom
+                        )
 
                         canvas.withClip(clipRect){
                             canvas.withClip(filledPath) {
-                                categoryPaints[climb.category]?.let { paint ->
-                                    canvas.drawRect(clipRect, paint)
-                                }
+                                canvas.drawRect(clipRect, Paint().apply {
+                                    color = inclineColor
+                                    style = Paint.Style.FILL
+                                })
                             }
                         }
                     }

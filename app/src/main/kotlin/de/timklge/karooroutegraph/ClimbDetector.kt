@@ -1,6 +1,7 @@
 import androidx.annotation.ColorRes
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.SampledElevationData
+import kotlin.math.roundToInt
 
 enum class ClimbCategory(
     val minGradient: Float,
@@ -46,6 +47,59 @@ data class Climb(
 
     fun totalGain(sampledElevationData: SampledElevationData): Double {
         return sampledElevationData.getTotalClimb(startDistance, endDistance)
+    }
+
+    fun getAverageIncline(elevationData: SampledElevationData): Double {
+        var totalIncline = 0.0
+        var count = 0
+
+        for(i in 1 until elevationData.elevations.size) {
+            val currentPosition = i * elevationData.interval
+            if (currentPosition in startDistance..endDistance) {
+                val incline = (elevationData.elevations[i] - elevationData.elevations[i-1]) / elevationData.interval
+                totalIncline += incline
+                count++
+            }
+        }
+
+        return if (count > 0) totalIncline / count else 0.0
+    }
+
+    data class MaxIncline(val start: Float, val end: Float, val incline: Int)
+
+    fun getMaxIncline(elevationData: SampledElevationData): MaxIncline {
+        var maxIncline = -100
+        var start = 0f
+        var end = 0f
+
+        // Find indices corresponding to start and end distances
+        val startIdx = maxOf(0, (startDistance / elevationData.interval).toInt())
+        val endIdx = minOf(elevationData.elevations.size - 1, (endDistance / elevationData.interval).toInt())
+
+        // Check all possible segments within the range
+        for (i in startIdx until endIdx) {
+            val iDistance = i * elevationData.interval
+
+            for (j in i + 1..endIdx) {
+                val jDistance = j * elevationData.interval
+                val distance = jDistance - iDistance
+
+                if (distance > 0) {
+                    val elevationChange = elevationData.elevations[j] - elevationData.elevations[i]
+                    val incline = (elevationChange / distance * 100).roundToInt()
+
+                    if (incline > maxIncline) {
+                        maxIncline = incline
+                        start = iDistance
+                        end = jDistance
+                    } else if (distance > end - start){
+                        break
+                    }
+                }
+            }
+        }
+
+        return MaxIncline(start, end, maxIncline)
     }
 }
 

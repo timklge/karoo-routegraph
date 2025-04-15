@@ -20,10 +20,8 @@ import androidx.glance.action.clickable
 import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
 import androidx.glance.appwidget.GlanceRemoteViews
 import androidx.glance.appwidget.action.actionRunCallback
-import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
-import androidx.glance.text.Text
 import de.timklge.karooroutegraph.ChangeZoomLevelAction
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.NearestPoint
@@ -35,6 +33,7 @@ import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.SparseElevationData
 import de.timklge.karooroutegraph.ZoomLevel
 import de.timklge.karooroutegraph.distanceToString
+import de.timklge.karooroutegraph.getInclineIndicator
 import de.timklge.karooroutegraph.streamUserProfile
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.DataTypeImpl
@@ -301,10 +300,12 @@ class VerticalRouteGraphDataType(
 
                         val clipRect = RectF(graphBounds.left, clampedClimbStartProgressPixels, graphBounds.bottom, clampedClimbEndProgressPixels)
 
-                        canvas.withClip(clipRect){
-                            canvas.withClip(filledPath) {
-                                categoryPaints[climb.category]?.let { paint ->
-                                    canvas.drawRect(clipRect, paint)
+                        if (displayViewModel.zoomLevel != ZoomLevel.TWO_UNITS) {
+                            canvas.withClip(clipRect) {
+                                canvas.withClip(filledPath) {
+                                    categoryPaints[climb.category]?.let { paint ->
+                                        canvas.drawRect(clipRect, paint)
+                                    }
                                 }
                             }
                         }
@@ -312,7 +313,40 @@ class VerticalRouteGraphDataType(
                         val climbGain = distanceToString(climb.totalGain(viewModel.sampledElevationData).toFloat(), userProfile, true)
                         val climbLength = distanceToString(climb.length, userProfile, false)
 
+                        val climbAverageIncline = climb.getAverageIncline(viewModel.sampledElevationData)
+                        val climbMaxIncline = climb.getMaxIncline(viewModel.sampledElevationData)
+                        val climbMaxInclineLength = distanceToString(climbMaxIncline.end - climbMaxIncline.start, userProfile, false)
+
                         textDrawCommands.add(TextDrawCommand(graphBounds.right + 75, climbStartProgressPixels + 15f, "⛰ $climbGain, $climbLength", textPaint, climb.category.importance))
+                        textDrawCommands.add(TextDrawCommand(graphBounds.right + 75, climbStartProgressPixels + 16f, "⌀ ${climbAverageIncline}; Max ${climbMaxIncline.incline}% ${climbMaxInclineLength}", textPaint, climb.category.importance))
+                    }
+                }
+
+                if (displayViewModel.zoomLevel == ZoomLevel.TWO_UNITS) {
+                    for (i in 0 until viewModel.sampledElevationData.elevations.size-1){
+                        val distance = i * viewModel.sampledElevationData.interval
+                        if (distance !in viewRange) continue
+
+                        val incline = (viewModel.sampledElevationData.elevations[i+1] - viewModel.sampledElevationData.elevations[i]) / viewModel.sampledElevationData.interval
+                        val inclineIndicator = getInclineIndicator(incline * 100) ?: continue
+
+                        val inclineColor = applicationContext.getColor(inclineIndicator)
+
+                        val clipRect = RectF(
+                            graphBounds.left,
+                            remap(distance, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom),
+                            graphBounds.right,
+                            remap(distance + viewModel.sampledElevationData.interval, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom),
+                        )
+
+                        canvas.withClip(clipRect){
+                            canvas.withClip(filledPath) {
+                                canvas.drawRect(clipRect, Paint().apply {
+                                    color = inclineColor
+                                    style = Paint.Style.FILL
+                                })
+                            }
+                        }
                     }
                 }
 
