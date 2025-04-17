@@ -32,6 +32,7 @@ import de.timklge.karooroutegraph.RouteGraphViewModel
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.SparseElevationData
 import de.timklge.karooroutegraph.ZoomLevel
+import de.timklge.karooroutegraph.distanceIsZero
 import de.timklge.karooroutegraph.distanceToString
 import de.timklge.karooroutegraph.streamUserProfile
 import io.hammerhead.karooext.KarooSystemService
@@ -348,8 +349,8 @@ class VerticalRouteGraphDataType(
                             var distanceStr = "In ${distanceToString(distanceMeters, userProfile, false)}"
 
                             val elevationMetersRemaining = viewModel.sampledElevationData?.getTotalClimb(viewModel.distanceAlongRoute, nearestPoint.distanceFromRouteStart)
-                            if (elevationMetersRemaining != null && elevationMetersRemaining > 0) {
-                                distanceStr += " ${distanceToString(elevationMetersRemaining.toFloat(), userProfile, true)}"
+                            if (elevationMetersRemaining != null && !distanceIsZero(elevationMetersRemaining.toFloat(), userProfile)) {
+                                distanceStr += " ↗ ${distanceToString(elevationMetersRemaining.toFloat(), userProfile, true)}"
                             }
 
                             textDrawCommands.add(TextDrawCommand(graphBounds.right + 75, progressPixels + 15f, distanceStr, textPaint, 11))
