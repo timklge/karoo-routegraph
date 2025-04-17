@@ -70,3 +70,13 @@ fun distanceToString(distanceMeters: Float, userProfile: UserProfile, onlyMinorU
         }
     }
 }
+
+fun distanceIsZero(distanceMeters: Float, userProfile: UserProfile): Boolean {
+    return if (userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL){
+        val distanceMiles = distanceMeters / 1609.344f
+        (distanceMiles * 5280).toInt() == 0
+    } else {
+        val distanceKm = distanceMeters / 1000f
+        (distanceKm * 1000).toInt() == 0
+    }
+}

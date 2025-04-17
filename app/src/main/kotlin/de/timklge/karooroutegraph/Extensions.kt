@@ -18,8 +18,6 @@ fun<T> Flow<T>.throttle(timeout: Long): Flow<T> = flow {
     }
 }
 
-data class GpsCoordinates(val lat: Double, val lon: Double)
-
 @Serializable
 data class HeightResponse(
     @SerialName("encoded_polyline") val encodedPolyline: String,
