@@ -421,8 +421,11 @@ class VerticalRouteGraphDataType(
                 }
 
                 val result = glance.compose(context, DpSize.Unspecified) {
-                    Box(modifier = GlanceModifier.fillMaxSize().clickable(actionRunCallback(ChangeZoomLevelAction::class.java))) {
-                        Image(ImageProvider(bitmap), "Route Graph", modifier = GlanceModifier.fillMaxSize())
+                    var modifier = GlanceModifier.fillMaxSize()
+
+                    if (!config.preview) modifier = modifier.clickable(onClick = actionRunCallback<ChangeZoomLevelAction>())
+
+                    Box(modifier = modifier) {
                         Image(ImageProvider(bitmap), "Route Graph", modifier = GlanceModifier.fillMaxSize())
                     }
                 }
