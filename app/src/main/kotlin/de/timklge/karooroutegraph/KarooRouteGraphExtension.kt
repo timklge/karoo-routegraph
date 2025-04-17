@@ -101,8 +101,9 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         }
     }
 
+    private var lastDrawnSymbols = mutableSetOf<GradientIndicator>()
+
     override fun startMap(emitter: Emitter<MapEffect>) {
-        var lastDrawnSymbols = mutableSetOf<GradientIndicator>()
         var currentSymbols: MutableSet<GradientIndicator>
 
         Log.d(TAG, "Starting map effect")
@@ -167,7 +168,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     if (currentSymbols.isNotEmpty()) {
                         Log.d(TAG, "Drawing symbols: $currentSymbols")
 
-                    val icons =currentSymbols.mapNotNull { inclindeIndicator ->
+                    val icons = currentSymbols.mapNotNull { inclindeIndicator ->
                             val knownRoute = viewModel.knownRoute ?: return@mapNotNull null
 
                             val position = TurfMeasurement.along(
