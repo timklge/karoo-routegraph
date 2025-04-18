@@ -216,128 +216,123 @@ class RouteGraphDataType(
                     return@collect
                 }
 
-                if (viewModel.sampledElevationData == null) {
-                    emitter.onNext(ShowCustomStreamState("No elevation data downloaded. Retrying...", if (isNightMode()) Color.WHITE else Color.BLACK))
-                    Log.d(TAG, "Not drawing route graph: No route loaded")
-                    emitter.updateView(glance.compose(context, DpSize.Unspecified) { Box(modifier = GlanceModifier.fillMaxSize()){} }.remoteViews)
-                    return@collect
-                }
-
                 emitter.onNext(ShowCustomStreamState("", null))
 
-                Log.d(TAG, "Drawing route graph with ${viewModel.routeDistance} and ${viewModel.sampledElevationData.elevations.size} elevation points, min $minElevation, max $maxElevation")
+                Log.d(TAG, "Drawing route graph with ${viewModel.routeDistance} and ${viewModel.sampledElevationData?.elevations?.size} elevation points, min $minElevation, max $maxElevation")
 
                 var lastPixelFromLeft = 0.0f
                 var firstPixelFromLeft = 0.0f
                 var previousDrawnPixelsFromLeft = 0.0f
                 var firstPixelsFromTop: Float? = null
 
-                val elevationProfilePath = Path().apply {
-                    for (i in 1 until viewModel.sampledElevationData.elevations.size){
-                        val previousDistance = (i - 1) * viewModel.sampledElevationData.interval
-                        val distance = i * viewModel.sampledElevationData.interval
-                        if (distance !in viewRange) continue;
+                if (viewModel.sampledElevationData != null){
+                    val elevationProfilePath = Path().apply {
+                        for (i in 1 until viewModel.sampledElevationData.elevations.size){
+                            val previousDistance = (i - 1) * viewModel.sampledElevationData.interval
+                            val distance = i * viewModel.sampledElevationData.interval
+                            if (distance !in viewRange) continue;
 
-                        val pixelsFromLeft = remap(distance, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
+                            val pixelsFromLeft = remap(distance, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
 
-                        val elevation = viewModel.sampledElevationData.elevations[i]
+                            val elevation = viewModel.sampledElevationData.elevations[i]
 
-                        val pixelsFromTop = remap(elevation, maxElevation, minElevation, graphBounds.top, graphBounds.bottom)
+                            val pixelsFromTop = remap(elevation, maxElevation, minElevation, graphBounds.top, graphBounds.bottom)
 
-                        if (firstPixelsFromTop == null){
-                            val previousPixelsFromLeft = remap(previousDistance, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
-                            val previousElevation = viewModel.sampledElevationData.elevations[i - 1]
-                            val previousPixelsFromTop = remap(previousElevation, maxElevation, minElevation, graphBounds.top, graphBounds.bottom)
+                            if (firstPixelsFromTop == null){
+                                val previousPixelsFromLeft = remap(previousDistance, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
+                                val previousElevation = viewModel.sampledElevationData.elevations[i - 1]
+                                val previousPixelsFromTop = remap(previousElevation, maxElevation, minElevation, graphBounds.top, graphBounds.bottom)
 
-                            moveTo(previousPixelsFromLeft, previousPixelsFromTop)
-                            firstPixelFromLeft = previousPixelsFromLeft
-                            firstPixelsFromTop = previousPixelsFromTop
-                            previousDrawnPixelsFromLeft = pixelsFromLeft
-                        }
-
-                        if (pixelsFromLeft - previousDrawnPixelsFromLeft > 3){
-                            lineTo(previousDrawnPixelsFromLeft, pixelsFromTop)
-                            previousDrawnPixelsFromLeft = pixelsFromLeft
-                        }
-
-                        lastPixelFromLeft = pixelsFromLeft
-                    }
-                }
-
-                canvas.drawPath(elevationProfilePath, pastLinePaint)
-
-                val filledPath = Path(elevationProfilePath)
-                filledPath.lineTo(lastPixelFromLeft, graphBounds.bottom)
-                filledPath.lineTo(firstPixelFromLeft, graphBounds.bottom)
-                filledPath.close()
-
-                if (displayViewModel.zoomLevel != ZoomLevel.TWO_UNITS){
-                    if (viewModel.climbs != null){
-                        // Sort climbs so that harder climbs will be drawn on top if they overlap
-                        val climbsSortedByCategory = viewModel.climbs.sortedByDescending { it.category.number }
-
-                        climbsSortedByCategory.forEach { climb ->
-                            var climbStartPixelsFromLeft = remap(climb.startDistance, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
-                            var climbEndPixelsFromLeft = remap(climb.endDistance, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
-
-                            if (climbEndPixelsFromLeft > climbStartPixelsFromLeft){
-                                while(climbEndPixelsFromLeft - climbStartPixelsFromLeft < 6){
-                                    climbStartPixelsFromLeft -= 1
-                                    climbEndPixelsFromLeft += 1
-                                }
+                                moveTo(previousPixelsFromLeft, previousPixelsFromTop)
+                                firstPixelFromLeft = previousPixelsFromLeft
+                                firstPixelsFromTop = previousPixelsFromTop
+                                previousDrawnPixelsFromLeft = pixelsFromLeft
                             }
 
-                            climbStartPixelsFromLeft = climbStartPixelsFromLeft.coerceIn(graphBounds.left, graphBounds.right)
-                            climbEndPixelsFromLeft = climbEndPixelsFromLeft.coerceIn(graphBounds.left, graphBounds.right)
+                            if (pixelsFromLeft - previousDrawnPixelsFromLeft > 3){
+                                lineTo(previousDrawnPixelsFromLeft, pixelsFromTop)
+                                previousDrawnPixelsFromLeft = pixelsFromLeft
+                            }
 
-                            val clipRect = RectF(climbStartPixelsFromLeft, graphBounds.top, climbEndPixelsFromLeft, graphBounds.bottom)
+                            lastPixelFromLeft = pixelsFromLeft
+                        }
+                    }
 
-                            canvas.withClip(clipRect){
-                                canvas.withClip(filledPath) {
-                                    categoryPaints[climb.category]?.let { paint ->
-                                        canvas.drawRect(clipRect, paint)
+                    canvas.drawPath(elevationProfilePath, pastLinePaint)
+
+                    val filledPath = Path(elevationProfilePath)
+                    filledPath.lineTo(lastPixelFromLeft, graphBounds.bottom)
+                    filledPath.lineTo(firstPixelFromLeft, graphBounds.bottom)
+                    filledPath.close()
+
+                    if (displayViewModel.zoomLevel != ZoomLevel.TWO_UNITS){
+                        if (viewModel.climbs != null){
+                            // Sort climbs so that harder climbs will be drawn on top if they overlap
+                            val climbsSortedByCategory = viewModel.climbs.sortedByDescending { it.category.number }
+
+                            climbsSortedByCategory.forEach { climb ->
+                                var climbStartPixelsFromLeft = remap(climb.startDistance, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
+                                var climbEndPixelsFromLeft = remap(climb.endDistance, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
+
+                                if (climbEndPixelsFromLeft > climbStartPixelsFromLeft){
+                                    while(climbEndPixelsFromLeft - climbStartPixelsFromLeft < 6){
+                                        climbStartPixelsFromLeft -= 1
+                                        climbEndPixelsFromLeft += 1
+                                    }
+                                }
+
+                                climbStartPixelsFromLeft = climbStartPixelsFromLeft.coerceIn(graphBounds.left, graphBounds.right)
+                                climbEndPixelsFromLeft = climbEndPixelsFromLeft.coerceIn(graphBounds.left, graphBounds.right)
+
+                                val clipRect = RectF(climbStartPixelsFromLeft, graphBounds.top, climbEndPixelsFromLeft, graphBounds.bottom)
+
+                                canvas.withClip(clipRect){
+                                    canvas.withClip(filledPath) {
+                                        categoryPaints[climb.category]?.let { paint ->
+                                            canvas.drawRect(clipRect, paint)
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                } else {
-                    for (i in 0 until viewModel.sampledElevationData.elevations.size-1){
-                        val distance = i * viewModel.sampledElevationData.interval
-                        if (distance !in viewRange) continue
+                    } else {
+                        for (i in 0 until viewModel.sampledElevationData.elevations.size-1){
+                            val distance = i * viewModel.sampledElevationData.interval
+                            if (distance !in viewRange) continue
 
-                        val incline = (viewModel.sampledElevationData.elevations[i+1] - viewModel.sampledElevationData.elevations[i]) / viewModel.sampledElevationData.interval
-                        val inclineIndicator = getInclineIndicator(incline * 100) ?: continue
+                            val incline = (viewModel.sampledElevationData.elevations[i+1] - viewModel.sampledElevationData.elevations[i]) / viewModel.sampledElevationData.interval
+                            val inclineIndicator = getInclineIndicator(incline * 100) ?: continue
 
-                        val inclineColor = applicationContext.getColor(inclineIndicator)
+                            val inclineColor = applicationContext.getColor(inclineIndicator)
 
-                        val clipRect = RectF(
-                            remap(distance, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right),
-                            graphBounds.top,
-                            remap(distance + viewModel.sampledElevationData.interval, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right),
-                            graphBounds.bottom
-                        )
+                            val clipRect = RectF(
+                                remap(distance, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right),
+                                graphBounds.top,
+                                remap(distance + viewModel.sampledElevationData.interval, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right),
+                                graphBounds.bottom
+                            )
 
-                        canvas.withClip(clipRect){
-                            canvas.withClip(filledPath) {
-                                canvas.drawRect(clipRect, Paint().apply {
-                                    color = inclineColor
-                                    style = Paint.Style.FILL
-                                })
+                            canvas.withClip(clipRect){
+                                canvas.withClip(filledPath) {
+                                    canvas.drawRect(clipRect, Paint().apply {
+                                        color = inclineColor
+                                        style = Paint.Style.FILL
+                                    })
+                                }
                             }
                         }
                     }
-                }
 
-                if (viewModel.distanceAlongRoute != null){
-                    val distanceAlongRoutePixelsFromLeft = remap(viewModel.distanceAlongRoute, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
+                    if (viewModel.distanceAlongRoute != null){
+                        val distanceAlongRoutePixelsFromLeft = remap(viewModel.distanceAlongRoute, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
 
-                    canvas.withClip(0f, 0f, distanceAlongRoutePixelsFromLeft, config.viewSize.second.toFloat()){
-                        canvas.withClip(filledPath) {
-                            canvas.drawRect(graphBounds, elevationFillPaint)
+                        canvas.withClip(0f, 0f, distanceAlongRoutePixelsFromLeft, config.viewSize.second.toFloat()){
+                            canvas.withClip(filledPath) {
+                                canvas.drawRect(graphBounds, elevationFillPaint)
+                            }
+
+                            canvas.drawPath(elevationProfilePath, upcomingLinePaint)
                         }
-
-                        canvas.drawPath(elevationProfilePath, upcomingLinePaint)
                     }
                 }
 
@@ -477,7 +472,11 @@ class RouteGraphDataType(
                 }
 
                 val result = glance.compose(context, DpSize.Unspecified) {
-                    Box(modifier = GlanceModifier.fillMaxSize().clickable(actionRunCallback(ChangeZoomLevelAction::class.java))){
+                    var modifier = GlanceModifier.fillMaxSize()
+
+                    if (!config.preview) modifier = modifier.clickable(onClick = actionRunCallback<ChangeZoomLevelAction>())
+
+                    Box(modifier = modifier){
                         Image(ImageProvider(bitmap), "Route Graph", modifier = GlanceModifier.fillMaxSize())
                     }
                 }

@@ -6,10 +6,10 @@ import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
 import com.mapbox.turf.TurfConstants
 import com.mapbox.turf.TurfMeasurement
-import de.timklge.karooroutegraph.datatypes.VerticalRouteGraphDataType
 import de.timklge.karooroutegraph.datatypes.DistanceToNextPOIDataType
 import de.timklge.karooroutegraph.datatypes.ElevationToNextPOIDataType
 import de.timklge.karooroutegraph.datatypes.RouteGraphDataType
+import de.timklge.karooroutegraph.datatypes.VerticalRouteGraphDataType
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import identifyClimbs
 import io.hammerhead.karooext.extension.KarooExtension
@@ -41,7 +41,7 @@ import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import kotlin.math.pow
 import kotlin.math.roundToInt
-import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 class GradientIndicator(val id: String, val distance: Float, val gradientPercent: Float, @DrawableRes val drawableRes: Int){
     override fun equals(other: Any?): Boolean {
@@ -101,8 +101,9 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         }
     }
 
+    private var lastDrawnSymbols = mutableSetOf<GradientIndicator>()
+
     override fun startMap(emitter: Emitter<MapEffect>) {
-        var lastDrawnSymbols = mutableSetOf<GradientIndicator>()
         var currentSymbols: MutableSet<GradientIndicator>
 
         Log.d(TAG, "Starting map effect")
@@ -167,7 +168,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     if (currentSymbols.isNotEmpty()) {
                         Log.d(TAG, "Drawing symbols: $currentSymbols")
 
-                    val icons =currentSymbols.mapNotNull { inclindeIndicator ->
+                    val icons = currentSymbols.mapNotNull { inclindeIndicator ->
                             val knownRoute = viewModel.knownRoute ?: return@mapNotNull null
 
                             val position = TurfMeasurement.along(
@@ -269,7 +270,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
             .transformLatest { value ->
                 while(true){
                     emit(value)
-                    delay(1.minutes)
+                    delay(30.seconds)
                 }
             }
             .collect { (navigationStateEvent, userProfile, globalPOIs, locationAndRemainingRouteDistance) ->
