@@ -84,22 +84,26 @@ data class Climb(
                 val jDistance = j * elevationData.interval
                 val distance = jDistance - iDistance
 
-                if (distance > 0) {
-                    val elevationChange = elevationData.elevations[j] - elevationData.elevations[i]
-                    val incline = (elevationChange / distance * 100).roundToInt()
+                val elevationChange = elevationData.elevations[j] - elevationData.elevations[i]
+                val incline = ((elevationChange / distance * 100) / 5.0).toInt() * 5
 
-                    if (incline > maxIncline) {
-                        maxIncline = incline
-                        start = iDistance
-                        end = jDistance
-                    } else if (distance > end - start){
-                        break
-                    }
+                if (incline >= maxIncline) {
+                    maxIncline = incline
+                    start = iDistance
+                    end = jDistance
+                } else {
+                    break
                 }
             }
         }
 
-        return MaxIncline(start, end, maxIncline)
+        val avgMaxIncline = if (end - start > 0) {
+            (elevationData.getTotalClimb(start, end) / (end - start) * 100).roundToInt()
+        } else {
+            maxIncline
+        }
+
+        return MaxIncline(start, end, avgMaxIncline)
     }
 }
 
