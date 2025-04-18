@@ -1,20 +1,17 @@
 package de.timklge.karooroutegraph
 
 import android.util.Log
+import androidx.annotation.ColorRes
 import androidx.annotation.DrawableRes
 import com.mapbox.geojson.LineString
 import io.hammerhead.karooext.models.HttpResponseState
 import io.hammerhead.karooext.models.OnHttpResponse
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.single
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.util.zip.GZIPInputStream
-import kotlin.math.ceil
-import kotlin.math.floor
 
 @DrawableRes
 fun getInclineIndicator(percent: Float): Int? {
@@ -27,6 +24,21 @@ fun getInclineIndicator(percent: Float): Int? {
         in 10.0f..13.0f -> R.drawable.elevate6
         in 13.0f..16.0f -> R.drawable.elevate7
         in 16.0f..Float.MAX_VALUE -> R.drawable.elevate8
+        else -> null
+    }
+}
+
+@ColorRes
+fun getInclineIndicatorColor(percent: Float): Int? {
+    return when(percent) {
+        in 2.5f..3f -> R.color.elevate0
+        in 3f..3.5f -> R.color.elevate1
+        in 3.5f..5.0f -> R.color.elevate2
+        in 5.0f..7.0f -> R.color.elevate2
+        in 7.0f..10.0f -> R.color.elevate3
+        in 10.0f..13.0f -> R.color.elevate2
+        in 13.0f..16.0f -> R.color.elevate4
+        in 16.0f..Float.MAX_VALUE -> R.color.elevate4
         else -> null
     }
 }

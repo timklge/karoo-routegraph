@@ -31,7 +31,7 @@ import de.timklge.karooroutegraph.RouteGraphViewModel
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.SparseElevationData
 import de.timklge.karooroutegraph.ZoomLevel
-import de.timklge.karooroutegraph.getInclineIndicator
+import de.timklge.karooroutegraph.getInclineIndicatorColor
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.DataTypeImpl
 import io.hammerhead.karooext.internal.ViewEmitter
@@ -301,7 +301,7 @@ class RouteGraphDataType(
                             if (distance !in viewRange) continue
 
                             val incline = (viewModel.sampledElevationData.elevations[i+1] - viewModel.sampledElevationData.elevations[i]) / viewModel.sampledElevationData.interval
-                            val inclineIndicator = getInclineIndicator(incline * 100) ?: continue
+                            val inclineIndicator = getInclineIndicatorColor(incline * 100) ?: continue
 
                             val inclineColor = applicationContext.getColor(inclineIndicator)
 
