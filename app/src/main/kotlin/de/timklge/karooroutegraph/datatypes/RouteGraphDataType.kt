@@ -51,6 +51,7 @@ import java.util.Locale
 import java.util.UUID
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.math.roundToInt
 
 fun remap(value: Float, fromLow: Float, fromHigh: Float, toLow: Float, toHigh: Float): Float {
     return toLow + (value - fromLow) / (fromHigh - fromLow) * (toHigh - toLow)
@@ -306,9 +307,9 @@ class RouteGraphDataType(
                             val inclineColor = applicationContext.getColor(inclineIndicator)
 
                             val clipRect = RectF(
-                                remap(distance, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right),
+                                remap(distance, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right).roundToInt().toFloat(),
                                 graphBounds.top,
-                                remap(distance + viewModel.sampledElevationData.interval, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right),
+                                remap(distance + viewModel.sampledElevationData.interval, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right).roundToInt() + 1f,
                                 graphBounds.bottom
                             )
 
