@@ -1,6 +1,7 @@
 package de.timklge.karooroutegraph
 
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 class SampledElevationData(val interval: Float, val elevations: FloatArray) {
     fun getMinimumElevationInRange(startDistance: Float, endDistance: Float): Float {
@@ -34,7 +35,7 @@ class SampledElevationData(val interval: Float, val elevations: FloatArray) {
 
         for(i in 1..elevations.size) {
             val currentPosition = i * interval
-            if (currentPosition in startDistance..endDistance) {
+            if (currentPosition in startDistance+1..endDistance) {
                 val addedElevation = elevations[i] - elevations[i-1]
                 if (addedElevation > 0) {
                     elevationSum += addedElevation
