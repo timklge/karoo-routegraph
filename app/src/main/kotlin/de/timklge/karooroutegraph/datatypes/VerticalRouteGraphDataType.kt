@@ -34,7 +34,7 @@ import de.timklge.karooroutegraph.SparseElevationData
 import de.timklge.karooroutegraph.ZoomLevel
 import de.timklge.karooroutegraph.distanceIsZero
 import de.timklge.karooroutegraph.distanceToString
-import de.timklge.karooroutegraph.getInclineIndicator
+import de.timklge.karooroutegraph.getInclineIndicatorColor
 import de.timklge.karooroutegraph.streamUserProfile
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.DataTypeImpl
@@ -55,6 +55,7 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalGlanceRemoteViewsApi::class)
 class VerticalRouteGraphDataType(
@@ -229,7 +230,10 @@ class VerticalRouteGraphDataType(
                 var previousDrawnProgressPixels = 0.0f
                 var firstElevationPixels: Float? = null
 
-                data class TextDrawCommand(val x: Float, val y: Float, val text: String, val paint: Paint, val importance: Int = 10)
+                data class TextDrawCommand(val x: Float, val y: Float, val text: String, val paint: Paint, val importance: Int = 10,
+                    /** If set, draws this text over the original text */
+                    val overdrawText: String? = null,
+                    val overdrawPaint: Paint = paint)
 
                 val textDrawCommands = mutableListOf<TextDrawCommand>()
 
@@ -308,12 +312,18 @@ class VerticalRouteGraphDataType(
                         val climbGain = distanceToString(climb.totalGain(viewModel.sampledElevationData).toFloat(), userProfile, true)
                         val climbLength = distanceToString(climb.length, userProfile, false)
 
-                        val climbAverageIncline = climb.getAverageIncline(viewModel.sampledElevationData)
+                        val climbAverageIncline = (climb.getAverageIncline(viewModel.sampledElevationData) * 100).roundToInt()   // String.format(Locale.getDefault(), "%.1f", climb.getAverageIncline(viewModel.sampledElevationData) * 100)
                         val climbMaxIncline = climb.getMaxIncline(viewModel.sampledElevationData)
                         val climbMaxInclineLength = distanceToString(climbMaxIncline.end - climbMaxIncline.start, userProfile, false)
 
-                        textDrawCommands.add(TextDrawCommand(graphBounds.right + 75, climbStartProgressPixels + 15f, "⛰ $climbGain, $climbLength", textPaint, climb.category.importance))
-                        textDrawCommands.add(TextDrawCommand(graphBounds.right + 75, climbStartProgressPixels + 16f, "⌀ ${climbAverageIncline}; Max ${climbMaxIncline.incline}% ${climbMaxInclineLength}", textPaint, climb.category.importance))
+                        if (climb.category.number <= 3){
+                            textDrawCommands.add(TextDrawCommand(graphBounds.right + 75, climbStartProgressPixels + 15f, "⛰ $climbGain, $climbLength", textPaint, climb.category.importance, "⛰", Paint(textPaint).apply {
+                                color = applicationContext.getColor(climb.category.colorRes)
+                            }))
+
+                            val maxInclineString = if (climbMaxIncline.incline > climbAverageIncline) ", ${climbMaxIncline.incline}% $climbMaxInclineLength" else ""
+                            textDrawCommands.add(TextDrawCommand(graphBounds.right + 75, climbStartProgressPixels + 16f, "⌀ ${climbAverageIncline}%${maxInclineString}", textPaint, climb.category.importance))
+                        }
                     }
                 }
 
@@ -323,15 +333,15 @@ class VerticalRouteGraphDataType(
                         if (distance !in viewRange) continue
 
                         val incline = (viewModel.sampledElevationData.elevations[i+1] - viewModel.sampledElevationData.elevations[i]) / viewModel.sampledElevationData.interval
-                        val inclineIndicator = getInclineIndicator(incline * 100) ?: continue
+                        val inclineIndicator = getInclineIndicatorColor(incline * 100) ?: continue
 
                         val inclineColor = applicationContext.getColor(inclineIndicator)
 
                         val clipRect = RectF(
                             graphBounds.left,
-                            remap(distance, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom),
+                            remap(distance, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom).roundToInt().toFloat(),
                             graphBounds.right,
-                            remap(distance + viewModel.sampledElevationData.interval, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom),
+                            remap(distance + viewModel.sampledElevationData.interval, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom).roundToInt() + 1f,
                         )
 
                         canvas.withClip(clipRect){
@@ -418,6 +428,9 @@ class VerticalRouteGraphDataType(
                         }
                         if (currentY + textHeight <= config.viewSize.second) {
                             canvas.drawText(cmd.text, cmd.x, currentY, cmd.paint)
+                            if (cmd.overdrawText != null){
+                                canvas.drawText(cmd.overdrawText, cmd.x, currentY, cmd.overdrawPaint)
+                            }
                             occupiedRanges.add(currentY..(currentY + textHeight))
                         }
                     }
