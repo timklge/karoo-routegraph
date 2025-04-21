@@ -21,6 +21,13 @@
         typeId="verticalroutegraph" />
 
     <DataType
+        description="@string/poilist_description"
+        displayName="@string/poilist"
+        graphical="true"
+        icon="@drawable/trip"
+        typeId="poilist" />
+
+    <DataType
         description="@string/distance_to_poi_description"
         displayName="@string/distance_to_poi"
         graphical="false"

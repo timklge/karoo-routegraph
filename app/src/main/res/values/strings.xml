@@ -9,4 +9,8 @@
     <string name="distance_to_poi_description">Distance to the next POI</string>
     <string name="elevation_to_poi">Elevation to POI</string>
     <string name="elevation_to_poi_description">Elevation to the next POI</string>
+    <string name="routepoilist">Route POI List</string>
+    <string name="routepoilist_description">List of POIs on the route</string>
+    <string name="poilist">POI List</string>
+    <string name="poilist_description">List of POIs sorted by proximity</string>
 </resources>
