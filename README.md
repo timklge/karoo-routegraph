@@ -15,6 +15,7 @@ Compatible with Karoo 2 and Karoo 3 devices.
 
 ![Route Graph](routegraph.png)
 ![Vertical Route Graph](vertical_routegraph.png)
+![Chevrons](chevrons.png)
 
 ## Installation
 
@@ -44,6 +45,8 @@ between the full route and the upcoming 2km, 20km, 50km and 100km of the route.
 to them as well as climb lengths and total climb elevations are shown next to the elevation profile.
 - Distance to POI: Shows the distance to the next POI along the route. Note that this is the distance along the route and not the straight-line distance.
 - Elevation to POI: Shows the remaining climbing to the next POI along the route. Note that this is the elevation along the route and not the straight-line elevation.
+
+Additionally, you can enable chevrons on the map to indicate gradients. The chevrons are drawn on top of the route (see third screenshot).
 
 ## Open issues
 
