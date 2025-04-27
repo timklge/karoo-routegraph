@@ -70,7 +70,7 @@ tasks.register("generateManifest") {
             "latestVersionCode" to android.defaultConfig.versionCode,
             "developer" to "timklge",
             "description" to "Provides an elevation graph datafield showing the complete current route, including climbs and POIs (e. g. checkpoints and refueling stops)",
-            "releaseNotes" to "Initial release",
+            "releaseNotes" to "* Replace gradient indicators with chevrons\n* Fix gradient indicator setting",
         )
 
         val gson = groovy.json.JsonBuilder(manifest).toPrettyString()
