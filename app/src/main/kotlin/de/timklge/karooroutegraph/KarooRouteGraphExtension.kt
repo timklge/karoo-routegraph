@@ -36,6 +36,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.launch
@@ -116,7 +117,6 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
         val gradientIndicatorJob = CoroutineScope(Dispatchers.IO).launch {
             val zoomLevelFlow = karooSystem.stream<OnMapZoomLevel>()
-
             val locationFlow = karooSystem.stream<OnLocationChanged>()
 
             data class StreamData(
@@ -180,18 +180,18 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     if (currentSymbols.isNotEmpty()) {
                         Log.d(TAG, "Drawing symbols: $currentSymbols")
 
-                    val icons = currentSymbols.mapNotNull { inclindeIndicator ->
+                    val icons = currentSymbols.mapNotNull { gradientIndicator ->
                         val knownRoute = viewModel.knownRoute ?: return@mapNotNull null
 
                         val position = TurfMeasurement.along(
                             knownRoute,
-                            inclindeIndicator.distance.toDouble(),
+                            gradientIndicator.distance.toDouble(),
                             TurfConstants.UNIT_METERS
                         )
 
                         val nextPosition = TurfMeasurement.along(
                             viewModel.knownRoute,
-                            inclindeIndicator.distance.toDouble() + 10.0,
+                            gradientIndicator.distance.toDouble() + 10.0,
                             TurfConstants.UNIT_METERS
                         )
 
@@ -201,10 +201,10 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                         )
 
                         Symbol.Icon(
-                            id = inclindeIndicator.id,
+                            id = gradientIndicator.id,
                             lat = position.latitude(),
                             lng = position.longitude(),
-                            iconRes = inclindeIndicator.drawableRes,
+                            iconRes = gradientIndicator.drawableRes,
                             orientation = bearing.toFloat() - (location.orientation ?: 0.0).toFloat(),
                         )
                     }
