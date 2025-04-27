@@ -122,8 +122,8 @@ fun MainScreen(onFinish: () -> Unit) {
 
                     Column(modifier = Modifier.padding(10.dp)){
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Switch(checked = !showGradientIndicatorsOnMap, onCheckedChange = {
-                                showGradientIndicatorsOnMap = !it
+                            Switch(checked = showGradientIndicatorsOnMap, onCheckedChange = {
+                                showGradientIndicatorsOnMap = it
                                 coroutineScope.launch {
                                     updateSettings()
                                 }

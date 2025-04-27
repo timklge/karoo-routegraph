@@ -15,15 +15,12 @@ import java.util.zip.GZIPInputStream
 
 @DrawableRes
 fun getInclineIndicator(percent: Float): Int? {
-    return when (percent) {
-        in 2.5f..<3.0f -> R.drawable.elevate1
-        in 3.0f..<3.5f -> R.drawable.elevate2
-        in 3.5f..<5.0f -> R.drawable.elevate3
-        in 5.0f..<7.0f -> R.drawable.elevate4
-        in 7.0f..<10.0f -> R.drawable.elevate5
-        in 10.0f..<13.0f -> R.drawable.elevate6
-        in 13.0f..<16.0f -> R.drawable.elevate7
-        in 16.0f..Float.MAX_VALUE -> R.drawable.elevate8
+    return when (percent){
+        in 1.5f..<3.0f -> R.drawable.chevron0
+        in 3.0f..<5.0f -> R.drawable.chevron1
+        in 5.0f..<8.0f -> R.drawable.chevron2
+        in 8.0f..<11.0f -> R.drawable.chevron3
+        in 11.0f..Float.MAX_VALUE -> R.drawable.chevron4
         else -> null
     }
 }

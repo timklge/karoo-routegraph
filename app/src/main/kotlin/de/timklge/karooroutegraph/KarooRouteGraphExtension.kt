@@ -15,6 +15,7 @@ import identifyClimbs
 import io.hammerhead.karooext.extension.KarooExtension
 import io.hammerhead.karooext.internal.Emitter
 import io.hammerhead.karooext.models.DataType
+import io.hammerhead.karooext.models.HardwareType
 import io.hammerhead.karooext.models.HideSymbols
 import io.hammerhead.karooext.models.MapEffect
 import io.hammerhead.karooext.models.OnGlobalPOIs
@@ -40,7 +41,7 @@ import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import kotlin.math.pow
-import kotlin.math.roundToInt
+import kotlin.math.round
 import kotlin.time.Duration.Companion.seconds
 
 class GradientIndicator(val id: String, val distance: Float, val gradientPercent: Float, @DrawableRes val drawableRes: Int){
@@ -116,6 +117,8 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         val gradientIndicatorJob = CoroutineScope(Dispatchers.IO).launch {
             val zoomLevelFlow = karooSystem.stream<OnMapZoomLevel>()
 
+            val locationFlow = karooSystem.stream<OnLocationChanged>()
+
             data class StreamData(
                 val settings: RouteGraphSettings,
                 val location: OnLocationChanged,
@@ -123,9 +126,16 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 val viewModel: RouteGraphViewModel
             )
 
-            combine(applicationContext.streamSettings(karooSystem.karooSystemService), karooSystem.stream<OnLocationChanged>(), zoomLevelFlow, routeGraphViewModelProvider.viewModelFlow) { settings, location, mapZoom, viewModel ->
+            val redrawInterval = if (karooSystem.karooSystemService.hardwareType == HardwareType.K2) {
+                3.seconds
+            } else {
+                1.seconds
+            }
+
+            combine(applicationContext.streamSettings(karooSystem.karooSystemService), locationFlow, zoomLevelFlow, routeGraphViewModelProvider.viewModelFlow) { settings, location, mapZoom, viewModel ->
                 StreamData(settings, location, mapZoom, viewModel)
-            }.collect { (settings, location, mapZoom, viewModel) ->
+            }.throttle(redrawInterval.inWholeMilliseconds).collect { (settings, location, mapZoom, viewModel) ->
+                Log.d(TAG, "Location: $location, MapZoom: $mapZoom")
                 if (settings.showGradientIndicatorsOnMap) {
                     val boundingBox =
                         calculateBoundingBox(location.lat, location.lng, mapZoom.zoomLevel)
@@ -133,8 +143,8 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                         Point.fromLngLat(boundingBox.minLng, boundingBox.minLat),
                         Point.fromLngLat(boundingBox.maxLng, boundingBox.maxLat),
                         TurfConstants.UNIT_METERS
-                    )
-                    Log.d(TAG, "Location: $location, MapZoom: $mapZoom, Diagonal: $mapDiagonal")
+                    ) * 2
+                    Log.d(TAG, "Drawing gradient indicators, Diagonal: $mapDiagonal")
 
                     val distanceAlongRoute = viewModel.distanceAlongRoute ?: 0.0f
                     val startDistance =
@@ -143,7 +153,9 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
                     if (viewModel.sampledElevationData != null) {
                         Log.d(TAG, "Range: $startDistance - $endDistance")
-                        val steps = ((mapDiagonal / 8.0) / viewModel.sampledElevationData.interval).roundToInt().coerceIn(1, 100)
+
+                        val wantedStepInMeters = mapDiagonal / 20.0
+                        val steps = round(wantedStepInMeters / viewModel.sampledElevationData.interval).toInt().coerceAtLeast(1)
 
                         currentSymbols = viewModel.sampledElevationData.getGradientIndicators(steps) { distance ->
                             val targetPosition = TurfMeasurement.along(
@@ -169,43 +181,34 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                         Log.d(TAG, "Drawing symbols: $currentSymbols")
 
                     val icons = currentSymbols.mapNotNull { inclindeIndicator ->
-                            val knownRoute = viewModel.knownRoute ?: return@mapNotNull null
+                        val knownRoute = viewModel.knownRoute ?: return@mapNotNull null
 
-                            val position = TurfMeasurement.along(
-                                knownRoute,
-                                inclindeIndicator.distance.toDouble(),
-                                TurfConstants.UNIT_METERS
-                            )
+                        val position = TurfMeasurement.along(
+                            knownRoute,
+                            inclindeIndicator.distance.toDouble(),
+                            TurfConstants.UNIT_METERS
+                        )
 
-                            val nextPosition = TurfMeasurement.along(
-                                viewModel.knownRoute,
-                                inclindeIndicator.distance.toDouble() + 10.0,
-                                TurfConstants.UNIT_METERS
-                            )
+                        val nextPosition = TurfMeasurement.along(
+                            viewModel.knownRoute,
+                            inclindeIndicator.distance.toDouble() + 10.0,
+                            TurfConstants.UNIT_METERS
+                        )
 
-                            val bearing = TurfMeasurement.bearing(
-                                position,
-                                nextPosition
-                            )
+                        val bearing = TurfMeasurement.bearing(
+                            position,
+                            nextPosition
+                        )
 
-                            val normal = bearing + 90.0
-
-                            val offsetPosition = TurfMeasurement.destination(
-                                position,
-                                (mapDiagonal / 12.0).coerceIn(10.0, 100.0),
-                                normal,
-                                TurfConstants.UNIT_METERS
-                            )
-
-                            Symbol.Icon(
-                                id = inclindeIndicator.id,
-                                lat = offsetPosition.latitude(),
-                                lng = offsetPosition.longitude(),
-                                iconRes = inclindeIndicator.drawableRes,
-                                orientation = 0.0f
-                            )
-                        }
-                        emitter.onNext(ShowSymbols(icons))
+                        Symbol.Icon(
+                            id = inclindeIndicator.id,
+                            lat = position.latitude(),
+                            lng = position.longitude(),
+                            iconRes = inclindeIndicator.drawableRes,
+                            orientation = bearing.toFloat() - (location.orientation ?: 0.0).toFloat(),
+                        )
+                    }
+                    emitter.onNext(ShowSymbols(icons))
                 }
 
                     lastDrawnSymbols = currentSymbols
