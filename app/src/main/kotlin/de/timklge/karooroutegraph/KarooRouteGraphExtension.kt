@@ -36,7 +36,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.launch
@@ -143,7 +142,8 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                         Point.fromLngLat(boundingBox.minLng, boundingBox.minLat),
                         Point.fromLngLat(boundingBox.maxLng, boundingBox.maxLat),
                         TurfConstants.UNIT_METERS
-                    ) * 2
+                    ) * 3
+                    val currentPosition = Point.fromLngLat(location.lng, location.lat)
                     Log.d(TAG, "Drawing gradient indicators, Diagonal: $mapDiagonal")
 
                     val distanceAlongRoute = viewModel.distanceAlongRoute ?: 0.0f
@@ -164,7 +164,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                                 TurfConstants.UNIT_METERS
                             )
 
-                            boundingBox.contains(targetPosition.latitude(), targetPosition.longitude())
+                            boundingBox.contains(targetPosition.latitude(), targetPosition.longitude()) || TurfMeasurement.distance(targetPosition, currentPosition, TurfConstants.UNIT_METERS) <= 500
                         }.toMutableSet()
                     } else {
                         currentSymbols = mutableSetOf()
