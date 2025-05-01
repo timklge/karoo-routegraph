@@ -13,7 +13,7 @@ hosted by FOSSGIS e. V. (Credits see below).
 
 Compatible with Karoo 2 and Karoo 3 devices.
 
-![Route Graph](routegraph.png)
+![Horizontal Route Graph](horizontal_routegraph.png)
 ![Vertical Route Graph](vertical_routegraph.png)
 ![Chevrons](chevrons.png)
 

@@ -62,15 +62,20 @@ tasks.register("generateManifest") {
     doLast {
         val manifestFile = file("$projectDir/manifest.json")
         val manifest = mapOf(
-            "label" to "karoo-routegraph",
+            "label" to "RouteGraph",
             "packageName" to "de.timklge.karooroutegraph",
             "iconUrl" to "https://github.com/timklge/karoo-routegraph/releases/latest/download/karoo-routegraph.png",
             "latestApkUrl" to "https://github.com/timklge/karoo-routegraph/releases/latest/download/app-release.apk",
             "latestVersion" to android.defaultConfig.versionName,
             "latestVersionCode" to android.defaultConfig.versionCode,
-            "developer" to "timklge",
-            "description" to "Provides an elevation graph datafield showing the complete current route, including climbs and POIs (e. g. checkpoints and refueling stops)",
+            "developer" to "github.com/timklge",
+            "description" to "Open-source extension that provides an elevation graph datafield depicting the complete current route, including climbs and POIs (e. g. checkpoints and refueling stops)",
             "releaseNotes" to "* Replace gradient indicators with chevrons\n* Fix gradient indicator setting",
+            "screenshotUrls" to listOf(
+                "https://github.com/timklge/karoo-routegraph/releases/latest/download/horizontal_routegraph.png",
+                "https://github.com/timklge/karoo-routegraph/releases/latest/download/vertical_routegraph.png",
+                "https://github.com/timklge/karoo-routegraph/releases/latest/download/chevrons.png",
+            ),
         )
 
         val gson = groovy.json.JsonBuilder(manifest).toPrettyString()
