@@ -36,6 +36,7 @@ import de.timklge.karooroutegraph.KarooRouteGraphExtension
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.MinimapViewModel
 import de.timklge.karooroutegraph.MinimapViewModelProvider
+import de.timklge.karooroutegraph.NearestPoint
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModel
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModelProvider
 import de.timklge.karooroutegraph.RouteGraphViewModel
@@ -118,7 +119,6 @@ class MinimapDataType(
 ) : DataTypeImpl("karoo-routegraph", "minimap") {
     private val glance = GlanceRemoteViews()
 
-    // Constants for unit conversion
     private val METERS_PER_FOOT = 0.3048
     private val FEET_PER_MILE = 5280.0
 
@@ -150,13 +150,18 @@ class MinimapDataType(
         val flow = if (config.preview) {
             val polyline = LineString.fromPolyline(String(Base64.decode(previewPolylineBase64, 0)), 5)
             val polylineLength = TurfMeasurement.length(polyline, UNIT_METERS).toFloat()
-            val positionAlongRoute = TurfMeasurement.along(polyline, 3_000.0, UNIT_METERS)
-            val bearing = TurfMeasurement.bearing(positionAlongRoute, TurfMeasurement.along(polyline, 3010.0, UNIT_METERS))
+            val positionAlongRoute = TurfMeasurement.along(polyline, 13_000.0, UNIT_METERS)
+            val bearing = TurfMeasurement.bearing(positionAlongRoute, TurfMeasurement.along(polyline, 13010.0, UNIT_METERS))
 
             flow {
                 emit(StreamData(
-                    RouteGraphViewModel(routeDistance = polylineLength, distanceAlongRoute = 3_000f, knownRoute = polyline,
-                        locationAndRemainingRouteDistance = KarooRouteGraphExtension.LocationAndRemainingRouteDistance(positionAlongRoute.latitude(), positionAlongRoute.longitude(), bearing, polylineLength.toDouble() - 3_000)),
+                    RouteGraphViewModel(routeDistance = polylineLength, distanceAlongRoute = 13_000f, knownRoute = polyline,
+                        locationAndRemainingRouteDistance = KarooRouteGraphExtension.LocationAndRemainingRouteDistance(positionAlongRoute.latitude(), positionAlongRoute.longitude(), bearing, polylineLength.toDouble() - 3_000),
+                        poiDistances = mapOf(
+                            Symbol.POI("gate", 52.5159305, 13.3774302, name = "Gate") to listOf(
+                                NearestPoint(null, 0.0f, 0.0f, null)
+                            )
+                        )),
                     MinimapViewModel(),
                     UserProfile(
                         weight = 70.0f,
@@ -173,7 +178,7 @@ class MinimapDataType(
                         powerZones = listOf()
                     ),
                     displayViewModel = RouteGraphDisplayViewModel(),
-                    settings = context.streamSettings(karooSystem).first()
+                    settings = context.streamSettings(karooSystem).first(),
                 ))
             }
         } else {
@@ -234,8 +239,6 @@ class MinimapDataType(
                     val nightMode = isNightMode()
                     val imperialUnits = userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
 
-                    // --- Map Drawing Logic (Placeholder - Assuming map is drawn here) ---
-                    // Clear canvas or draw map background if needed
                     canvas.drawColor(if (nightMode) Color.BLACK else Color.WHITE)
 
                     val intZoom = floor(zoomLevel).toInt()
@@ -243,7 +246,6 @@ class MinimapDataType(
                     val downloadedTiles = requiredTiles.associateWith { tile -> tileDownloadService.getTileIfAvailableInstantly(tile) }
                     val nextTileToDownload = requiredTiles.firstOrNull { tile -> downloadedTiles[tile] == null } // Check if bitmap is null
 
-                    // --- Draw Map Tiles ---
                     val centerTileX = lonToTileX(centerPosition.longitude(), intZoom)
                     val centerTileY = latToTileY(centerPosition.latitude(), intZoom)
                     val centerScreenX = width / 2.0
@@ -343,7 +345,6 @@ class MinimapDataType(
                         }
                     }
 
-                    // Only draw POIs and scale bar if larger than 1x1 data field
                     if (config.gridSize.first > 15 && config.gridSize.second > 15) {
                         val pois = viewModel.poiDistances?.keys ?: emptySet()
                         pois.forEach { poi ->
@@ -351,7 +352,6 @@ class MinimapDataType(
                             drawPoi(canvas, poi, centerPosition, zoomLevel, settings.showPOILabelsOnMinimap)
                         }
 
-                        // --- Draw Scale Bar ---
                         drawScaleBar(
                             canvas,
                             height,
@@ -361,7 +361,6 @@ class MinimapDataType(
                         )
                     }
 
-                    // --- Draw Copyright ---
                     drawCopyright(canvas, width, height, nightMode)
 
                     if (viewModel.locationAndRemainingRouteDistance?.lon != null && viewModel.locationAndRemainingRouteDistance.lat != null) {
@@ -371,9 +370,8 @@ class MinimapDataType(
                             viewModel.locationAndRemainingRouteDistance.lat,
                             centerPosition,
                             zoomLevel,
-                            (viewModel.locationAndRemainingRouteDistance.bearing ?: 0.0)    ,
-                            Color.YELLOW,
-                            10f
+                            (viewModel.locationAndRemainingRouteDistance.bearing ?: 0.0),
+                            Color.YELLOW
                         )
                     }
 
@@ -443,7 +441,6 @@ class MinimapDataType(
         val screenX = (canvas.width / 2f + deltaPixelX).toFloat()
         val screenY = (canvas.height / 2f + deltaPixelY).toFloat()
 
-        // --- Draw the 'X' marker ---
         val xSize = 15f // Half the size of the X
         val xStrokeWidth = 5f
         val outlineStrokeWidth = xStrokeWidth + 4f // Outline slightly thicker
@@ -474,45 +471,38 @@ class MinimapDataType(
 
 
         if (showPOILabelsOnMinimap) {
-            // --- Prepare Paints for Label ---
             val textPaint = Paint().apply {
                 color = Color.WHITE
-                textSize = 30f // Adjust size as needed
+                textSize = 30f
                 isAntiAlias = true
-                textAlign = Paint.Align.CENTER // Center text horizontally
-                typeface = Typeface.DEFAULT_BOLD // Set font to bold
+                textAlign = Paint.Align.CENTER
+                typeface = Typeface.DEFAULT_BOLD
             }
 
             val backgroundPaint = Paint().apply {
-                color = Color.argb(180, 0, 0, 0) // Semi-transparent black background
+                color = Color.argb(180, 0, 0, 0)
                 style = Paint.Style.FILL
                 isAntiAlias = true
             }
 
-            // --- Measure Text ---
             val text = poi.name ?: "POI"
             val textBounds = Rect()
             textPaint.getTextBounds(text, 0, text.length, textBounds)
 
-            // --- Draw Background Box ---
             val padding = 5f // Padding around the text
-            // Adjust label position slightly above the X marker
-            val labelOffsetY = -xSize - 5f // Offset the label upwards from the center of the X
+            val labelOffsetY = -xSize - 5f
             val rectLeft = screenX - textBounds.width() / 2f - padding
             val rectTop =
-                screenY + labelOffsetY - textBounds.height() - padding // Position box above the point's Y, considering offset
+                screenY + labelOffsetY - textBounds.height() - padding
             val rectRight = screenX + textBounds.width() / 2f + padding
             val rectBottom =
-                screenY + labelOffsetY + padding // Adjust bottom based on text baseline and offset
+                screenY + labelOffsetY + padding
 
             val backgroundRect = RectF(rectLeft, rectTop, rectRight, rectBottom)
-            val cornerRadius = 10f // Rounded corners for the box
+            val cornerRadius = 10f
             canvas.drawRoundRect(backgroundRect, cornerRadius, cornerRadius, backgroundPaint)
 
-            // --- Draw Text ---
-            // Adjust Y position for drawing text (Paint.Align.CENTER centers horizontally, need vertical adjustment)
-            val textY =
-                screenY + labelOffsetY // Center text vertically within the box, considering offset
+            val textY = screenY + labelOffsetY
             canvas.drawText(text, screenX, textY, textPaint) // Use adjusted Y
         }
     }
@@ -525,7 +515,6 @@ class MinimapDataType(
         zoomLevel: Float, // Changed to Float and renamed from zoomLevel (Int)
         bearingInDegrees: Double,
         color: Int,
-        strokeWidth: Float,
     ) {
         val chevronPaint = Paint().apply {
             this.color = color

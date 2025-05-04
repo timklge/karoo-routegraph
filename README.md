@@ -13,6 +13,7 @@ hosted by FOSSGIS e. V. (Credits see below).
 
 Compatible with Karoo 2 and Karoo 3 devices.
 
+![Minimap](minimap.png)
 ![Horizontal Route Graph](horizontal_routegraph.png)
 ![Vertical Route Graph](vertical_routegraph.png)
 ![Chevrons](chevrons.png)
@@ -38,10 +39,11 @@ If you are using a Karoo 2, you can use manual sideloading:
 
 After installing this app on your Karoo and opening it once from the main menu, you can add the following new data fields to your data pages:
 
-- Route Graph (see first screenshot): Shows a graph of the current route, including POIs / checkpoints / refueling stops. This data field works just like the native
+- Minimap (see first screenshot): Shows a secondary map of the whole route, including climbs and POIs
+- Route Graph (see second screenshot): Shows a graph of the current route, including POIs / checkpoints / refueling stops. This data field works just like the native
 elevation profile data field of the Karoo, but adds markers for route-specific and global POIs and climbs. By touching the data field, you can cycle
 between the full route and the upcoming 2km, 20km, 50km and 100km of the route.
-- Vertical Route Graph (see second screenshot): Similar to the route graph, but flipped so that the vertical axis depicts the route distance. The name of POIs, the remaining distance and elevation
+- Vertical Route Graph (see third screenshot): Similar to the route graph, but flipped so that the vertical axis depicts the route distance. The name of POIs, the remaining distance and elevation
 to them as well as climb lengths and total climb elevations are shown next to the elevation profile.
 - Distance to POI: Shows the distance to the next POI along the route. Note that this is the distance along the route and not the straight-line distance.
 - Elevation to POI: Shows the remaining climbing to the next POI along the route. Note that this is the elevation along the route and not the straight-line elevation.
