@@ -72,6 +72,7 @@ tasks.register("generateManifest") {
             "description" to "Open-source extension that provides an elevation graph datafield depicting the complete current route, including climbs and POIs (e. g. checkpoints and refueling stops)",
             "releaseNotes" to "* Add initial minimap implementation \n* Replace gradient indicators with chevrons\n* Fix gradient indicator setting",
             "screenshotUrls" to listOf(
+                "https://github.com/timklge/karoo-routegraph/releases/latest/download/minimap.png",
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/horizontal_routegraph.png",
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/vertical_routegraph.png",
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/chevrons.png",
