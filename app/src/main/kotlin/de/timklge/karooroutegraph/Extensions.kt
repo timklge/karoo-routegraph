@@ -1,22 +1,20 @@
 package de.timklge.karooroutegraph
 
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.transform
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 
-fun<T> Flow<T>.throttle(timeout: Long): Flow<T> = flow {
-    var lastEmissionTime = 0L
-
-    collect { value ->
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastEmissionTime >= timeout) {
-            emit(value)
-            lastEmissionTime = currentTime
-        }
+fun<T> Flow<T>.throttle(timeout: Long): Flow<T> = this
+    .conflate()
+    .transform {
+        emit(it)
+        delay(timeout)
     }
-}
 
 @Serializable
 data class HeightResponse(

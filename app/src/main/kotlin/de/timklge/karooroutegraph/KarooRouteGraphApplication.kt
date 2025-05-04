@@ -12,6 +12,8 @@ val appModule = module {
     singleOf(::RouteGraphViewModelProvider)
     singleOf(::RouteGraphDisplayViewModelProvider)
     singleOf(::ValhallaAPIElevationProvider)
+    singleOf(::MinimapViewModelProvider)
+    singleOf(::TileDownloadService)
 }
 
 class KarooRouteGraphApplication : Application() {

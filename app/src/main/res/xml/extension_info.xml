@@ -33,4 +33,12 @@
         graphical="false"
         icon="@drawable/trip"
         typeId="elevationtopoi" />
+
+    <DataType
+        description="@string/minimap_description"
+        displayName="@string/minimap"
+        graphical="true"
+        icon="@drawable/trip"
+        typeId="minimap" />
+
 </ExtensionInfo>
