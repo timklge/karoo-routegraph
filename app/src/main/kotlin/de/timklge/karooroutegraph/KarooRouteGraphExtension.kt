@@ -321,9 +321,9 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 } else false
 
                 if (routeChanged){
-                    Log.i(TAG, "Route changed, recalculating POI distances")
-
                     if (routeLineString != null){
+                        Log.i(TAG, "Route changed, recalculating POI distances")
+
                         poiDistances = calculatePoiDistances(routeLineString, pois)
 
                         val poiDistancesDebug = poiDistances?.map { (key, value) ->

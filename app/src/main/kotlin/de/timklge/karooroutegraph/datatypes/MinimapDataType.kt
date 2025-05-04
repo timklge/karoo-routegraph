@@ -356,6 +356,7 @@ class MinimapDataType(
                             canvas,
                             height,
                             centerPosition.latitude(),
+                            displayViewModel.minimapZoomLevel,
                             zoomLevel,
                             imperialUnits
                         )
@@ -706,6 +707,7 @@ class MinimapDataType(
         canvas: Canvas,
         height: Int,
         latitude: Double,
+        minimapZoomLevel: MinimapZoomLevel,
         zoomLevel: Float,
         imperialUnits: Boolean
     ) {
@@ -792,10 +794,16 @@ class MinimapDataType(
         canvas.drawLine(startX, yPos - 5, startX, yPos + 5, paint)
         canvas.drawLine(endX, yPos - 5, endX, yPos + 5, paint)
 
+        val scaleTextWithSuffix = if (minimapZoomLevel == MinimapZoomLevel.COMPLETE_ROUTE) {
+            "$scaleText max"
+        } else {
+            scaleText
+        }
+
         val textBounds = Rect()
-        textPaint.getTextBounds(scaleText, 0, scaleText.length, textBounds)
+        textPaint.getTextBounds(scaleTextWithSuffix, 0, scaleText.length, textBounds)
         val textX = startX
-        canvas.drawText(scaleText, textX, yPos - 10, textPaint)
+        canvas.drawText(scaleTextWithSuffix, textX, yPos - 10, textPaint)
     }
 
     private fun drawCopyright(canvas: Canvas, width: Int, height: Int, nightMode: Boolean) {

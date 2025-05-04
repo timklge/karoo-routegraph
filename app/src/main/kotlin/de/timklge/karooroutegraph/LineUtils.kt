@@ -17,7 +17,7 @@ const val TARGET_TILE_SIZE = 512.0
 fun LineString.getOSMZoomLevelToFit(
     screenWidthPx: Int,
     screenHeightPx: Int,
-    paddingPx: Int = 15
+    paddingPx: Int = 20
 ): Float {
     val points = this.coordinates()
     if (points.isEmpty()) {
