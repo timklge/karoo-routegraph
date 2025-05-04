@@ -1,5 +1,6 @@
 package de.timklge.karooroutegraph
 
+import android.util.Base64
 import android.util.Log
 import androidx.annotation.DrawableRes
 import com.mapbox.geojson.LineString
@@ -240,22 +241,27 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                                      val pois: OnGlobalPOIs,
                                      val locationAndRemainingRouteDistance: LocationAndRemainingRouteDistance)
 
-    data class LocationAndRemainingRouteDistance(val lat: Double?, val lon: Double?, val remainingRouteDistance: Double?)
+    data class LocationAndRemainingRouteDistance(val lat: Double?, val lon: Double?, val bearing: Double?, val remainingRouteDistance: Double?)
 
     private fun streamLocationAndRemainingRouteDistance(): Flow<LocationAndRemainingRouteDistance> = flow {
+        val throttle = if (karooSystem.karooSystemService.hardwareType == HardwareType.K2) {
+            30_000L
+        } else {
+            15_000L
+        }
+
         val locationFlow = karooSystem.stream<OnLocationChanged>()
             .distinctUntilChanged()
-            .map { it.lat to it.lng }
 
         val remainingRouteDistanceFlow = karooSystem.streamDataFlow(DataType.Type.DISTANCE_TO_DESTINATION)
             .distinctUntilChanged()
             .map { (it as? StreamState.Streaming)?.dataPoint?.values?.get(DataType.Field.DISTANCE_TO_DESTINATION) ?: 0.0 }
 
-        emit(LocationAndRemainingRouteDistance(null, null, null))
+        emit(LocationAndRemainingRouteDistance(null, null, null, null))
 
-        locationFlow.combine(remainingRouteDistanceFlow) { (lat, lon), remainingRouteDistance ->
-            LocationAndRemainingRouteDistance(lat, lon, remainingRouteDistance)
-        }.throttle(15_000).collect {
+        locationFlow.combine(remainingRouteDistanceFlow) { locationChangedEvent, remainingRouteDistance ->
+            LocationAndRemainingRouteDistance(locationChangedEvent.lat, locationChangedEvent.lng,locationChangedEvent.orientation, remainingRouteDistance)
+        }.throttle(throttle).collect {
             emit(it)
         }
     }
@@ -276,8 +282,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 karooSystem.stream<OnGlobalPOIs>()
             ) { navigationState, userProfile, locationAndRemainingRouteDistance, pois ->
                 NavigationStreamState(navigationState.state, userProfile, pois, locationAndRemainingRouteDistance)
-            }.distinctUntilChanged()
-            .transformLatest { value ->
+            }.distinctUntilChanged().transformLatest { value ->
                 while(true){
                     emit(value)
                     delay(30.seconds)
@@ -300,6 +305,8 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
                 val routeLineString = if (navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute){
                     val polyline = navigationStateEvent.routePolyline
+
+                    // Log.d(TAG, "Route polyline: ${Base64.encodeToString(polyline.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)}")
 
                     LineString.fromPolyline(polyline, 5)
                 } else {
@@ -348,6 +355,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     isImperial = isImperial,
                     routeToDestination = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingToDestination)?.polyline?.let { LineString.fromPolyline(it, 5) },
                     rejoin = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.rejoinPolyline?.let { LineString.fromPolyline(it, 5) },
+                    locationAndRemainingRouteDistance = locationAndRemainingRouteDistance
                 )
                 routeGraphViewModelProvider.update(viewModel)
 

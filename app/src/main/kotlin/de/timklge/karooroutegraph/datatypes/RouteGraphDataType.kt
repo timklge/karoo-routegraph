@@ -15,6 +15,8 @@ import androidx.core.graphics.withClip
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
+import androidx.glance.action.ActionParameters
+import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
 import androidx.glance.appwidget.GlanceRemoteViews
@@ -325,7 +327,7 @@ class RouteGraphDataType(
                     }
 
                     if (viewModel.distanceAlongRoute != null){
-                        val distanceAlongRoutePixelsFromLeft = remap(viewModel.distanceAlongRoute, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
+                        val distanceAlongRoutePixelsFromLeft = remap(viewModel.distanceAlongRoute!!, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
 
                         canvas.withClip(0f, 0f, distanceAlongRoutePixelsFromLeft, config.viewSize.second.toFloat()){
                             canvas.withClip(filledPath) {
@@ -338,7 +340,7 @@ class RouteGraphDataType(
                 }
 
                 if (viewModel.distanceAlongRoute != null && viewModel.routeDistance != null){
-                    val distanceAlongRoutePixelsFromLeft = remap(viewModel.distanceAlongRoute, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
+                    val distanceAlongRoutePixelsFromLeft = remap(viewModel.distanceAlongRoute!!, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
 
                     canvas.drawLine(distanceAlongRoutePixelsFromLeft, 0f, distanceAlongRoutePixelsFromLeft, graphBounds.bottom, backgroundStrokePaint)
                     canvas.drawLine(distanceAlongRoutePixelsFromLeft, 0f, distanceAlongRoutePixelsFromLeft, graphBounds.bottom, currentLinePaint)
@@ -475,10 +477,14 @@ class RouteGraphDataType(
                 val result = glance.compose(context, DpSize.Unspecified) {
                     var modifier = GlanceModifier.fillMaxSize()
 
-                    if (!config.preview) modifier = modifier.clickable(onClick = actionRunCallback<ChangeZoomLevelAction>())
+                    if (!config.preview) modifier = modifier.clickable(onClick = actionRunCallback<ChangeZoomLevelAction>(
+                        parameters = actionParametersOf(
+                            ActionParameters.Key<String>("action_type") to "zoom"
+                        )
+                    ))
 
-                    Box(modifier = modifier){
-                        Image(ImageProvider(bitmap), "Route Graph", modifier = GlanceModifier.fillMaxSize())
+                    Box(modifier = GlanceModifier.fillMaxSize()){
+                        Image(ImageProvider(bitmap), "Route Graph", modifier = modifier)
                     }
                 }
                 emitter.updateView(result.remoteViews)

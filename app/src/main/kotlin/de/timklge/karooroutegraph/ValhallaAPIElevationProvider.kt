@@ -43,7 +43,7 @@ fun getInclineIndicatorColor(percent: Float): Int? {
 class ValhallaAPIElevationProvider(
     private val karooSystemServiceProvider: KarooSystemServiceProvider,
 ) {
-    suspend fun requestValhallaElevations(polyline: LineString, interval: Float = 60.0f): SampledElevationData {
+        suspend fun requestValhallaElevations(polyline: LineString, interval: Float = 60.0f): SampledElevationData {
         return callbackFlow {
             val url = "https://valhalla1.openstreetmap.de/height"
             val request = HeightRequest(range = true, shapeFormat = "polyline5", encodedPolyline = polyline.toPolyline(5), heightPrecision = 2, resampleDistance = interval.toDouble())
@@ -68,10 +68,15 @@ class ValhallaAPIElevationProvider(
                         val lowercaseHeaders = completeEvent.headers.map { (k: String, v: String) -> k.lowercase() to v.lowercase() }.toMap()
                         val isGzippedResponse = lowercaseHeaders["content-encoding"]?.contains("gzip") == true
                         val responseString = if(isGzippedResponse){
-                            val gzipStream = GZIPInputStream(inputStream)
-                            val response = gzipStream.use { stream -> String(stream.readBytes()) }
-                            Log.d(KarooRouteGraphExtension.TAG, "Http response event; size ${completeEvent.body?.size} gzip decompressed to ${response.length} bytes")
-                            response
+                            try {
+                                val gzipStream = GZIPInputStream(inputStream)
+                                val response = gzipStream.use { stream -> String(stream.readBytes()) }
+                                Log.d(KarooRouteGraphExtension.TAG, "Http response event; size ${completeEvent.body?.size} gzip decompressed to ${response.length} bytes")
+                                response
+                            } catch(e: Exception) {
+                                Log.e(KarooRouteGraphExtension.TAG, "Failed to decompress gzip response", e)
+                                String(completeEvent.body ?: ByteArray(0))
+                            }
                         } else {
                             val response = inputStream.use { stream -> String(stream.readBytes()) }
                             Log.d(KarooRouteGraphExtension.TAG, "Http response event; size ${completeEvent.body?.size} bytes")

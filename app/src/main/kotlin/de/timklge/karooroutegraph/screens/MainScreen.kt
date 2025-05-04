@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -49,6 +50,7 @@ import kotlinx.serialization.json.Json
 @Serializable
 data class RouteGraphSettings(
     val showGradientIndicatorsOnMap: Boolean = false,
+    val showPOILabelsOnMinimap: Boolean = true,
     val welcomeDialogAccepted: Boolean = false,
 ){
     companion object {
@@ -65,13 +67,15 @@ fun MainScreen(onFinish: () -> Unit) {
     val karooSystem = remember { KarooSystemService(ctx) }
     var welcomeDialogVisible by remember { mutableStateOf(false) }
     var showGradientIndicatorsOnMap by remember { mutableStateOf(false) }
+    var showPOIsOnMinimap by remember { mutableStateOf(true) }
 
     suspend fun updateSettings(){
         Log.d(KarooRouteGraphExtension.TAG, "Updating settings")
 
         val newSettings = RouteGraphSettings(
             showGradientIndicatorsOnMap = showGradientIndicatorsOnMap,
-            welcomeDialogAccepted = !welcomeDialogVisible
+            welcomeDialogAccepted = !welcomeDialogVisible,
+            showPOILabelsOnMinimap = showPOIsOnMinimap
         )
 
         saveSettings(ctx, newSettings)
@@ -81,6 +85,7 @@ fun MainScreen(onFinish: () -> Unit) {
         ctx.streamSettings(karooSystem).collect { settings ->
             welcomeDialogVisible = !settings.welcomeDialogAccepted
             showGradientIndicatorsOnMap = settings.showGradientIndicatorsOnMap
+            showPOIsOnMinimap = settings.showPOILabelsOnMinimap
         }
     }
 
@@ -120,7 +125,7 @@ fun MainScreen(onFinish: () -> Unit) {
                         }
                     }
 
-                    Column(modifier = Modifier.padding(10.dp)){
+                    Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)){
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Switch(checked = showGradientIndicatorsOnMap, onCheckedChange = {
                                 showGradientIndicatorsOnMap = it
@@ -130,6 +135,17 @@ fun MainScreen(onFinish: () -> Unit) {
                             })
                             Spacer(modifier = Modifier.width(10.dp))
                             Text("Show gradient indicators on map")
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Switch(checked = showPOIsOnMinimap, onCheckedChange = {
+                                showPOIsOnMinimap = it
+                                coroutineScope.launch {
+                                    updateSettings()
+                                }
+                            })
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Show POI labels on minimap")
                         }
 
                         Spacer(modifier = Modifier.padding(30.dp))

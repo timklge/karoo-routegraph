@@ -38,7 +38,7 @@ class TileDownloadService(
     }
 
     private fun getTileFile(tile: Tile): File {
-        return File(cacheDir, "${tile.z}-${tile.x}-${tile.y}.png")
+        return File(cacheDir, "${tile.style}-${tile.z}-${tile.x}-${tile.y}.png")
     }
 
     suspend fun getTileIfAvailableInstantly(tile: Tile): Bitmap? {

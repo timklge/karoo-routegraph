@@ -16,6 +16,8 @@ import androidx.core.graphics.withClip
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
+import androidx.glance.action.ActionParameters
+import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
 import androidx.glance.appwidget.GlanceRemoteViews
@@ -356,7 +358,7 @@ class VerticalRouteGraphDataType(
                     }
 
                     if (viewModel.distanceAlongRoute != null){
-                        val distanceAlongRouteProgressPixels = remap(viewModel.distanceAlongRoute, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
+                        val distanceAlongRouteProgressPixels = remap(viewModel.distanceAlongRoute!!, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
 
                         canvas.withClip(0f, 0f, config.viewSize.second.toFloat(), distanceAlongRouteProgressPixels){
                             canvas.withClip(filledPath) {
@@ -369,7 +371,7 @@ class VerticalRouteGraphDataType(
                 }
 
                 if (viewModel.distanceAlongRoute != null && viewModel.routeDistance != null){
-                    val distanceAlongRoutePixelsFromLeft = remap(viewModel.distanceAlongRoute, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
+                    val distanceAlongRoutePixelsFromLeft = remap(viewModel.distanceAlongRoute!!, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
 
                     canvas.drawLine(0f, distanceAlongRoutePixelsFromLeft, config.viewSize.first.toFloat(), distanceAlongRoutePixelsFromLeft, backgroundStrokePaint)
                     canvas.drawLine(0f, distanceAlongRoutePixelsFromLeft, config.viewSize.second.toFloat(), distanceAlongRoutePixelsFromLeft, currentLinePaint)
@@ -390,11 +392,11 @@ class VerticalRouteGraphDataType(
 
                         textDrawCommands.add(TextDrawCommand(graphBounds.right + 75, progressPixels + 15f, text, textPaintBold, 11))
 
-                        if (viewModel.distanceAlongRoute != null && nearestPoint.distanceFromRouteStart > viewModel.distanceAlongRoute){
-                            val distanceMeters = nearestPoint.distanceFromRouteStart - viewModel.distanceAlongRoute
+                        if (viewModel.distanceAlongRoute != null && nearestPoint.distanceFromRouteStart > viewModel.distanceAlongRoute!!){
+                            val distanceMeters = nearestPoint.distanceFromRouteStart - viewModel.distanceAlongRoute!!
                             var distanceStr = "In ${distanceToString(distanceMeters, userProfile, false)}"
 
-                            val elevationMetersRemaining = viewModel.sampledElevationData?.getTotalClimb(viewModel.distanceAlongRoute, nearestPoint.distanceFromRouteStart)
+                            val elevationMetersRemaining = viewModel.sampledElevationData?.getTotalClimb(viewModel.distanceAlongRoute!!, nearestPoint.distanceFromRouteStart)
                             if (elevationMetersRemaining != null && !distanceIsZero(elevationMetersRemaining.toFloat(), userProfile)) {
                                 distanceStr += " ↗ ${distanceToString(elevationMetersRemaining.toFloat(), userProfile, true)}"
                             }
@@ -466,7 +468,11 @@ class VerticalRouteGraphDataType(
                 val result = glance.compose(context, DpSize.Unspecified) {
                     var modifier = GlanceModifier.fillMaxSize()
 
-                    if (!config.preview) modifier = modifier.clickable(onClick = actionRunCallback<ChangeZoomLevelAction>())
+                    if (!config.preview) modifier = modifier.clickable(onClick = actionRunCallback<ChangeZoomLevelAction>(
+                        parameters = actionParametersOf(
+                            ActionParameters.Key<String>("action_type") to "zoom"
+                        )
+                    ))
 
                     Box(modifier = modifier) {
                         Image(ImageProvider(bitmap), "Route Graph", modifier = GlanceModifier.fillMaxSize())

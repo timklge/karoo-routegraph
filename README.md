@@ -58,7 +58,7 @@ try to identify climbs using an alternate algorithm, so they will not perfectly 
 
 ## Credits
 
-- Uses valhalla1.openstreetmap.de for elevation data (hosted by [FOSSGIS e.V.](https://www.fossgis.de/news/2021-11-12_funding_valhalla/))
-  - Daten © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-Mitwirkende (<a href="https://opendatacommons.org/licenses/odbl/index.html">ODbL</a>), <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, <a href="https://openstreetmap.org/fixthemap">mitmachen/Fehler melden</a>
+- Uses valhalla1.openstreetmap.de for elevation data (hosted by [FOSSGIS e.V.](https://www.fossgis.de/news/2021-11-12_funding_valhalla/)) and OpenStreetMap raster tiles served by https://tile.openstreetmap.org
+  - Data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors (<a href="https://opendatacommons.org/licenses/odbl/index.html">ODbL</a>), <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, <a href="https://openstreetmap.org/fixthemap">participate/fix mistakes</a>
 - Icons are from [boxicons.com](https://boxicons.com) ([MIT-licensed](icon_credits.txt))
 - Uses [karoo-ext](https://github.com/hammerheadnav/karoo-ext) (Apache2-licensed)
