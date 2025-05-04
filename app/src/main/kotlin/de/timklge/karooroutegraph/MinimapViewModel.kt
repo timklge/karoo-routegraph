@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-data class MinimapViewModel(val pastPoints: List<Point>? = null,
+data class MinimapViewModel(/* val pastPoints: List<Point>? = null, */
                             val currentLat: Double? = null,
                             val currentLng: Double? = null,
                             val currentBearing: Double? = null)

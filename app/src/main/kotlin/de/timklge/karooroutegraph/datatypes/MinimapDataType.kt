@@ -298,10 +298,11 @@ class MinimapDataType(
                         }
                     }
 
-                    if (minimapViewModel.pastPoints != null) {
+                    /* if (minimapViewModel.pastPoints != null) {
                         val lineString = LineString.fromLngLats(minimapViewModel.pastPoints)
                         drawPolyline(lineString, canvas, Color.GRAY, 8f, centerPosition, zoomLevel)
-                    }
+                    } */
+
                     if (viewModel.rejoin != null) {
                         drawPolyline(viewModel.rejoin, canvas, Color.RED, 8f, centerPosition, zoomLevel)
                     } else if (viewModel.routeToDestination != null) {

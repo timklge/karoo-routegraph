@@ -421,7 +421,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 }
 
                 val minimapViewModel = MinimapViewModel(
-                    pastPoints = newPointList,
+                    // pastPoints = newPointList,
                     currentLat = locationEvent.lat,
                     currentLng = locationEvent.lng,
                     currentBearing = locationEvent.orientation
