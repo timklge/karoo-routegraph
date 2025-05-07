@@ -2,6 +2,7 @@ package de.timklge.karooroutegraph.datatypes
 
 import android.content.Context
 import android.content.res.Configuration
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ColorMatrix
@@ -13,8 +14,10 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.util.Base64
 import android.util.Log
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.compose.ui.unit.DpSize
 import androidx.core.graphics.createBitmap
+import androidx.core.graphics.drawable.toBitmap
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
@@ -37,6 +40,7 @@ import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.MinimapViewModel
 import de.timklge.karooroutegraph.MinimapViewModelProvider
 import de.timklge.karooroutegraph.NearestPoint
+import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModel
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModelProvider
 import de.timklge.karooroutegraph.RouteGraphViewModel
@@ -75,6 +79,7 @@ import kotlin.math.floor
 import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
+import androidx.core.graphics.withRotation
 
 enum class MinimapZoomLevel(val level: Float?) {
     CLOSEST(16.0f),
@@ -304,9 +309,15 @@ class MinimapDataType(
                     } */
 
                     if (viewModel.rejoin != null) {
-                        drawPolyline(viewModel.rejoin, canvas, Color.RED, 8f, centerPosition, zoomLevel)
+                        drawPolyline(viewModel.rejoin, canvas, Color.RED, centerPosition, zoomLevel)
                     } else if (viewModel.routeToDestination != null) {
-                        drawPolyline(viewModel.routeToDestination, canvas, Color.rgb(1.0f, 0.0f, 1.0f), 5f, centerPosition, zoomLevel)
+                        drawPolyline(
+                            viewModel.routeToDestination,
+                            canvas,
+                            Color.rgb(1.0f, 0.0f, 1.0f),
+                            centerPosition,
+                            zoomLevel
+                        )
                     }
 
                     if (viewModel.knownRoute != null) {
@@ -327,10 +338,28 @@ class MinimapDataType(
                                 null
                             }
 
-                            if (pastRouteSlice != null) drawPolyline(pastRouteSlice, canvas, Color.LTGRAY, 8f, centerPosition, zoomLevel)
-                            if (routeSlice != null) drawPolyline(routeSlice, canvas, Color.YELLOW, 8f, centerPosition, zoomLevel)
+                            if (pastRouteSlice != null) drawPolyline(
+                                pastRouteSlice,
+                                canvas,
+                                Color.LTGRAY,
+                                centerPosition,
+                                zoomLevel
+                            )
+                            if (routeSlice != null) drawPolyline(
+                                routeSlice,
+                                canvas,
+                                Color.YELLOW,
+                                centerPosition,
+                                zoomLevel
+                            )
                         } else {
-                            drawPolyline(viewModel.knownRoute, canvas, Color.YELLOW, 8f, centerPosition, zoomLevel)
+                            drawPolyline(
+                                viewModel.knownRoute,
+                                canvas,
+                                Color.YELLOW,
+                                centerPosition,
+                                zoomLevel
+                            )
                         }
                     }
 
@@ -339,7 +368,13 @@ class MinimapDataType(
                             try {
                                 val polyline = TurfMisc.lineSliceAlong(viewModel.knownRoute, climb.startDistance.toDouble().coerceAtLeast(0.0), climb.endDistance.toDouble(), UNIT_METERS)
 
-                                drawPolyline(polyline, canvas, applicationContext.getColor(climb.category.colorRes), 8f, centerPosition, zoomLevel)
+                                drawPolyline(
+                                    polyline,
+                                    canvas,
+                                    applicationContext.getColor(climb.category.colorRes),
+                                    centerPosition,
+                                    zoomLevel
+                                )
                             } catch (e: Exception) {
                                 Log.e(TAG, "Error drawing climb polyline", e)
                             }
@@ -366,6 +401,12 @@ class MinimapDataType(
                     drawCopyright(canvas, width, height, nightMode)
 
                     if (viewModel.locationAndRemainingRouteDistance?.lon != null && viewModel.locationAndRemainingRouteDistance.lat != null) {
+                        val currentPositionIndicatorWidth = if (config.gridSize.first > 15 && config.gridSize.second > 15) {
+                            35f
+                        } else {
+                            25f
+                        }
+
                         drawCurrentPosition(
                             canvas,
                             viewModel.locationAndRemainingRouteDistance.lon,
@@ -373,7 +414,7 @@ class MinimapDataType(
                             centerPosition,
                             zoomLevel,
                             (viewModel.locationAndRemainingRouteDistance.bearing ?: 0.0),
-                            Color.YELLOW
+                            currentPositionIndicatorWidth
                         )
                     }
 
@@ -509,6 +550,19 @@ class MinimapDataType(
         }
     }
 
+    val _navigationBitmapCache = mutableMapOf<Float, Bitmap?>()
+    fun getNavigationBitmap(navigationImageWidth: Float): Bitmap? {
+        return _navigationBitmapCache.getOrPut(navigationImageWidth) {
+            val navigationDrawable = AppCompatResources.getDrawable(applicationContext, R.drawable.navigation)
+            val originalNavigationDrawableWidth = navigationDrawable?.intrinsicWidth
+            val originalNavigationDrawableHeight = navigationDrawable?.intrinsicHeight
+            val imageAspectRatio = if (originalNavigationDrawableWidth != null && originalNavigationDrawableWidth > 0 && originalNavigationDrawableHeight != null) originalNavigationDrawableHeight.toFloat() / originalNavigationDrawableWidth.toFloat() else 1.0f
+            val navigationImageHeight = navigationImageWidth * imageAspectRatio // Calculate height to preserve aspect ratio
+
+            navigationDrawable?.toBitmap(navigationImageWidth.toInt(), navigationImageHeight.toInt())
+        }
+    }
+
     private fun drawCurrentPosition(
         canvas: Canvas,
         lng: Double,
@@ -516,24 +570,9 @@ class MinimapDataType(
         mapCenter: Point, // Added mapCenter
         zoomLevel: Float, // Changed to Float and renamed from zoomLevel (Int)
         bearingInDegrees: Double,
-        color: Int,
+        width: Float,
     ) {
-        val chevronPaint = Paint().apply {
-            this.color = color
-            style = Paint.Style.FILL
-            isAntiAlias = true
-        }
-        val chevronOutlinePaint = Paint().apply {
-            this.color = Color.BLACK
-            style = Paint.Style.STROKE
-            isAntiAlias = true
-            this.strokeWidth = 3f
-            strokeCap = Paint.Cap.ROUND
-            strokeJoin = Paint.Join.ROUND
-        }
-
-        val triangleSize = 30f
-        val triangleBaseAngleRad = (PI / 1.5).toFloat()
+        // imageHeight will be calculated based on aspect ratio
 
         val intZoom = floor(zoomLevel).toInt()
         val centerTileX = lonToTileX(mapCenter.longitude(), intZoom)
@@ -550,32 +589,38 @@ class MinimapDataType(
         val screenX = (centerScreenX + deltaPixelX).toFloat()
         val screenY = (centerScreenY + deltaPixelY).toFloat()
 
-        val angleRad = Math.toRadians(bearingInDegrees + 90.0).toFloat()
+        val paint = Paint().apply {
+            isAntiAlias = true
+            isFilterBitmap = true
+        }
 
-        val leftBaseX = screenX + triangleSize * cos(angleRad + PI.toFloat() - triangleBaseAngleRad)
-        val leftBaseY = screenY + triangleSize * sin(angleRad + PI.toFloat() - triangleBaseAngleRad)
-        val rightBaseX = screenX + triangleSize * cos(angleRad + PI.toFloat() + triangleBaseAngleRad)
-        val rightBaseY = screenY + triangleSize * sin(angleRad + PI.toFloat() + triangleBaseAngleRad)
+        val navigationBitmap = getNavigationBitmap(width)
+        if (navigationBitmap != null) {
+            // Create bitmap with the target dimensions
+            canvas.withRotation(
+                bearingInDegrees.toFloat(),
+                screenX,
+                screenY
+            ) { // Save the current canvas state
+                // Calculate the top-left position to draw the bitmap so it's centered
+                val left = screenX - navigationBitmap.width / 2
+                val top = screenY - navigationBitmap.height / 2
 
-        val trianglePath = Path()
-        trianglePath.moveTo(screenX, screenY)
-        trianglePath.lineTo(leftBaseX, leftBaseY)
-        trianglePath.lineTo(rightBaseX, rightBaseY)
-        trianglePath.close()
-
-        canvas.drawPath(trianglePath, chevronPaint)
-        canvas.drawPath(trianglePath, chevronOutlinePaint)
+                drawBitmap(navigationBitmap, left, top, paint)
+            }
+        }
     }
 
     private fun drawPolyline(
         lineString: LineString,
         canvas: Canvas,
         color: Int,
-        strokeWidth: Float,
         mapCenter: Point,
         zoomLevel: Float,
         drawDirectionIndicatorChevrons: Boolean = true
     ) {
+        val strokeWidth = 13f
+
         val points = lineString.coordinates()
         if (points.size < 2) {
             return
