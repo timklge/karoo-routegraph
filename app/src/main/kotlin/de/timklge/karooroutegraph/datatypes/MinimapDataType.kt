@@ -441,11 +441,11 @@ class MinimapDataType(
                         } else {
                             25f
                         }
+                        val targetPosition = Point.fromLngLat(viewModel.locationAndRemainingRouteDistance.lon, viewModel.locationAndRemainingRouteDistance.lat)
 
                         drawCurrentPosition(
                             canvas,
-                            viewModel.locationAndRemainingRouteDistance.lon,
-                            viewModel.locationAndRemainingRouteDistance.lat,
+                            targetPosition,
                             centerPosition,
                             zoomLevel,
                             (viewModel.locationAndRemainingRouteDistance.bearing ?: 0.0),
@@ -599,9 +599,8 @@ class MinimapDataType(
 
     private fun drawCurrentPosition(
         canvas: Canvas,
-        lng: Double,
-        lat: Double,
-        mapCenter: Point, // Added mapCenter
+        targetPosition: Point,
+        mapCenter: Point,
         zoomLevel: Float, // Changed to Float and renamed from zoomLevel (Int)
         bearingInDegrees: Double,
         width: Float,
@@ -614,8 +613,8 @@ class MinimapDataType(
         val centerScreenX = canvas.width / 2f
         val centerScreenY = canvas.height / 2f
 
-        val pointTileX = lonToTileX(lng, intZoom)
-        val pointTileY = latToTileY(lat, intZoom)
+        val pointTileX = lonToTileX(targetPosition.longitude(), intZoom)
+        val pointTileY = latToTileY(targetPosition.latitude(), intZoom)
 
         val deltaPixelX = (pointTileX - centerTileX) * TARGET_TILE_SIZE
         val deltaPixelY = (pointTileY - centerTileY) * TARGET_TILE_SIZE
@@ -922,4 +921,3 @@ fun LineString.getCenterPoint(): Point? {
 
     return Point.fromLngLat(avgLng, avgLat)
 }
-
