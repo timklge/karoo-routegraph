@@ -6,10 +6,15 @@ import android.graphics.BitmapFactory
 import android.util.Log
 import io.hammerhead.karooext.models.HttpResponseState
 import io.hammerhead.karooext.models.OnHttpResponse
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.single
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
@@ -21,6 +26,7 @@ import java.time.Instant
 
 class TileDownloadService(
     private val karooSystemServiceProvider: KarooSystemServiceProvider,
+    private val minimapViewModelProvider: MinimapViewModelProvider,
     private val context: Context,
 ) {
     data class CachedTile(val lastAccessed: Instant, val bitmap: Bitmap)
@@ -34,6 +40,32 @@ class TileDownloadService(
     init {
         if (!cacheDir.exists()) {
             cacheDir.mkdirs()
+        }
+    }
+
+    private var downloadJob: Job? = null
+    private var downloadQueue: Channel<Tile> = Channel(Channel.UNLIMITED)
+
+    fun startDownloadJob() {
+        downloadJob = CoroutineScope(Dispatchers.IO).launch {
+            for (tile in downloadQueue) {
+                try {
+                    val fetchedBitmap = fetchTileFromNetwork(tile)
+
+                    // Save to caches (file and memory)
+                    mutex.withLock {
+                        val tileFile = getTileFile(tile)
+                        saveTileToFile(fetchedBitmap, tileFile)
+                        gcCache() // Clean up memory cache before adding new item
+                        inMemoryCache[tile] = CachedTile(Instant.now(), fetchedBitmap)
+                        Log.d(KarooRouteGraphExtension.TAG, "Fetched tile ${tile}, saved to file and added to memory cache")
+                    }
+
+                    minimapViewModelProvider.update { it.copy(lastTileDownloadedAt = Instant.now()) }
+                } catch (e: Exception) {
+                    Log.e(KarooRouteGraphExtension.TAG, "Error downloading tile ${tile}", e)
+                }
+            }
         }
     }
 
@@ -85,23 +117,9 @@ class TileDownloadService(
         return null // Not found in memory or file cache
     }
 
-    suspend fun getTile(tile: Tile): Bitmap {
-        // First, try getting it instantly (checks memory and file cache)
-        getTileIfAvailableInstantly(tile)?.let { return it }
-
-        // If not available instantly, fetch from network
-        val fetchedBitmap = fetchTileFromNetwork(tile)
-
-        // Save to caches (file and memory)
-        mutex.withLock {
-            val tileFile = getTileFile(tile)
-            saveTileToFile(fetchedBitmap, tileFile)
-            gcCache() // Clean up memory cache before adding new item
-            inMemoryCache[tile] = CachedTile(Instant.now(), fetchedBitmap)
-            Log.d(KarooRouteGraphExtension.TAG, "Fetched tile ${tile}, saved to file and added to memory cache")
-        }
-
-        return fetchedBitmap
+    fun queueTileDownload(tile: Tile) {
+        // If not available instantly, add to download queue
+        downloadQueue.trySendBlocking(tile)
     }
 
     private suspend fun fetchTileFromNetwork(tile: Tile): Bitmap {

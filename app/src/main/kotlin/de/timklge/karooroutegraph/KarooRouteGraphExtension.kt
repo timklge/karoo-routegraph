@@ -386,6 +386,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
         startGraphUpdater()
         startMinimapUpdater()
+        tileDownloadService.startDownloadJob()
     }
 
     private fun startMinimapUpdater() {

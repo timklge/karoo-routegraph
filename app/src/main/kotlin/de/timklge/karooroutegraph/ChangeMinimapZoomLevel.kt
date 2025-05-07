@@ -13,7 +13,7 @@ class ChangeMinimapZoomLevel : ActionCallback, KoinComponent {
     private val viewModelProvider: RouteGraphViewModelProvider by inject()
     private val routeGraphDisplayViewModelProvider: RouteGraphDisplayViewModelProvider by inject()
 
-    private fun getRequiredZoomLevel(viewModel: RouteGraphViewModel, width: Int, height: Int) : Float {
+    private fun getRequiredZoomLevel(viewModel: RouteGraphViewModel, width: Int, height: Int): Float? {
         return if (viewModel.rejoin != null){
                 viewModel.rejoin.getOSMZoomLevelToFit(width, height)
             } else if (viewModel.routeToDestination != null){
@@ -21,7 +21,7 @@ class ChangeMinimapZoomLevel : ActionCallback, KoinComponent {
             } else if (viewModel.knownRoute != null){
                 viewModel.knownRoute.getOSMZoomLevelToFit(width, height)
             } else {
-                16.0f
+                null
             }
     }
 

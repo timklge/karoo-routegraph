@@ -18,6 +18,7 @@ import androidx.appcompat.content.res.AppCompatResources
 import androidx.compose.ui.unit.DpSize
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.drawable.toBitmap
+import androidx.core.graphics.withRotation
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
@@ -65,9 +66,9 @@ import io.hammerhead.karooext.models.UpdateGraphicConfig
 import io.hammerhead.karooext.models.UserProfile
 import io.hammerhead.karooext.models.ViewConfig
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -79,7 +80,6 @@ import kotlin.math.floor
 import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
-import androidx.core.graphics.withRotation
 
 enum class MinimapZoomLevel(val level: Float?) {
     CLOSEST(16.0f),
@@ -88,7 +88,7 @@ enum class MinimapZoomLevel(val level: Float?) {
     FURTHEST(10.0f),
     COMPLETE_ROUTE(null);
 
-    fun next(maxZoomLevel: Float): MinimapZoomLevel {
+    fun next(maxZoomLevel: Float?): MinimapZoomLevel {
         if (this == COMPLETE_ROUTE) {
             return CLOSEST
         }
@@ -101,11 +101,15 @@ enum class MinimapZoomLevel(val level: Float?) {
             else -> null
         }
 
+        if (nextLevel == COMPLETE_ROUTE && maxZoomLevel == null) {
+            return CLOSEST
+        }
+
         if (nextLevel?.level == null) {
             return COMPLETE_ROUTE
         }
 
-        return if (nextLevel.level <     maxZoomLevel) {
+        return if (maxZoomLevel != null && nextLevel.level < maxZoomLevel) {
             COMPLETE_ROUTE
         } else {
             nextLevel
@@ -143,6 +147,7 @@ class MinimapDataType(
         val settings: RouteGraphSettings
     )
 
+    @OptIn(DelicateCoroutinesApi::class)
     override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
         Log.d(TAG, "Starting minimap view with $emitter")
 
@@ -206,7 +211,7 @@ class MinimapDataType(
                 displayViewModel.copy(minimapWidth = width, minimapHeight = height)
             }
 
-            flow.collectLatest { (viewModel, minimapViewModel, userProfile, displayViewModel, settings) ->
+            flow.collect { (viewModel, minimapViewModel, userProfile, displayViewModel, settings) ->
                 val width = config.viewSize.first
                 val height = config.viewSize.second
 
@@ -250,6 +255,7 @@ class MinimapDataType(
                     val requiredTiles = getRequiredTiles(zoomLevel, width, height, centerPosition)
                     val downloadedTiles = requiredTiles.associateWith { tile -> tileDownloadService.getTileIfAvailableInstantly(tile) }
                     val nextTileToDownload = requiredTiles.firstOrNull { tile -> downloadedTiles[tile] == null } // Check if bitmap is null
+                    val missingTiles = requiredTiles - downloadedTiles.filter { it.value != null }.map { it.key }
 
                     val centerTileX = lonToTileX(centerPosition.longitude(), intZoom)
                     val centerTileY = latToTileY(centerPosition.latitude(), intZoom)
@@ -301,6 +307,35 @@ class MinimapDataType(
 
                             canvas.drawBitmap(tileBitmap, srcRect, dstRect, bitmapPaint)
                         }
+                    }
+
+                    missingTiles.forEach { tile ->
+                        // Calculate the difference in tile coordinates from the center
+                        val deltaTileX = tile.x - centerTileX
+                        val deltaTileY = tile.y - centerTileY
+
+                        // Convert tile difference to pixel difference using the target size
+                        val deltaPixelX = deltaTileX * TARGET_TILE_SIZE
+                        val deltaPixelY = deltaTileY * TARGET_TILE_SIZE
+
+                        // Calculate the top-left screen coordinates for this tile
+                        val tileScreenX = (centerScreenX + deltaPixelX).toFloat()
+                        val tileScreenY = (centerScreenY + deltaPixelY).toFloat()
+
+                        val outlinePaint = Paint().apply {
+                            color = Color.LTGRAY
+                            style = Paint.Style.STROKE
+                            strokeWidth = 2f
+                            isAntiAlias = true
+                        }
+
+                        canvas.drawRect(
+                            tileScreenX,
+                            tileScreenY,
+                            (tileScreenX + TARGET_TILE_SIZE).toFloat(),
+                            (tileScreenY + TARGET_TILE_SIZE).toFloat(),
+                            outlinePaint
+                        )
                     }
 
                     /* if (minimapViewModel.pastPoints != null) {
@@ -436,10 +471,9 @@ class MinimapDataType(
 
                     if (nextTileToDownload != null) {
                         try {
-                            tileDownloadService.getTile(nextTileToDownload)
-                            update()
+                            tileDownloadService.queueTileDownload(nextTileToDownload)
                         } catch (e: Exception) {
-                            Log.e(TAG, "Error downloading tile: ${nextTileToDownload}", e)
+                            Log.e(TAG, "Error downloading tile: $nextTileToDownload", e)
                         }
                     }
                 }
@@ -619,7 +653,7 @@ class MinimapDataType(
         zoomLevel: Float,
         drawDirectionIndicatorChevrons: Boolean = true
     ) {
-        val strokeWidth = 13f
+        val strokeWidth = 11f
 
         val points = lineString.coordinates()
         if (points.size < 2) {
@@ -760,8 +794,8 @@ class MinimapDataType(
         val paint = Paint().apply {
             isAntiAlias = true
             color = Color.BLACK
-            strokeWidth = 3f
-            textSize = 20f
+            strokeWidth = 5f
+            textSize = 30f
             textAlign = Paint.Align.LEFT
         }
         val textPaint = Paint(paint).apply {
@@ -772,7 +806,7 @@ class MinimapDataType(
 
         val metersPerPixel = (earthCircumference * cos(Math.toRadians(latitude))) / (2.0.pow(zoomLevel.toDouble() + 8))
 
-        val targetWidthPx = 75
+        val targetWidthPx = 80
         val targetDistanceMeters = targetWidthPx * metersPerPixel
 
         val bestDistanceMeters: Double
@@ -888,3 +922,4 @@ fun LineString.getCenterPoint(): Point? {
 
     return Point.fromLngLat(avgLng, avgLat)
 }
+
