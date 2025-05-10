@@ -1,10 +1,14 @@
-package de.timklge.karooroutegraph
+package de.timklge.karooroutegraph.datatypes.minimap
 
 import android.content.Context
 import android.util.Log
 import androidx.glance.GlanceId
 import androidx.glance.action.ActionParameters
 import androidx.glance.appwidget.action.ActionCallback
+import de.timklge.karooroutegraph.KarooRouteGraphExtension
+import de.timklge.karooroutegraph.RouteGraphDisplayViewModelProvider
+import de.timklge.karooroutegraph.RouteGraphViewModel
+import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import kotlinx.coroutines.flow.first
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -39,7 +43,7 @@ class ChangeMinimapZoomLevel : ActionCallback, KoinComponent {
             if (width != null && height != null) {
                 val requiredZoomLevel = getRequiredZoomLevel(viewModel, displayViewModel.minimapWidth, displayViewModel.minimapHeight)
                 val newZoomLevel = displayViewModel.minimapZoomLevel.next(requiredZoomLevel)
-                Log.d(KarooRouteGraphExtension.TAG, "Updated zoom level: $newZoomLevel")
+                Log.d(KarooRouteGraphExtension.Companion.TAG, "Updated zoom level: $newZoomLevel")
 
                 displayViewModel.copy(minimapZoomLevel = newZoomLevel)
             } else {

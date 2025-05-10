@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
+import de.timklge.karooroutegraph.datatypes.minimap.MinimapViewModelProvider
 import io.hammerhead.karooext.models.HttpResponseState
 import io.hammerhead.karooext.models.OnHttpResponse
 import kotlinx.coroutines.CoroutineScope
@@ -50,6 +51,11 @@ class TileDownloadService(
         downloadJob = CoroutineScope(Dispatchers.IO).launch {
             for (tile in downloadQueue) {
                 try {
+                    val downloadedTile = getTileIfAvailableInstantly(tile)
+                    if (downloadedTile != null) {
+                        Log.d(KarooRouteGraphExtension.TAG, "Tile $tile already in cache")
+                        continue
+                    }
                     val fetchedBitmap = fetchTileFromNetwork(tile)
 
                     // Save to caches (file and memory)
@@ -61,9 +67,11 @@ class TileDownloadService(
                         Log.d(KarooRouteGraphExtension.TAG, "Fetched tile ${tile}, saved to file and added to memory cache")
                     }
 
-                    minimapViewModelProvider.update { it.copy(lastTileDownloadedAt = Instant.now()) }
+                    minimapViewModelProvider.update {
+                        it.copy(lastTileDownloadedAt = Instant.now())
+                    }
                 } catch (e: Exception) {
-                    Log.e(KarooRouteGraphExtension.TAG, "Error downloading tile ${tile}", e)
+                    Log.e(KarooRouteGraphExtension.TAG, "Error downloading tile $tile", e)
                 }
             }
         }

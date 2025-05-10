@@ -2,11 +2,10 @@ package de.timklge.karooroutegraph
 
 import Climb
 import com.mapbox.geojson.LineString
-import io.hammerhead.karooext.models.OnGlobalPOIs
-import io.hammerhead.karooext.models.OnLocationChanged
 import io.hammerhead.karooext.models.Symbol
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 data class RouteGraphViewModel(val routeDistance: Float? = null,
                                val distanceAlongRoute: Float? = null,
@@ -24,7 +23,7 @@ class RouteGraphViewModelProvider {
     private val observableStateFlow = MutableStateFlow(RouteGraphViewModel())
     val viewModelFlow = observableStateFlow.asStateFlow()
 
-    suspend fun update(vm: RouteGraphViewModel){
-        observableStateFlow.emit(vm)
+    fun update(action: (RouteGraphViewModel) -> RouteGraphViewModel){
+        observableStateFlow.update(action)
     }
 }

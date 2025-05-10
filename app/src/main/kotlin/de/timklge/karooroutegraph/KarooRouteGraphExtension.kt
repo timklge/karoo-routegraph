@@ -1,6 +1,5 @@
 package de.timklge.karooroutegraph
 
-import android.util.Base64
 import android.util.Log
 import androidx.annotation.DrawableRes
 import com.mapbox.geojson.LineString
@@ -10,9 +9,10 @@ import com.mapbox.turf.TurfMeasurement
 import com.mapbox.turf.TurfTransformation
 import de.timklge.karooroutegraph.datatypes.DistanceToNextPOIDataType
 import de.timklge.karooroutegraph.datatypes.ElevationToNextPOIDataType
-import de.timklge.karooroutegraph.datatypes.MinimapDataType
 import de.timklge.karooroutegraph.datatypes.RouteGraphDataType
 import de.timklge.karooroutegraph.datatypes.VerticalRouteGraphDataType
+import de.timklge.karooroutegraph.datatypes.minimap.MinimapDataType
+import de.timklge.karooroutegraph.datatypes.minimap.MinimapViewModelProvider
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import identifyClimbs
 import io.hammerhead.karooext.extension.KarooExtension
@@ -38,7 +38,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformLatest
@@ -347,17 +346,19 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     }
                 }
 
-                val viewModel = routeGraphViewModelProvider.viewModelFlow.first().copy(routeDistance = routeDistance?.toFloat(),
-                    distanceAlongRoute = distanceAlongRoute?.toFloat(),
-                    knownRoute = knownRoute,
-                    poiDistances = poiDistances,
-                    sampledElevationData = knownRouteElevation,
-                    isImperial = isImperial,
-                    routeToDestination = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingToDestination)?.polyline?.let { LineString.fromPolyline(it, 5) },
-                    rejoin = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.rejoinPolyline?.let { LineString.fromPolyline(it, 5) },
-                    locationAndRemainingRouteDistance = locationAndRemainingRouteDistance
-                )
-                routeGraphViewModelProvider.update(viewModel)
+                routeGraphViewModelProvider.update {
+                    it.copy(
+                        routeDistance = routeDistance?.toFloat(),
+                        distanceAlongRoute = distanceAlongRoute?.toFloat(),
+                        knownRoute = knownRoute,
+                        poiDistances = poiDistances,
+                        sampledElevationData = knownRouteElevation,
+                        isImperial = isImperial,
+                        routeToDestination = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingToDestination)?.polyline?.let { LineString.fromPolyline(it, 5) },
+                        rejoin = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.rejoinPolyline?.let { LineString.fromPolyline(it, 5) },
+                        locationAndRemainingRouteDistance = locationAndRemainingRouteDistance
+                    )
+                }
 
                 // Request elevation data
                 if (knownRouteElevation == null && routeLineString != null && routeDistance != null){
@@ -372,7 +373,9 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                         val climbs = elevations.identifyClimbs()
                         Log.i(TAG, "Identified climbs: $climbs")
 
-                        routeGraphViewModelProvider.update(viewModel.copy(sampledElevationData = elevations, climbs = climbs))
+                        routeGraphViewModelProvider.update {
+                            it.copy(sampledElevationData = elevations, climbs = climbs)
+                        }
                     } catch(e: Exception){
                         Log.e(TAG, "Failed to sample route elevation")
                     }
@@ -403,12 +406,14 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 StreamData(location, rideState)
             }
 
-            flow.collect { (locationEvent, rideState) ->
+            flow.throttle(30_000L).collect { (locationEvent, rideState) ->
                 if (rideState is RideState.Idle) {
                     pastPoints = emptyList()
                     tempPoints.clear()
                     return@collect
                 }
+
+                /* TODO store ridden path
 
                 val location = Point.fromLngLat(locationEvent.lng, locationEvent.lat)
 
@@ -419,16 +424,16 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 if (tempPoints.size >= 30) {
                     pastPoints = TurfTransformation.simplify(newPointList)
                     tempPoints.clear()
+                } */
+
+                minimapViewModelProvider.update {
+                    it.copy(
+                        // pastPoints = newPointList,
+                        currentLat = locationEvent.lat,
+                        currentLng = locationEvent.lng,
+                        currentBearing = locationEvent.orientation
+                    )
                 }
-
-                val minimapViewModel = MinimapViewModel(
-                    // pastPoints = newPointList,
-                    currentLat = locationEvent.lat,
-                    currentLng = locationEvent.lng,
-                    currentBearing = locationEvent.orientation
-                )
-
-                minimapViewModelProvider.update(minimapViewModel)
             }
         }
     }

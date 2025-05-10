@@ -1,6 +1,5 @@
-package de.timklge.karooroutegraph
+package de.timklge.karooroutegraph.datatypes.minimap
 
-import com.mapbox.geojson.Point
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -16,11 +15,7 @@ class MinimapViewModelProvider {
     private val observableStateFlow = MutableStateFlow(MinimapViewModel())
     val viewModelFlow = observableStateFlow.asStateFlow()
 
-    suspend fun update(vm: MinimapViewModel){
-        observableStateFlow.emit(vm)
-    }
-
-    suspend fun update(action: (MinimapViewModel) -> MinimapViewModel) {
-        observableStateFlow.update { action(it) }
+    fun update(action: (MinimapViewModel) -> MinimapViewModel) {
+        observableStateFlow.update(action)
     }
 }

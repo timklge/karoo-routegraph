@@ -1,4 +1,4 @@
-package de.timklge.karooroutegraph.datatypes
+package de.timklge.karooroutegraph.datatypes.minimap
 
 import android.content.Context
 import android.content.res.Configuration
@@ -32,28 +32,19 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
 import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
+import com.mapbox.turf.TurfConstants
 import com.mapbox.turf.TurfConstants.UNIT_METERS
 import com.mapbox.turf.TurfMeasurement
 import com.mapbox.turf.TurfMisc
-import de.timklge.karooroutegraph.ChangeMinimapZoomLevel
 import de.timklge.karooroutegraph.KarooRouteGraphExtension
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
-import de.timklge.karooroutegraph.MinimapViewModel
-import de.timklge.karooroutegraph.MinimapViewModelProvider
 import de.timklge.karooroutegraph.NearestPoint
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModel
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModelProvider
 import de.timklge.karooroutegraph.RouteGraphViewModel
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
-import de.timklge.karooroutegraph.TARGET_TILE_SIZE
 import de.timklge.karooroutegraph.TileDownloadService
-import de.timklge.karooroutegraph.earthCircumference
-import de.timklge.karooroutegraph.getOSMZoomLevelToFit
-import de.timklge.karooroutegraph.getRequiredTiles
-import de.timklge.karooroutegraph.latToTileY
-import de.timklge.karooroutegraph.lonToTileX
-import de.timklge.karooroutegraph.previewPolylineBase64
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.streamSettings
 import de.timklge.karooroutegraph.streamUserProfile
@@ -203,7 +194,7 @@ class MinimapDataType(
             }
         }
 
-        val viewJob = CoroutineScope(Dispatchers.Default).launch {
+        val viewJob = CoroutineScope(Dispatchers.IO).launch {
             displayViewModelProvider.update { displayViewModel ->
                 val width = config.viewSize.first
                 val height = config.viewSize.second
@@ -212,56 +203,74 @@ class MinimapDataType(
             }
 
             flow.collect { (viewModel, minimapViewModel, userProfile, displayViewModel, settings) ->
+                Log.d(TAG, "Redrawing minimap view")
+
                 val width = config.viewSize.first
                 val height = config.viewSize.second
 
-                val centerPosition = if (displayViewModel.minimapZoomLevel == MinimapZoomLevel.COMPLETE_ROUTE || viewModel.distanceAlongRoute == null || minimapViewModel.currentLat == null || minimapViewModel.currentLng == null) {
+                val currentPosition = if (minimapViewModel.currentLng != null && minimapViewModel.currentLat != null){
+                    Point.fromLngLat(minimapViewModel.currentLng, minimapViewModel.currentLat)
+                } else null
+
+                val zoomLevel =
+                    if (displayViewModel.minimapZoomLevel == MinimapZoomLevel.COMPLETE_ROUTE) {
+                        if (viewModel.rejoin != null) {
+                            viewModel.rejoin.getOSMZoomLevelToFit(width, height)
+                        } else if (viewModel.routeToDestination != null) {
+                            viewModel.routeToDestination.getOSMZoomLevelToFit(width, height)
+                        } else if (viewModel.knownRoute != null) {
+                            viewModel.knownRoute.getOSMZoomLevelToFit(width, height)
+                        } else {
+                            16.0f
+                        }
+                    } else {
+                        displayViewModel.minimapZoomLevel.level ?: 16.0f
+                    }
+
+                val centerPosition = if (displayViewModel.minimapZoomLevel == MinimapZoomLevel.COMPLETE_ROUTE){
                     if (viewModel.rejoin != null) {
-                        viewModel.rejoin.getCenterPoint() ?: defaultMapCenter
+                        viewModel.rejoin.getCenterPoint()
                     } else if (viewModel.routeToDestination != null) {
-                        viewModel.routeToDestination.getCenterPoint() ?: defaultMapCenter
+                        viewModel.routeToDestination.getCenterPoint()
                     } else if (viewModel.knownRoute != null) {
-                        viewModel.knownRoute.getCenterPoint() ?: defaultMapCenter
+                        viewModel.knownRoute.getCenterPoint()
                     } else {
                         defaultMapCenter
                     }
                 } else {
-                    Point.fromLngLat(minimapViewModel.currentLng, minimapViewModel.currentLat)
-                }
-                val zoomLevel = if (displayViewModel.minimapZoomLevel == MinimapZoomLevel.COMPLETE_ROUTE){
-                    if (viewModel.rejoin != null){
-                        viewModel.rejoin.getOSMZoomLevelToFit(width, height)
-                    } else if (viewModel.routeToDestination != null){
-                        viewModel.routeToDestination.getOSMZoomLevelToFit(width, height)
-                    } else if (viewModel.knownRoute != null){
-                        viewModel.knownRoute.getOSMZoomLevelToFit(width, height)
+                    if (viewModel.rejoin != null) {
+                        viewModel.rejoin.previewRemainingRoute(zoomLevel, null, width, height) ?: defaultMapCenter
+                    } else if (viewModel.routeToDestination != null) {
+                        viewModel.routeToDestination.previewRemainingRoute(zoomLevel, viewModel.distanceAlongRoute, width, height) ?: defaultMapCenter
+                    } else if (viewModel.knownRoute != null) {
+                        viewModel.knownRoute.previewRemainingRoute(zoomLevel, viewModel.distanceAlongRoute, width, height) ?: defaultMapCenter
+                    } else if (minimapViewModel.currentLng != null && minimapViewModel.currentLat != null) {
+                        Point.fromLngLat(minimapViewModel.currentLng, minimapViewModel.currentLat)
                     } else {
-                        16.0f
+                        defaultMapCenter
                     }
-                } else {
-                    displayViewModel.minimapZoomLevel.level ?: 16.0f
                 }
 
-                suspend fun update() {
+                try {
                     val bitmap = createBitmap(width, height)
-
                     val canvas = Canvas(bitmap)
-                    val nightMode = isNightMode()
-                    val imperialUnits = userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
-
+                    val nightMode = this@MinimapDataType.isNightMode()
+                    val imperialUnits =
+                        userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
                     canvas.drawColor(if (nightMode) Color.BLACK else Color.WHITE)
-
                     val intZoom = floor(zoomLevel).toInt()
                     val requiredTiles = getRequiredTiles(zoomLevel, width, height, centerPosition)
-                    val downloadedTiles = requiredTiles.associateWith { tile -> tileDownloadService.getTileIfAvailableInstantly(tile) }
-                    val nextTileToDownload = requiredTiles.firstOrNull { tile -> downloadedTiles[tile] == null } // Check if bitmap is null
-                    val missingTiles = requiredTiles - downloadedTiles.filter { it.value != null }.map { it.key }
-
+                    val downloadedTiles = requiredTiles.associateWith { tile ->
+                        this@MinimapDataType.tileDownloadService.getTileIfAvailableInstantly(tile)
+                    }
+                    val nextTileToDownload =
+                        requiredTiles.firstOrNull { tile -> downloadedTiles[tile] == null } // Check if bitmap is null
+                    val missingTiles =
+                        requiredTiles - downloadedTiles.filter { it.value != null }.map { it.key }
                     val centerTileX = lonToTileX(centerPosition.longitude(), intZoom)
                     val centerTileY = latToTileY(centerPosition.latitude(), intZoom)
                     val centerScreenX = width / 2.0
                     val centerScreenY = height / 2.0
-
                     downloadedTiles.forEach { (tile, tileBitmap) ->
                         if (tileBitmap != null) { // Ensure bitmap is not null
                             // Calculate the difference in tile coordinates from the center
@@ -277,7 +286,12 @@ class MinimapDataType(
                             val tileScreenY = (centerScreenY + deltaPixelY).toFloat()
 
                             // Define source and destination rectangles for scaling
-                            val srcRect = Rect(0, 0, tileBitmap.width, tileBitmap.height) // Source is the original tile bitmap
+                            val srcRect = Rect(
+                                0,
+                                0,
+                                tileBitmap.width,
+                                tileBitmap.height
+                            ) // Source is the original tile bitmap
                             val dstRect = Rect(
                                 tileScreenX.toInt(),
                                 tileScreenY.toInt(),
@@ -285,30 +299,31 @@ class MinimapDataType(
                                 (tileScreenY + TARGET_TILE_SIZE).toInt()  // Use target size for destination height
                             )
                             val bitmapPaint = Paint().apply {
-                                isFilterBitmap = true
-                                isAntiAlias = true
+                                this.isFilterBitmap = true
+                                this.isAntiAlias = true
 
                                 // Grayscale
                                 // val matrix = ColorMatrix().apply { setSaturation(0f) }
                                 // colorFilter = ColorMatrixColorFilter(matrix)
 
                                 if (nightMode) {
-                                    val invertMatrix = ColorMatrix(floatArrayOf(
-                                        -1f, 0f, 0f, 0f, 255f,
-                                        0f, -1f, 0f, 0f, 255f,
-                                        0f, 0f, -1f, 0f, 255f,
-                                        0f, 0f, 0f, 1f, 0f
-                                    ))
-                                    val grayMatrix = ColorMatrix().apply { setSaturation(0f) }
+                                    val invertMatrix = ColorMatrix(
+                                        floatArrayOf(
+                                            -1f, 0f, 0f, 0f, 255f,
+                                            0f, -1f, 0f, 0f, 255f,
+                                            0f, 0f, -1f, 0f, 255f,
+                                            0f, 0f, 0f, 1f, 0f
+                                        )
+                                    )
+                                    val grayMatrix = ColorMatrix().apply { setSaturation(0f); }
                                     invertMatrix.postConcat(grayMatrix)
-                                    colorFilter = ColorMatrixColorFilter(invertMatrix)
+                                    setColorFilter(ColorMatrixColorFilter(invertMatrix))
                                 }
                             }
 
                             canvas.drawBitmap(tileBitmap, srcRect, dstRect, bitmapPaint)
                         }
                     }
-
                     missingTiles.forEach { tile ->
                         // Calculate the difference in tile coordinates from the center
                         val deltaTileX = tile.x - centerTileX
@@ -323,10 +338,10 @@ class MinimapDataType(
                         val tileScreenY = (centerScreenY + deltaPixelY).toFloat()
 
                         val outlinePaint = Paint().apply {
-                            color = Color.LTGRAY
-                            style = Paint.Style.STROKE
-                            strokeWidth = 2f
-                            isAntiAlias = true
+                            this.color = Color.LTGRAY
+                            this.style = Paint.Style.STROKE
+                            this.strokeWidth = 2f
+                            this.isAntiAlias = true
                         }
 
                         canvas.drawRect(
@@ -337,16 +352,20 @@ class MinimapDataType(
                             outlinePaint
                         )
                     }
-
                     /* if (minimapViewModel.pastPoints != null) {
                         val lineString = LineString.fromLngLats(minimapViewModel.pastPoints)
                         drawPolyline(lineString, canvas, Color.GRAY, 8f, centerPosition, zoomLevel)
                     } */
-
                     if (viewModel.rejoin != null) {
-                        drawPolyline(viewModel.rejoin, canvas, Color.RED, centerPosition, zoomLevel)
+                        this@MinimapDataType.drawPolyline(
+                            viewModel.rejoin,
+                            canvas,
+                            Color.RED,
+                            centerPosition,
+                            zoomLevel
+                        )
                     } else if (viewModel.routeToDestination != null) {
-                        drawPolyline(
+                        this@MinimapDataType.drawPolyline(
                             viewModel.routeToDestination,
                             canvas,
                             Color.rgb(1.0f, 0.0f, 1.0f),
@@ -354,33 +373,46 @@ class MinimapDataType(
                             zoomLevel
                         )
                     }
-
                     if (viewModel.knownRoute != null) {
                         if (viewModel.distanceAlongRoute != null) {
                             // Only draw the part of the route that is ahead of the current position
-                            val endDistance = viewModel.routeDistance?.toDouble() ?: TurfMeasurement.length(viewModel.knownRoute, UNIT_METERS)
-                            val startDistance = viewModel.distanceAlongRoute.toDouble().coerceIn(0.0, endDistance)
+                            val endDistance =
+                                viewModel.routeDistance?.toDouble() ?: TurfMeasurement.length(
+                                    viewModel.knownRoute, UNIT_METERS
+                                )
+                            val startDistance =
+                                viewModel.distanceAlongRoute.toDouble().coerceIn(0.0, endDistance)
                             val routeSlice = try {
-                                TurfMisc.lineSliceAlong(viewModel.knownRoute, startDistance, endDistance, UNIT_METERS)
-                            } catch(e: Exception) {
+                                TurfMisc.lineSliceAlong(
+                                    viewModel.knownRoute,
+                                    startDistance,
+                                    endDistance,
+                                    UNIT_METERS
+                                )
+                            } catch (e: Exception) {
                                 Log.e(TAG, "Error slicing route: ${e.message}")
                                 null
                             }
                             val pastRouteSlice = try {
-                                TurfMisc.lineSliceAlong(viewModel.knownRoute, 0.0, startDistance, UNIT_METERS)
-                            } catch(e: Exception) {
+                                TurfMisc.lineSliceAlong(
+                                    viewModel.knownRoute,
+                                    0.0,
+                                    startDistance,
+                                    TurfConstants.UNIT_METERS
+                                )
+                            } catch (e: Exception) {
                                 Log.e(TAG, "Error slicing route: ${e.message}")
                                 null
                             }
 
-                            if (pastRouteSlice != null) drawPolyline(
+                            if (pastRouteSlice != null) this@MinimapDataType.drawPolyline(
                                 pastRouteSlice,
                                 canvas,
                                 Color.LTGRAY,
                                 centerPosition,
                                 zoomLevel
                             )
-                            if (routeSlice != null) drawPolyline(
+                            if (routeSlice != null) this@MinimapDataType.drawPolyline(
                                 routeSlice,
                                 canvas,
                                 Color.YELLOW,
@@ -388,7 +420,7 @@ class MinimapDataType(
                                 zoomLevel
                             )
                         } else {
-                            drawPolyline(
+                            this@MinimapDataType.drawPolyline(
                                 viewModel.knownRoute,
                                 canvas,
                                 Color.YELLOW,
@@ -397,16 +429,20 @@ class MinimapDataType(
                             )
                         }
                     }
-
                     if (viewModel.knownRoute != null) {
                         viewModel.climbs?.forEach { climb ->
                             try {
-                                val polyline = TurfMisc.lineSliceAlong(viewModel.knownRoute, climb.startDistance.toDouble().coerceAtLeast(0.0), climb.endDistance.toDouble(), UNIT_METERS)
+                                val polyline = TurfMisc.lineSliceAlong(
+                                    viewModel.knownRoute,
+                                    climb.startDistance.toDouble().coerceAtLeast(0.0),
+                                    climb.endDistance.toDouble(),
+                                    UNIT_METERS
+                                )
 
-                                drawPolyline(
+                                this@MinimapDataType.drawPolyline(
                                     polyline,
                                     canvas,
-                                    applicationContext.getColor(climb.category.colorRes),
+                                    this@MinimapDataType.applicationContext.getColor(climb.category.colorRes),
                                     centerPosition,
                                     zoomLevel
                                 )
@@ -415,15 +451,20 @@ class MinimapDataType(
                             }
                         }
                     }
-
                     if (config.gridSize.first > 15 && config.gridSize.second > 15) {
                         val pois = viewModel.poiDistances?.keys ?: emptySet()
                         pois.forEach { poi ->
                             // Label: poi.name, Lat: poi.lat, Long: poi.lng
-                            drawPoi(canvas, poi, centerPosition, zoomLevel, settings.showPOILabelsOnMinimap)
+                            this@MinimapDataType.drawPoi(
+                                canvas,
+                                poi,
+                                centerPosition,
+                                zoomLevel,
+                                settings.showPOILabelsOnMinimap
+                            )
                         }
 
-                        drawScaleBar(
+                        this@MinimapDataType.drawScaleBar(
                             canvas,
                             height,
                             centerPosition.latitude(),
@@ -432,18 +473,20 @@ class MinimapDataType(
                             imperialUnits
                         )
                     }
-
-                    drawCopyright(canvas, width, height, nightMode)
-
+                    this@MinimapDataType.drawCopyright(canvas, width, height, nightMode)
                     if (viewModel.locationAndRemainingRouteDistance?.lon != null && viewModel.locationAndRemainingRouteDistance.lat != null) {
-                        val currentPositionIndicatorWidth = if (config.gridSize.first > 15 && config.gridSize.second > 15) {
-                            35f
-                        } else {
-                            25f
-                        }
-                        val targetPosition = Point.fromLngLat(viewModel.locationAndRemainingRouteDistance.lon, viewModel.locationAndRemainingRouteDistance.lat)
+                        val currentPositionIndicatorWidth =
+                            if (config.gridSize.first > 15 && config.gridSize.second > 15) {
+                                35f
+                            } else {
+                                25f
+                            }
+                        val targetPosition = Point.fromLngLat(
+                            viewModel.locationAndRemainingRouteDistance.lon,
+                            viewModel.locationAndRemainingRouteDistance.lat
+                        )
 
-                        drawCurrentPosition(
+                        this@MinimapDataType.drawCurrentPosition(
                             canvas,
                             targetPosition,
                             centerPosition,
@@ -452,34 +495,35 @@ class MinimapDataType(
                             currentPositionIndicatorWidth
                         )
                     }
-
-                    val result = glance.compose(context, DpSize.Unspecified) {
+                    val result = this@MinimapDataType.glance.compose(context, DpSize.Unspecified) {
                         var modifier = GlanceModifier.fillMaxSize()
 
-                        if (!config.preview) modifier = modifier.clickable(onClick = actionRunCallback<ChangeMinimapZoomLevel>(
-                            parameters = actionParametersOf(
-                                ActionParameters.Key<String>("action_type") to "minimap_zoom"
+                        if (!config.preview) modifier = modifier.clickable(
+                            onClick = actionRunCallback<ChangeMinimapZoomLevel>(
+                                parameters = actionParametersOf(
+                                    ActionParameters.Key<String>("action_type") to "minimap_zoom"
+                                )
                             )
-                        ))
+                        )
 
                         Box(modifier = modifier) {
-                            Image(ImageProvider(bitmap), "Minimap", modifier = GlanceModifier.fillMaxSize())
+                            Image(
+                                ImageProvider(bitmap),
+                                "Minimap",
+                                modifier = GlanceModifier.fillMaxSize()
+                            )
                         }
                     }
-
                     emitter.updateView(result.remoteViews)
-
                     if (nextTileToDownload != null) {
                         try {
-                            tileDownloadService.queueTileDownload(nextTileToDownload)
+                            this@MinimapDataType.tileDownloadService.queueTileDownload(
+                                nextTileToDownload
+                            )
                         } catch (e: Exception) {
                             Log.e(TAG, "Error downloading tile: $nextTileToDownload", e)
                         }
                     }
-                }
-
-                try {
-                    update()
                 } catch (e: Exception) {
                     Log.e(TAG, "Error updating minimap view", e)
                 }
@@ -553,7 +597,7 @@ class MinimapDataType(
                 textSize = 30f
                 isAntiAlias = true
                 textAlign = Paint.Align.CENTER
-                typeface = Typeface.DEFAULT_BOLD
+                setTypeface(Typeface.DEFAULT_BOLD)
             }
 
             val backgroundPaint = Paint().apply {
@@ -788,7 +832,7 @@ class MinimapDataType(
         latitude: Double,
         minimapZoomLevel: MinimapZoomLevel,
         zoomLevel: Float,
-        imperialUnits: Boolean
+        imperialUnits: Boolean,
     ) {
         val paint = Paint().apply {
             isAntiAlias = true
@@ -803,7 +847,9 @@ class MinimapDataType(
 
         val padding = 5f
 
-        val metersPerPixel = (earthCircumference * cos(Math.toRadians(latitude))) / (2.0.pow(zoomLevel.toDouble() + 8))
+        val standardTileSize = 256.0
+        val tileScaleFactor = TARGET_TILE_SIZE / standardTileSize
+        val metersPerPixel = 156543.03392 * cos(Math.toRadians(latitude)) / (2.0.pow(zoomLevel.toDouble()) * tileScaleFactor)
 
         val targetWidthPx = 80
         val targetDistanceMeters = targetWidthPx * metersPerPixel
@@ -900,24 +946,4 @@ class MinimapDataType(
 
         canvas.drawText(copyrightText, xPos, yPos, paint)
     }
-}
-
-fun LineString.getCenterPoint(): Point? {
-    val points = this.coordinates()
-    if (points.isEmpty()) {
-        return null
-    }
-
-    var totalLat = 0.0
-    var totalLng = 0.0
-
-    for (point in points) {
-        totalLat += point.latitude()
-        totalLng += point.longitude()
-    }
-
-    val avgLat = totalLat / points.size
-    val avgLng = totalLng / points.size
-
-    return Point.fromLngLat(avgLng, avgLat)
 }

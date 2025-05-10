@@ -1,6 +1,6 @@
 package de.timklge.karooroutegraph
 
-import de.timklge.karooroutegraph.datatypes.MinimapZoomLevel
+import de.timklge.karooroutegraph.datatypes.minimap.MinimapZoomLevel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
