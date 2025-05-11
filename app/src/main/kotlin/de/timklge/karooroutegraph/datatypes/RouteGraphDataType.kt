@@ -15,13 +15,14 @@ import androidx.core.graphics.withClip
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
+import androidx.glance.action.ActionParameters
+import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
 import androidx.glance.appwidget.GlanceRemoteViews
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
-import de.timklge.karooroutegraph.ChangeZoomLevelAction
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.NearestPoint
 import de.timklge.karooroutegraph.R
@@ -31,7 +32,9 @@ import de.timklge.karooroutegraph.RouteGraphViewModel
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.SparseElevationData
 import de.timklge.karooroutegraph.ZoomLevel
+import de.timklge.karooroutegraph.datatypes.minimap.ChangeZoomLevelAction
 import de.timklge.karooroutegraph.getInclineIndicatorColor
+import de.timklge.karooroutegraph.streamDatatypeIsVisible
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.DataTypeImpl
 import io.hammerhead.karooext.internal.ViewEmitter
@@ -45,6 +48,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -71,7 +75,7 @@ class RouteGraphDataType(
         return nightModeFlags == Configuration.UI_MODE_NIGHT_YES
     }
 
-    data class ViewModels(val routeGraphViewModel: RouteGraphViewModel, val routeGraphDisplayViewModel: RouteGraphDisplayViewModel)
+    data class ViewModels(val routeGraphViewModel: RouteGraphViewModel, val routeGraphDisplayViewModel: RouteGraphDisplayViewModel, val isVisible: Boolean)
 
     @OptIn(DelicateCoroutinesApi::class)
     override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
@@ -88,13 +92,17 @@ class RouteGraphDataType(
         val flow = if (config.preview){
             previewFlow()
         } else {
-            viewModelProvider.viewModelFlow.combine(displayViewModelProvider.viewModelFlow) { viewModel, displayViewModel ->
-                ViewModels(viewModel, displayViewModel)
+            combine(
+                viewModelProvider.viewModelFlow,
+                displayViewModelProvider.viewModelFlow,
+                karooSystem.streamDatatypeIsVisible(dataTypeId)
+            ) { viewModel, displayViewModel, visible ->
+                ViewModels(viewModel, displayViewModel, visible)
             }
         }
 
         val viewJob = CoroutineScope(Dispatchers.Default).launch {
-            flow.collect { (viewModel, displayViewModel) ->
+            flow.filter { it.isVisible }.collect { (viewModel, displayViewModel) ->
                 val bitmap = createBitmap(config.viewSize.first, config.viewSize.second)
 
                 val canvas = Canvas(bitmap)
@@ -337,22 +345,28 @@ class RouteGraphDataType(
                     }
                 }
 
-                if (viewModel.distanceAlongRoute != null && viewModel.routeDistance != null){
+                if (viewModel.distanceAlongRoute != null){
                     val distanceAlongRoutePixelsFromLeft = remap(viewModel.distanceAlongRoute, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
 
                     canvas.drawLine(distanceAlongRoutePixelsFromLeft, 0f, distanceAlongRoutePixelsFromLeft, graphBounds.bottom, backgroundStrokePaint)
                     canvas.drawLine(distanceAlongRoutePixelsFromLeft, 0f, distanceAlongRoutePixelsFromLeft, graphBounds.bottom, currentLinePaint)
                 }
 
-                if (viewModel.poiDistances != null && viewModel.routeDistance != null){
+                if (viewModel.poiDistances != null){
                     val previousPOIs = mutableSetOf<RectF>()
 
+                    val allPoisInRange = viewModel.poiDistances.values.flatten().filter { nearestPoint ->
+                        nearestPoint.distanceFromRouteStart in viewRange
+                    }
+
                     viewModel.poiDistances.forEach { (poi, distances) ->
-                        distances.filter { nearestPoint ->
+                        val poisInRange = distances.filter { nearestPoint ->
                             nearestPoint.distanceFromRouteStart in viewRange
-                        }.forEach { nearestPoint ->
+                        }
+
+                        poisInRange.forEach { nearestPoint ->
                             val distanceFromRouteStart = nearestPoint.distanceFromRouteStart
-                            val text = poi.name ?: ""
+                            val text = (if (allPoisInRange.size <= 4) poi.name else "X") ?: "X"
                             val textWidth = textPaintInv.measureText(text)
                             val pixelsFromLeft = remap(distanceFromRouteStart, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
 
@@ -475,10 +489,14 @@ class RouteGraphDataType(
                 val result = glance.compose(context, DpSize.Unspecified) {
                     var modifier = GlanceModifier.fillMaxSize()
 
-                    if (!config.preview) modifier = modifier.clickable(onClick = actionRunCallback<ChangeZoomLevelAction>())
+                    if (!config.preview) modifier = modifier.clickable(onClick = actionRunCallback<ChangeZoomLevelAction>(
+                        parameters = actionParametersOf(
+                            ActionParameters.Key<String>("action_type") to "zoom"
+                        )
+                    ))
 
-                    Box(modifier = modifier){
-                        Image(ImageProvider(bitmap), "Route Graph", modifier = GlanceModifier.fillMaxSize())
+                    Box(modifier = GlanceModifier.fillMaxSize()){
+                        Image(ImageProvider(bitmap), "Route Graph", modifier = modifier)
                     }
                 }
                 emitter.updateView(result.remoteViews)
@@ -506,7 +524,7 @@ class RouteGraphDataType(
                 ).toSampledElevationData(100.0f)
             )
             val routeGraphDisplayViewModel = RouteGraphDisplayViewModel()
-            val viewModels = ViewModels(routeGraphViewModel, routeGraphDisplayViewModel)
+            val viewModels = ViewModels(routeGraphViewModel, routeGraphDisplayViewModel, true)
 
             emit(viewModels)
 

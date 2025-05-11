@@ -7,6 +7,13 @@
     mapLayer="true">
 
     <DataType
+        description="@string/minimap_description"
+        displayName="@string/minimap"
+        graphical="true"
+        icon="@drawable/trip"
+        typeId="minimap" />
+
+    <DataType
         description="@string/routegraph_description"
         displayName="@string/routegraph"
         graphical="true"
@@ -33,4 +40,5 @@
         graphical="false"
         icon="@drawable/trip"
         typeId="elevationtopoi" />
+
 </ExtensionInfo>

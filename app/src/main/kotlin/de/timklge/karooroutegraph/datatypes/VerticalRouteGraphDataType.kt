@@ -16,13 +16,14 @@ import androidx.core.graphics.withClip
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
+import androidx.glance.action.ActionParameters
+import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
 import androidx.glance.appwidget.GlanceRemoteViews
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
-import de.timklge.karooroutegraph.ChangeZoomLevelAction
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.NearestPoint
 import de.timklge.karooroutegraph.R
@@ -32,9 +33,11 @@ import de.timklge.karooroutegraph.RouteGraphViewModel
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.SparseElevationData
 import de.timklge.karooroutegraph.ZoomLevel
+import de.timklge.karooroutegraph.datatypes.minimap.ChangeZoomLevelAction
 import de.timklge.karooroutegraph.distanceIsZero
 import de.timklge.karooroutegraph.distanceToString
 import de.timklge.karooroutegraph.getInclineIndicatorColor
+import de.timklge.karooroutegraph.streamDatatypeIsVisible
 import de.timklge.karooroutegraph.streamUserProfile
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.DataTypeImpl
@@ -49,6 +52,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
@@ -71,7 +75,7 @@ class VerticalRouteGraphDataType(
         return nightModeFlags == Configuration.UI_MODE_NIGHT_YES
     }
 
-    data class StreamData(val routeGraphViewModel: RouteGraphViewModel, val routeGraphDisplayViewModel: RouteGraphDisplayViewModel, val profile: UserProfile)
+    data class StreamData(val routeGraphViewModel: RouteGraphViewModel, val routeGraphDisplayViewModel: RouteGraphDisplayViewModel, val profile: UserProfile, val isVisible: Boolean)
 
     override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
         Log.d(TAG, "Starting route view with $emitter")
@@ -85,13 +89,18 @@ class VerticalRouteGraphDataType(
         val flow = if (config.preview){
             previewFlow()
         } else {
-            combine(viewModelProvider.viewModelFlow, displayViewModelProvider.viewModelFlow, karooSystem.streamUserProfile()) { viewModel, displayViewModel, profile ->
-                StreamData(viewModel, displayViewModel, profile)
+            combine(
+                viewModelProvider.viewModelFlow,
+                displayViewModelProvider.viewModelFlow,
+                karooSystem.streamUserProfile(),
+                karooSystem.streamDatatypeIsVisible(dataTypeId)
+            ) { viewModel, displayViewModel, profile, isVisible ->
+                StreamData(viewModel, displayViewModel, profile, isVisible)
             }
         }
 
         val viewJob = CoroutineScope(Dispatchers.Default).launch {
-            flow.collect { (viewModel, displayViewModel, userProfile) ->
+            flow.filter { it.isVisible }.collect { (viewModel, displayViewModel, userProfile) ->
                 val bitmap = createBitmap(config.viewSize.first, config.viewSize.second)
 
                 val canvas = Canvas(bitmap)
@@ -356,7 +365,7 @@ class VerticalRouteGraphDataType(
                     }
 
                     if (viewModel.distanceAlongRoute != null){
-                        val distanceAlongRouteProgressPixels = remap(viewModel.distanceAlongRoute, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
+                        val distanceAlongRouteProgressPixels = remap(viewModel.distanceAlongRoute!!, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
 
                         canvas.withClip(0f, 0f, config.viewSize.second.toFloat(), distanceAlongRouteProgressPixels){
                             canvas.withClip(filledPath) {
@@ -369,7 +378,7 @@ class VerticalRouteGraphDataType(
                 }
 
                 if (viewModel.distanceAlongRoute != null && viewModel.routeDistance != null){
-                    val distanceAlongRoutePixelsFromLeft = remap(viewModel.distanceAlongRoute, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
+                    val distanceAlongRoutePixelsFromLeft = remap(viewModel.distanceAlongRoute!!, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
 
                     canvas.drawLine(0f, distanceAlongRoutePixelsFromLeft, config.viewSize.first.toFloat(), distanceAlongRoutePixelsFromLeft, backgroundStrokePaint)
                     canvas.drawLine(0f, distanceAlongRoutePixelsFromLeft, config.viewSize.second.toFloat(), distanceAlongRoutePixelsFromLeft, currentLinePaint)
@@ -390,11 +399,11 @@ class VerticalRouteGraphDataType(
 
                         textDrawCommands.add(TextDrawCommand(graphBounds.right + 75, progressPixels + 15f, text, textPaintBold, 11))
 
-                        if (viewModel.distanceAlongRoute != null && nearestPoint.distanceFromRouteStart > viewModel.distanceAlongRoute){
-                            val distanceMeters = nearestPoint.distanceFromRouteStart - viewModel.distanceAlongRoute
+                        if (viewModel.distanceAlongRoute != null && nearestPoint.distanceFromRouteStart > viewModel.distanceAlongRoute!!){
+                            val distanceMeters = nearestPoint.distanceFromRouteStart - viewModel.distanceAlongRoute!!
                             var distanceStr = "In ${distanceToString(distanceMeters, userProfile, false)}"
 
-                            val elevationMetersRemaining = viewModel.sampledElevationData?.getTotalClimb(viewModel.distanceAlongRoute, nearestPoint.distanceFromRouteStart)
+                            val elevationMetersRemaining = viewModel.sampledElevationData?.getTotalClimb(viewModel.distanceAlongRoute!!, nearestPoint.distanceFromRouteStart)
                             if (elevationMetersRemaining != null && !distanceIsZero(elevationMetersRemaining.toFloat(), userProfile)) {
                                 distanceStr += " ↗ ${distanceToString(elevationMetersRemaining.toFloat(), userProfile, true)}"
                             }
@@ -466,7 +475,11 @@ class VerticalRouteGraphDataType(
                 val result = glance.compose(context, DpSize.Unspecified) {
                     var modifier = GlanceModifier.fillMaxSize()
 
-                    if (!config.preview) modifier = modifier.clickable(onClick = actionRunCallback<ChangeZoomLevelAction>())
+                    if (!config.preview) modifier = modifier.clickable(onClick = actionRunCallback<ChangeZoomLevelAction>(
+                        parameters = actionParametersOf(
+                            ActionParameters.Key<String>("action_type") to "zoom"
+                        )
+                    ))
 
                     Box(modifier = modifier) {
                         Image(ImageProvider(bitmap), "Route Graph", modifier = GlanceModifier.fillMaxSize())
@@ -497,7 +510,7 @@ class VerticalRouteGraphDataType(
                 ).toSampledElevationData(100.0f)
             )
             val routeGraphDisplayViewModel = RouteGraphDisplayViewModel()
-            val streamData = StreamData(routeGraphViewModel, routeGraphDisplayViewModel, karooSystem.streamUserProfile().first())
+            val streamData = StreamData(routeGraphViewModel, routeGraphDisplayViewModel, karooSystem.streamUserProfile().first(), true)
 
             emit(streamData)
 
