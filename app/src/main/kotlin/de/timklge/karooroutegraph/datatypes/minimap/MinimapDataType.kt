@@ -46,7 +46,6 @@ import de.timklge.karooroutegraph.RouteGraphViewModel
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.TileDownloadService
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
-import de.timklge.karooroutegraph.streamActiveRidePage
 import de.timklge.karooroutegraph.streamDatatypeIsVisible
 import de.timklge.karooroutegraph.streamSettings
 import de.timklge.karooroutegraph.streamUserProfile
@@ -223,16 +222,10 @@ class MinimapDataType(
                 val width = config.viewSize.first
                 val height = config.viewSize.second
 
-                val currentPosition = if (minimapViewModel.currentLng != null && minimapViewModel.currentLat != null){
-                    Point.fromLngLat(minimapViewModel.currentLng, minimapViewModel.currentLat)
-                } else null
-
                 val zoomLevel =
                     if (displayViewModel.minimapZoomLevel == MinimapZoomLevel.COMPLETE_ROUTE) {
                         if (viewModel.rejoin != null) {
                             viewModel.rejoin.getOSMZoomLevelToFit(width, height)
-                        } else if (viewModel.routeToDestination != null) {
-                            viewModel.routeToDestination.getOSMZoomLevelToFit(width, height)
                         } else if (viewModel.knownRoute != null) {
                             viewModel.knownRoute.getOSMZoomLevelToFit(width, height)
                         } else {
@@ -245,8 +238,6 @@ class MinimapDataType(
                 val centerPosition = if (displayViewModel.minimapZoomLevel == MinimapZoomLevel.COMPLETE_ROUTE){
                     if (viewModel.rejoin != null) {
                         viewModel.rejoin.getCenterPoint()
-                    } else if (viewModel.routeToDestination != null) {
-                        viewModel.routeToDestination.getCenterPoint()
                     } else if (viewModel.knownRoute != null) {
                         viewModel.knownRoute.getCenterPoint()
                     } else {
@@ -255,8 +246,6 @@ class MinimapDataType(
                 } else {
                     if (viewModel.rejoin != null) {
                         viewModel.rejoin.previewRemainingRoute(zoomLevel, null, width, height) ?: defaultMapCenter
-                    } else if (viewModel.routeToDestination != null) {
-                        viewModel.routeToDestination.previewRemainingRoute(zoomLevel, viewModel.distanceAlongRoute, width, height) ?: defaultMapCenter
                     } else if (viewModel.knownRoute != null) {
                         viewModel.knownRoute.previewRemainingRoute(zoomLevel, viewModel.distanceAlongRoute, width, height) ?: defaultMapCenter
                     } else if (minimapViewModel.currentLng != null && minimapViewModel.currentLat != null) {
@@ -379,14 +368,6 @@ class MinimapDataType(
                             centerPosition,
                             zoomLevel
                         )
-                    } else if (viewModel.routeToDestination != null) {
-                        this@MinimapDataType.drawPolyline(
-                            viewModel.routeToDestination,
-                            canvas,
-                            Color.rgb(1.0f, 0.0f, 1.0f),
-                            centerPosition,
-                            zoomLevel
-                        )
                     }
                     if (viewModel.knownRoute != null) {
                         if (viewModel.distanceAlongRoute != null) {
@@ -430,7 +411,7 @@ class MinimapDataType(
                             if (routeSlice != null) this@MinimapDataType.drawPolyline(
                                 routeSlice,
                                 canvas,
-                                Color.YELLOW,
+                                if (viewModel.navigatingToDestination) Color.rgb(1.0f, 0.0f, 1.0f) else Color.YELLOW,
                                 centerPosition,
                                 zoomLevel
                             )
@@ -438,7 +419,7 @@ class MinimapDataType(
                             this@MinimapDataType.drawPolyline(
                                 viewModel.knownRoute,
                                 canvas,
-                                Color.YELLOW,
+                                if (viewModel.navigatingToDestination) Color.rgb(1.0f, 0.0f, 1.0f) else Color.YELLOW,
                                 centerPosition,
                                 zoomLevel
                             )
@@ -709,7 +690,7 @@ class MinimapDataType(
         zoomLevel: Float,
         drawDirectionIndicatorChevrons: Boolean = true
     ) {
-        val strokeWidth = 11f
+        val strokeWidth = 12f
 
         val points = lineString.coordinates()
         if (points.size < 2) {
