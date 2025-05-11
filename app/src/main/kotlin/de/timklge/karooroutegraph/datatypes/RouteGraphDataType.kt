@@ -23,7 +23,6 @@ import androidx.glance.appwidget.GlanceRemoteViews
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
-import de.timklge.karooroutegraph.datatypes.minimap.ChangeZoomLevelAction
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.NearestPoint
 import de.timklge.karooroutegraph.R
@@ -33,7 +32,9 @@ import de.timklge.karooroutegraph.RouteGraphViewModel
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.SparseElevationData
 import de.timklge.karooroutegraph.ZoomLevel
+import de.timklge.karooroutegraph.datatypes.minimap.ChangeZoomLevelAction
 import de.timklge.karooroutegraph.getInclineIndicatorColor
+import de.timklge.karooroutegraph.streamDatatypeIsVisible
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.DataTypeImpl
 import io.hammerhead.karooext.internal.ViewEmitter
@@ -47,6 +48,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -331,7 +333,7 @@ class RouteGraphDataType(
                     }
 
                     if (viewModel.distanceAlongRoute != null){
-                        val distanceAlongRoutePixelsFromLeft = remap(viewModel.distanceAlongRoute!!, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
+                        val distanceAlongRoutePixelsFromLeft = remap(viewModel.distanceAlongRoute, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
 
                         canvas.withClip(0f, 0f, distanceAlongRoutePixelsFromLeft, config.viewSize.second.toFloat()){
                             canvas.withClip(filledPath) {
@@ -343,22 +345,28 @@ class RouteGraphDataType(
                     }
                 }
 
-                if (viewModel.distanceAlongRoute != null && viewModel.routeDistance != null){
-                    val distanceAlongRoutePixelsFromLeft = remap(viewModel.distanceAlongRoute!!, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
+                if (viewModel.distanceAlongRoute != null){
+                    val distanceAlongRoutePixelsFromLeft = remap(viewModel.distanceAlongRoute, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
 
                     canvas.drawLine(distanceAlongRoutePixelsFromLeft, 0f, distanceAlongRoutePixelsFromLeft, graphBounds.bottom, backgroundStrokePaint)
                     canvas.drawLine(distanceAlongRoutePixelsFromLeft, 0f, distanceAlongRoutePixelsFromLeft, graphBounds.bottom, currentLinePaint)
                 }
 
-                if (viewModel.poiDistances != null && viewModel.routeDistance != null){
+                if (viewModel.poiDistances != null){
                     val previousPOIs = mutableSetOf<RectF>()
 
+                    val allPoisInRange = viewModel.poiDistances.values.flatten().filter { nearestPoint ->
+                        nearestPoint.distanceFromRouteStart in viewRange
+                    }
+
                     viewModel.poiDistances.forEach { (poi, distances) ->
-                        distances.filter { nearestPoint ->
+                        val poisInRange = distances.filter { nearestPoint ->
                             nearestPoint.distanceFromRouteStart in viewRange
-                        }.forEach { nearestPoint ->
+                        }
+
+                        poisInRange.forEach { nearestPoint ->
                             val distanceFromRouteStart = nearestPoint.distanceFromRouteStart
-                            val text = poi.name ?: ""
+                            val text = (if (allPoisInRange.size <= 4) poi.name else "X") ?: "X"
                             val textWidth = textPaintInv.measureText(text)
                             val pixelsFromLeft = remap(distanceFromRouteStart, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
 
