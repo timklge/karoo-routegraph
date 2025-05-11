@@ -135,7 +135,8 @@ class MinimapDataType(
         val minimapViewModel: MinimapViewModel,
         val profile: UserProfile,
         val displayViewModel: RouteGraphDisplayViewModel,
-        val settings: RouteGraphSettings
+        val settings: RouteGraphSettings,
+        val dataPageIsVisible: Boolean,
     )
 
     @OptIn(DelicateCoroutinesApi::class)
@@ -180,6 +181,7 @@ class MinimapDataType(
                     ),
                     displayViewModel = RouteGraphDisplayViewModel(),
                     settings = context.streamSettings(karooSystem).first(),
+                    dataPageIsVisible = true
                 ))
             }
         } else {
@@ -188,9 +190,17 @@ class MinimapDataType(
                 minimapViewModelProvider.viewModelFlow,
                 karooSystem.streamUserProfile(),
                 displayViewModelProvider.viewModelFlow,
-                context.streamSettings(karooSystem)
-            ) { viewModel, minimapViewModel, profile, displayViewModel, settings ->
-                StreamData(viewModel, minimapViewModel, profile, displayViewModel, settings)
+                context.streamSettings(karooSystem),
+                karooSystem.streamDatatypeIsVisible(dataTypeId)
+            ) { data ->
+                val viewModel = data[0] as RouteGraphViewModel
+                val minimapViewModel = data[1] as MinimapViewModel
+                val profile = data[2] as UserProfile
+                val displayViewModel = data[3] as RouteGraphDisplayViewModel
+                val settings = data[4] as RouteGraphSettings
+                val isVisible = data[5] as Boolean
+
+                StreamData(viewModel, minimapViewModel, profile, displayViewModel, settings, isVisible)
             }
         }
 
@@ -202,7 +212,7 @@ class MinimapDataType(
                 displayViewModel.copy(minimapWidth = width, minimapHeight = height)
             }
 
-            flow.collect { (viewModel, minimapViewModel, userProfile, displayViewModel, settings) ->
+            flow.filter { it.dataPageIsVisible }.collect { (viewModel, minimapViewModel, userProfile, displayViewModel, settings) ->
                 Log.d(TAG, "Redrawing minimap view")
 
                 val width = config.viewSize.first

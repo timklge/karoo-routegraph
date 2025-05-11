@@ -73,7 +73,7 @@ class RouteGraphDataType(
         return nightModeFlags == Configuration.UI_MODE_NIGHT_YES
     }
 
-    data class ViewModels(val routeGraphViewModel: RouteGraphViewModel, val routeGraphDisplayViewModel: RouteGraphDisplayViewModel)
+    data class ViewModels(val routeGraphViewModel: RouteGraphViewModel, val routeGraphDisplayViewModel: RouteGraphDisplayViewModel, val isVisible: Boolean)
 
     @OptIn(DelicateCoroutinesApi::class)
     override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
@@ -90,13 +90,17 @@ class RouteGraphDataType(
         val flow = if (config.preview){
             previewFlow()
         } else {
-            viewModelProvider.viewModelFlow.combine(displayViewModelProvider.viewModelFlow) { viewModel, displayViewModel ->
-                ViewModels(viewModel, displayViewModel)
+            combine(
+                viewModelProvider.viewModelFlow,
+                displayViewModelProvider.viewModelFlow,
+                karooSystem.streamDatatypeIsVisible(dataTypeId)
+            ) { viewModel, displayViewModel, visible ->
+                ViewModels(viewModel, displayViewModel, visible)
             }
         }
 
         val viewJob = CoroutineScope(Dispatchers.Default).launch {
-            flow.collect { (viewModel, displayViewModel) ->
+            flow.filter { it.isVisible }.collect { (viewModel, displayViewModel) ->
                 val bitmap = createBitmap(config.viewSize.first, config.viewSize.second)
 
                 val canvas = Canvas(bitmap)
@@ -512,7 +516,7 @@ class RouteGraphDataType(
                 ).toSampledElevationData(100.0f)
             )
             val routeGraphDisplayViewModel = RouteGraphDisplayViewModel()
-            val viewModels = ViewModels(routeGraphViewModel, routeGraphDisplayViewModel)
+            val viewModels = ViewModels(routeGraphViewModel, routeGraphDisplayViewModel, true)
 
             emit(viewModels)
 

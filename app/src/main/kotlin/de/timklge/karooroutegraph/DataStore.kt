@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import io.hammerhead.karooext.KarooSystemService
+import io.hammerhead.karooext.models.ActiveRidePage
 import io.hammerhead.karooext.models.UserProfile
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.channels.trySendBlocking
@@ -46,6 +47,17 @@ fun KarooSystemService.streamUserProfile(): Flow<UserProfile> {
     return callbackFlow {
         val listenerId = addConsumer { userProfile: UserProfile ->
             trySendBlocking(userProfile)
+        }
+        awaitClose {
+            removeConsumer(listenerId)
+        }
+    }
+}
+
+fun KarooSystemService.streamActiveRidePage(): Flow<ActiveRidePage> {
+    return callbackFlow {
+        val listenerId = addConsumer { activeRidePage: ActiveRidePage ->
+            trySendBlocking(activeRidePage)
         }
         awaitClose {
             removeConsumer(listenerId)

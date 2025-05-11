@@ -24,7 +24,6 @@ import androidx.glance.appwidget.GlanceRemoteViews
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
-import de.timklge.karooroutegraph.datatypes.minimap.ChangeZoomLevelAction
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.NearestPoint
 import de.timklge.karooroutegraph.R
@@ -34,9 +33,11 @@ import de.timklge.karooroutegraph.RouteGraphViewModel
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.SparseElevationData
 import de.timklge.karooroutegraph.ZoomLevel
+import de.timklge.karooroutegraph.datatypes.minimap.ChangeZoomLevelAction
 import de.timklge.karooroutegraph.distanceIsZero
 import de.timklge.karooroutegraph.distanceToString
 import de.timklge.karooroutegraph.getInclineIndicatorColor
+import de.timklge.karooroutegraph.streamDatatypeIsVisible
 import de.timklge.karooroutegraph.streamUserProfile
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.DataTypeImpl
@@ -51,6 +52,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
@@ -73,7 +75,7 @@ class VerticalRouteGraphDataType(
         return nightModeFlags == Configuration.UI_MODE_NIGHT_YES
     }
 
-    data class StreamData(val routeGraphViewModel: RouteGraphViewModel, val routeGraphDisplayViewModel: RouteGraphDisplayViewModel, val profile: UserProfile)
+    data class StreamData(val routeGraphViewModel: RouteGraphViewModel, val routeGraphDisplayViewModel: RouteGraphDisplayViewModel, val profile: UserProfile, val isVisible: Boolean)
 
     override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
         Log.d(TAG, "Starting route view with $emitter")
@@ -87,13 +89,18 @@ class VerticalRouteGraphDataType(
         val flow = if (config.preview){
             previewFlow()
         } else {
-            combine(viewModelProvider.viewModelFlow, displayViewModelProvider.viewModelFlow, karooSystem.streamUserProfile()) { viewModel, displayViewModel, profile ->
-                StreamData(viewModel, displayViewModel, profile)
+            combine(
+                viewModelProvider.viewModelFlow,
+                displayViewModelProvider.viewModelFlow,
+                karooSystem.streamUserProfile(),
+                karooSystem.streamDatatypeIsVisible(dataTypeId)
+            ) { viewModel, displayViewModel, profile, isVisible ->
+                StreamData(viewModel, displayViewModel, profile, isVisible)
             }
         }
 
         val viewJob = CoroutineScope(Dispatchers.Default).launch {
-            flow.collect { (viewModel, displayViewModel, userProfile) ->
+            flow.filter { it.isVisible }.collect { (viewModel, displayViewModel, userProfile) ->
                 val bitmap = createBitmap(config.viewSize.first, config.viewSize.second)
 
                 val canvas = Canvas(bitmap)
@@ -503,7 +510,7 @@ class VerticalRouteGraphDataType(
                 ).toSampledElevationData(100.0f)
             )
             val routeGraphDisplayViewModel = RouteGraphDisplayViewModel()
-            val streamData = StreamData(routeGraphViewModel, routeGraphDisplayViewModel, karooSystem.streamUserProfile().first())
+            val streamData = StreamData(routeGraphViewModel, routeGraphDisplayViewModel, karooSystem.streamUserProfile().first(), true)
 
             emit(streamData)
 
