@@ -280,8 +280,8 @@ fun LineString.previewRemainingRoute(zoomLevel: Float, distanceAlongRoute: Float
 
         // Calculate center that keeps both start and lookahead point visible
         return Point.fromLngLat(
-            (startPoint.longitude() + newMaxLng) / 2,
-            (startPoint.latitude() + newMaxLat) / 2
+            (newMinLng + newMaxLng) / 2,
+            (newMinLat + newMaxLat) / 2
         )
     }
 

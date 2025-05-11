@@ -46,6 +46,8 @@ import de.timklge.karooroutegraph.RouteGraphViewModel
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.TileDownloadService
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
+import de.timklge.karooroutegraph.streamActiveRidePage
+import de.timklge.karooroutegraph.streamDatatypeIsVisible
 import de.timklge.karooroutegraph.streamSettings
 import de.timklge.karooroutegraph.streamUserProfile
 import io.hammerhead.karooext.KarooSystemService
@@ -61,6 +63,7 @@ import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
@@ -76,7 +79,8 @@ enum class MinimapZoomLevel(val level: Float?) {
     CLOSEST(16.0f),
     CLOSE(14.0f),
     FAR(12.0f),
-    FURTHEST(10.0f),
+    FURTHER(10.0f),
+    FURTHEST(8.0f),
     COMPLETE_ROUTE(null);
 
     fun next(maxZoomLevel: Float?): MinimapZoomLevel {
@@ -87,7 +91,8 @@ enum class MinimapZoomLevel(val level: Float?) {
         val nextLevel = when (this) {
             CLOSEST -> CLOSE
             CLOSE -> FAR
-            FAR -> FURTHEST
+            FAR -> FURTHER
+            FURTHER -> FURTHEST
             FURTHEST -> COMPLETE_ROUTE
             else -> null
         }
@@ -480,7 +485,8 @@ class MinimapDataType(
                             centerPosition.latitude(),
                             displayViewModel.minimapZoomLevel,
                             zoomLevel,
-                            imperialUnits
+                            imperialUnits,
+                            if (nightMode) Color.WHITE else Color.BLACK
                         )
                     }
                     this@MinimapDataType.drawCopyright(canvas, width, height, nightMode)
@@ -690,10 +696,7 @@ class MinimapDataType(
                 screenY
             ) { // Save the current canvas state
                 // Calculate the top-left position to draw the bitmap so it's centered
-                val left = screenX - navigationBitmap.width / 2
-                val top = screenY - navigationBitmap.height / 2
-
-                drawBitmap(navigationBitmap, left, top, paint)
+                drawBitmap(navigationBitmap, screenX, screenY, paint)
             }
         }
     }
@@ -843,16 +846,18 @@ class MinimapDataType(
         minimapZoomLevel: MinimapZoomLevel,
         zoomLevel: Float,
         imperialUnits: Boolean,
+        color: Int
     ) {
         val paint = Paint().apply {
             isAntiAlias = true
-            color = Color.BLACK
+            this.color = color
             strokeWidth = 5f
             textSize = 30f
             textAlign = Paint.Align.LEFT
         }
         val textPaint = Paint(paint).apply {
             strokeWidth = 1f
+            this.color = color
         }
 
         val padding = 5f
