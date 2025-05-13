@@ -20,13 +20,7 @@ class ChangeMinimapZoomLevel : ActionCallback, KoinComponent {
     private fun getRequiredZoomLevel(viewModel: RouteGraphViewModel, width: Int, height: Int): Float? {
         return if (viewModel.rejoin != null){
                 viewModel.rejoin.getOSMZoomLevelToFit(width, height)
-            } else if (viewModel.routeToDestination != null){
-                viewModel.routeToDestination.getOSMZoomLevelToFit(width, height)
-            } else if (viewModel.knownRoute != null){
-                viewModel.knownRoute.getOSMZoomLevelToFit(width, height)
-            } else {
-                null
-            }
+            } else viewModel.knownRoute?.getOSMZoomLevelToFit(width, height)
     }
 
     override suspend fun onAction(

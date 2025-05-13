@@ -15,7 +15,7 @@ data class RouteGraphViewModel(val routeDistance: Float? = null,
                                val isImperial: Boolean = false,
                                val climbs: List<Climb>? = null,
                                val rejoin: LineString? = null,
-                               val routeToDestination: LineString? = null,
+                               val navigatingToDestination: Boolean = false,
                                val locationAndRemainingRouteDistance: KarooRouteGraphExtension.LocationAndRemainingRouteDistance? = null
 )
 
