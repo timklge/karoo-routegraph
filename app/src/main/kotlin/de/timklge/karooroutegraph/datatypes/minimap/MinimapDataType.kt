@@ -696,7 +696,7 @@ class MinimapDataType(
                 screenY
             ) { // Save the current canvas state
                 // Calculate the top-left position to draw the bitmap so it's centered
-                drawBitmap(navigationBitmap, screenX, screenY, paint)
+                drawBitmap(navigationBitmap, screenX - navigationBitmap.width / 2f, screenY - navigationBitmap.height / 2f, paint)
             }
         }
     }
