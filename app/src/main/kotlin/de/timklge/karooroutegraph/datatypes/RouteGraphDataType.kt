@@ -9,8 +9,10 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.util.Log
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.compose.ui.unit.DpSize
 import androidx.core.graphics.createBitmap
+import androidx.core.graphics.drawable.toBitmap
 import androidx.core.graphics.withClip
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
@@ -33,6 +35,7 @@ import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.SparseElevationData
 import de.timklge.karooroutegraph.ZoomLevel
 import de.timklge.karooroutegraph.datatypes.minimap.ChangeZoomLevelAction
+import de.timklge.karooroutegraph.datatypes.minimap.mapPoiToIcon
 import de.timklge.karooroutegraph.getInclineIndicatorColor
 import de.timklge.karooroutegraph.streamDatatypeIsVisible
 import io.hammerhead.karooext.KarooSystemService
@@ -186,6 +189,17 @@ class RouteGraphDataType(
                     style = Paint.Style.FILL
                     textSize = 30f
                     textAlign = Paint.Align.LEFT
+                }
+
+                val inversePaintFilter = Paint().apply {
+                    colorFilter = android.graphics.ColorMatrixColorFilter(
+                        android.graphics.ColorMatrix().apply { set(floatArrayOf(
+                            -1f,  0f,  0f, 0f, 255f,
+                            0f, -1f,  0f, 0f, 255f,
+                            0f,  0f, -1f, 0f, 255f,
+                            0f,  0f,  0f, 1f,   0f
+                        )) }
+                    )
                 }
 
                 val categoryPaints = ClimbCategory.entries.associateWith { category ->
@@ -366,7 +380,7 @@ class RouteGraphDataType(
 
                         poisInRange.forEach { nearestPoint ->
                             val distanceFromRouteStart = nearestPoint.distanceFromRouteStart
-                            val text = (if (allPoisInRange.size <= 4) poi.name else "X") ?: "X"
+                            val text = poi.name ?: "X"
                             val textWidth = textPaintInv.measureText(text)
                             val pixelsFromLeft = remap(distanceFromRouteStart, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
 
@@ -380,6 +394,13 @@ class RouteGraphDataType(
                                 30f + graphBounds.top
                             )
 
+                            val currentPOIBottomIcon = RectF(
+                                pixelsFromLeft - 35f / 2 - 5f,
+                                graphBounds.bottom - 40f,
+                                pixelsFromLeft + 35f / 2 + 5f,
+                                graphBounds.bottom
+                            )
+
                             previousPOIs.forEach { previousPOI ->
                                 if (RectF.intersects(currentPOI, previousPOI)){
                                     currentPOI.offset(0f, 35f)
@@ -391,15 +412,25 @@ class RouteGraphDataType(
                             canvas.drawLine(pixelsFromLeft, currentPOI.bottom,
                                 pixelsFromLeft, graphBounds.bottom, poiLinePaintDashed)
 
-                            canvas.drawRoundRect(
-                                currentPOI,
-                                5f, 5f,
-                                backgroundFillPaint
-                            )
-                            Log.i(TAG, "Drawing text $text at $textStartFromLeft, $currentPOI")
+                            val maxPois = if (config.gridSize.first <= 30) 2 else 4
 
-                            canvas.drawText(text,
-                                textStartFromLeft, 20f + currentPOI.top + 2.5f, textPaintInv)
+                            if (allPoisInRange.size <= maxPois){
+                                canvas.drawRoundRect(currentPOI, 5f, 5f, backgroundFillPaint)
+                                Log.i(TAG, "Drawing text $text at $textStartFromLeft, $currentPOI")
+
+                                canvas.drawText(text, textStartFromLeft, 20f + currentPOI.top + 5f, textPaintInv)
+                            }
+
+                            canvas.drawRoundRect(currentPOIBottomIcon, 5f, 5f, backgroundFillPaint)
+
+                            val icon = mapPoiToIcon(poi.type)
+                            val sizeX = 35
+                            val sizeY = 35
+                            val bitmap = AppCompatResources.getDrawable(context, icon)?.toBitmap(sizeX, sizeY)
+
+                            val iconPaint = if (!isNightMode()) inversePaintFilter else textPaint
+
+                            if (bitmap != null) canvas.drawBitmap(bitmap, currentPOIBottomIcon.left + 5f, currentPOIBottomIcon.top, iconPaint)
 
                             previousPOIs.add(currentPOI)
                         }
@@ -514,9 +545,9 @@ class RouteGraphDataType(
             val distanceAlongRoute = (0..50_000).random()
             val routeGraphViewModel = RouteGraphViewModel(50_000.0f, distanceAlongRoute.toFloat(), null,
                 mapOf(
-                    Symbol.POI("checkpoint", 0.0, 0.0, name = "Checkpoint") to listOf(NearestPoint(null, 20.0f, 35_000.0f, null)),
-                    Symbol.POI("test", 0.0, 0.0, name = "Toilet") to listOf(NearestPoint(null, 20.0f, 13_000.0f, null)),
-                    Symbol.POI("refuel", 0.0, 0.0, name = "Refuel") to listOf(NearestPoint(null, 20.0f, 15_000.0f, null))
+                    Symbol.POI("checkpoint", 0.0, 0.0, name = "Checkpoint", type = "control") to listOf(NearestPoint(null, 20.0f, 35_000.0f, null)),
+                    Symbol.POI("test", 0.0, 0.0, name = "Toilet", type = "restroom") to listOf(NearestPoint(null, 20.0f, 5_000.0f, null)),
+                    Symbol.POI("refuel", 0.0, 0.0, name = "Refuel", type = "food") to listOf(NearestPoint(null, 20.0f, 20_000.0f, null))
                 ),
                 sampledElevationData = SparseElevationData(
                     floatArrayOf(0f, 10_000f, 20_000f, 30_000f, 40_000f, 50_000f),
