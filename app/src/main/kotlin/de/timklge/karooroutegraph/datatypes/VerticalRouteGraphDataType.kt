@@ -397,7 +397,7 @@ class VerticalRouteGraphDataType(
                     val distanceAlongRoutePixelsFromLeft = remap(viewModel.distanceAlongRoute, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
 
                     canvas.drawLine(0f, distanceAlongRoutePixelsFromLeft, config.viewSize.first.toFloat(), distanceAlongRoutePixelsFromLeft, backgroundStrokePaint)
-                    canvas.drawLine(0f, distanceAlongRoutePixelsFromLeft, config.viewSize.second.toFloat(), distanceAlongRoutePixelsFromLeft, currentLinePaint)
+                    canvas.drawLine(0f, distanceAlongRoutePixelsFromLeft, config.viewSize.first.toFloat(), distanceAlongRoutePixelsFromLeft, currentLinePaint)
                 }
 
                 if (viewModel.poiDistances != null && viewModel.routeDistance != null){
