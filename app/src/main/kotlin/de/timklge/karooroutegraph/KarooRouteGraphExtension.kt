@@ -6,7 +6,6 @@ import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
 import com.mapbox.turf.TurfConstants
 import com.mapbox.turf.TurfMeasurement
-import com.mapbox.turf.TurfTransformation
 import de.timklge.karooroutegraph.datatypes.DistanceToNextPOIDataType
 import de.timklge.karooroutegraph.datatypes.ElevationToNextPOIDataType
 import de.timklge.karooroutegraph.datatypes.RouteGraphDataType
@@ -38,6 +37,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformLatest
@@ -302,10 +302,15 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.routeDistance
                 }
                 val distanceAlongRoute = if (routeDistance != null && locationAndRemainingRouteDistance.remainingRouteDistance != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute){
-                    if (navigationStateEvent.reversed == true){
-                        routeDistance
+                    if (navigationStateEvent.rejoinDistance != null) {
+                        if (navigationStateEvent.reversed){
+                            routeDistance
+                        } else {
+                            routeDistance - locationAndRemainingRouteDistance.remainingRouteDistance
+                        }
                     } else {
-                        routeDistance - locationAndRemainingRouteDistance.remainingRouteDistance
+                        val lastKnownRouteDistance = routeGraphViewModelProvider.viewModelFlow.first().distanceAlongRoute
+                        lastKnownRouteDistance
                     }
                 } else if (routeDistance != null && locationAndRemainingRouteDistance.remainingRouteDistance != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingToDestination){
                     routeDistance - locationAndRemainingRouteDistance.remainingRouteDistance
