@@ -292,7 +292,12 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 val pois = globalPOIs.pois + (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.pois.orEmpty()
                 val navigatingToDestinationPolyline = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingToDestination)?.polyline?.let { LineString.fromPolyline(it, 5) }
                 val routeDistance = if (navigatingToDestinationPolyline != null) {
-                    TurfMeasurement.length(navigatingToDestinationPolyline, TurfConstants.UNIT_METERS)
+                    try {
+                        TurfMeasurement.length(navigatingToDestinationPolyline, TurfConstants.UNIT_METERS)
+                    } catch(e: Exception) {
+                        Log.e(TAG, "Failed to calculate route distance", e)
+                        null
+                    }
                 } else {
                     (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.routeDistance
                 }
