@@ -302,7 +302,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.routeDistance
                 }
                 val distanceAlongRoute = if (routeDistance != null && locationAndRemainingRouteDistance.remainingRouteDistance != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute){
-                    if (navigationStateEvent.rejoinDistance != null) {
+                    if (navigationStateEvent.rejoinDistance == null) {
                         if (navigationStateEvent.reversed){
                             routeDistance
                         } else {
