@@ -10,8 +10,11 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.util.Log
+import androidx.annotation.DrawableRes
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.compose.ui.unit.DpSize
 import androidx.core.graphics.createBitmap
+import androidx.core.graphics.drawable.toBitmap
 import androidx.core.graphics.withClip
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
@@ -34,6 +37,7 @@ import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.SparseElevationData
 import de.timklge.karooroutegraph.ZoomLevel
 import de.timklge.karooroutegraph.datatypes.minimap.ChangeZoomLevelAction
+import de.timklge.karooroutegraph.datatypes.minimap.mapPoiToIcon
 import de.timklge.karooroutegraph.distanceIsZero
 import de.timklge.karooroutegraph.distanceToString
 import de.timklge.karooroutegraph.getInclineIndicatorColor
@@ -194,6 +198,17 @@ class VerticalRouteGraphDataType(
                     textAlign = Paint.Align.LEFT
                 }
 
+                val inversePaintFilter = Paint().apply {
+                    colorFilter = android.graphics.ColorMatrixColorFilter(
+                        android.graphics.ColorMatrix().apply { set(floatArrayOf(
+                            -1f,  0f,  0f, 0f, 255f,
+                            0f, -1f,  0f, 0f, 255f,
+                            0f,  0f, -1f, 0f, 255f,
+                            0f,  0f,  0f, 1f,   0f
+                        )) }
+                    )
+                }
+
                 val categoryPaints = ClimbCategory.entries.associateWith { category ->
                     Paint().apply {
                         color = applicationContext.getColor(category.colorRes)
@@ -240,9 +255,10 @@ class VerticalRouteGraphDataType(
                 var firstElevationPixels: Float? = null
 
                 data class TextDrawCommand(val x: Float, val y: Float, val text: String, val paint: Paint, val importance: Int = 10,
-                    /** If set, draws this text over the original text */
-                    val overdrawText: String? = null,
-                    val overdrawPaint: Paint = paint)
+                                           /** If set, draws this text over the original text */
+                                           val overdrawText: String? = null,
+                                           val overdrawPaint: Paint = paint,
+                                           @DrawableRes val leadingIcon: Int? = null,)
 
                 val textDrawCommands = mutableListOf<TextDrawCommand>()
 
@@ -365,7 +381,7 @@ class VerticalRouteGraphDataType(
                     }
 
                     if (viewModel.distanceAlongRoute != null){
-                        val distanceAlongRouteProgressPixels = remap(viewModel.distanceAlongRoute!!, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
+                        val distanceAlongRouteProgressPixels = remap(viewModel.distanceAlongRoute, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
 
                         canvas.withClip(0f, 0f, config.viewSize.second.toFloat(), distanceAlongRouteProgressPixels){
                             canvas.withClip(filledPath) {
@@ -378,10 +394,10 @@ class VerticalRouteGraphDataType(
                 }
 
                 if (viewModel.distanceAlongRoute != null && viewModel.routeDistance != null){
-                    val distanceAlongRoutePixelsFromLeft = remap(viewModel.distanceAlongRoute!!, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
+                    val distanceAlongRoutePixelsFromLeft = remap(viewModel.distanceAlongRoute, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
 
                     canvas.drawLine(0f, distanceAlongRoutePixelsFromLeft, config.viewSize.first.toFloat(), distanceAlongRoutePixelsFromLeft, backgroundStrokePaint)
-                    canvas.drawLine(0f, distanceAlongRoutePixelsFromLeft, config.viewSize.second.toFloat(), distanceAlongRoutePixelsFromLeft, currentLinePaint)
+                    canvas.drawLine(0f, distanceAlongRoutePixelsFromLeft, config.viewSize.first.toFloat(), distanceAlongRoutePixelsFromLeft, currentLinePaint)
                 }
 
                 if (viewModel.poiDistances != null && viewModel.routeDistance != null){
@@ -397,13 +413,13 @@ class VerticalRouteGraphDataType(
                         canvas.drawLine(graphBounds.left, progressPixels, config.viewSize.first.toFloat(), progressPixels, backgroundStrokePaintDashed)
                         canvas.drawLine(graphBounds.left, progressPixels, config.viewSize.first.toFloat(), progressPixels, poiLinePaintDashed)
 
-                        textDrawCommands.add(TextDrawCommand(graphBounds.right + 75, progressPixels + 15f, text, textPaintBold, 11))
+                        textDrawCommands.add(TextDrawCommand(graphBounds.right + 75f + 40f, progressPixels + 15f, text, textPaintBold, 11, leadingIcon = mapPoiToIcon(poi.type)))
 
-                        if (viewModel.distanceAlongRoute != null && nearestPoint.distanceFromRouteStart > viewModel.distanceAlongRoute!!){
-                            val distanceMeters = nearestPoint.distanceFromRouteStart - viewModel.distanceAlongRoute!!
+                        if (viewModel.distanceAlongRoute != null && nearestPoint.distanceFromRouteStart > viewModel.distanceAlongRoute){
+                            val distanceMeters = nearestPoint.distanceFromRouteStart - viewModel.distanceAlongRoute
                             var distanceStr = "In ${distanceToString(distanceMeters, userProfile, false)}"
 
-                            val elevationMetersRemaining = viewModel.sampledElevationData?.getTotalClimb(viewModel.distanceAlongRoute!!, nearestPoint.distanceFromRouteStart)
+                            val elevationMetersRemaining = viewModel.sampledElevationData?.getTotalClimb(viewModel.distanceAlongRoute, nearestPoint.distanceFromRouteStart)
                             if (elevationMetersRemaining != null && !distanceIsZero(elevationMetersRemaining.toFloat(), userProfile)) {
                                 distanceStr += " ↗ ${distanceToString(elevationMetersRemaining.toFloat(), userProfile, true)}"
                             }
@@ -439,6 +455,15 @@ class VerticalRouteGraphDataType(
                             canvas.drawText(cmd.text, cmd.x, currentY, cmd.paint)
                             if (cmd.overdrawText != null){
                                 canvas.drawText(cmd.overdrawText, cmd.x, currentY, cmd.overdrawPaint)
+                            }
+                            if (cmd.leadingIcon != null){
+                                val sizeX = 35
+                                val sizeY = 35
+
+                                val iconPaint = if (isNightMode()) inversePaintFilter else textPaint;
+
+                                val bitmap = AppCompatResources.getDrawable(context, cmd.leadingIcon)?.toBitmap(sizeX, sizeY)
+                                if (bitmap != null) canvas.drawBitmap(bitmap, cmd.x - 40f, currentY - sizeY + 2.5f, iconPaint)
                             }
                             occupiedRanges.add(currentY..(currentY + textHeight))
                         }
@@ -500,9 +525,9 @@ class VerticalRouteGraphDataType(
             val distanceAlongRoute = (0..50_000).random()
             val routeGraphViewModel = RouteGraphViewModel(50_000.0f, distanceAlongRoute.toFloat(), null,
                 mapOf(
-                    Symbol.POI("checkpoint", 0.0, 0.0, name = "Checkpoint") to listOf(NearestPoint(null, 20.0f, 35_000.0f, null)),
-                    Symbol.POI("test", 0.0, 0.0, name = "Toilet") to listOf(NearestPoint(null, 20.0f, 13_000.0f, null)),
-                    Symbol.POI("refuel", 0.0, 0.0, name = "Refuel") to listOf(NearestPoint(null, 20.0f, 15_000.0f, null))
+                    Symbol.POI("checkpoint", 0.0, 0.0, name = "Checkpoint", type = "control") to listOf(NearestPoint(null, 20.0f, 35_000.0f, null)),
+                    Symbol.POI("test", 0.0, 0.0, name = "Toilet", type = "restroom") to listOf(NearestPoint(null, 20.0f, 5_000.0f, null)),
+                    Symbol.POI("refuel", 0.0, 0.0, name = "Refuel", type = "food") to listOf(NearestPoint(null, 20.0f, 20_000.0f, null))
                 ),
                 sampledElevationData = SparseElevationData(
                     floatArrayOf(0f, 10_000f, 20_000f, 30_000f, 40_000f, 50_000f),

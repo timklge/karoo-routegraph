@@ -1,12 +1,14 @@
 package de.timklge.karooroutegraph.datatypes.minimap
 
 import android.util.Log
+import androidx.annotation.DrawableRes
 import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
 import com.mapbox.turf.TurfConstants.UNIT_METERS
 import com.mapbox.turf.TurfMeasurement
 import com.mapbox.turf.TurfMisc
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
+import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.Tile
 import java.lang.Math.pow
 import kotlin.math.cos
@@ -18,6 +20,48 @@ import kotlin.math.pow
 import kotlin.math.tan
 
 const val TARGET_TILE_SIZE = 700.0
+
+@DrawableRes
+fun mapPoiToIcon(poiType: String): Int {
+    return when (poiType) {
+        "aid_station" -> R.drawable.bx_first_aid // Closest to aid station
+        "atm" -> R.drawable.bx_money_withdraw
+        "bar" -> R.drawable.bx_beer
+        "bike_parking" -> R.drawable.bxs_parking
+        "bike_share" -> R.drawable.bx_share_alt
+        "bike_shop" -> R.drawable.bx_store
+        "camping" -> R.drawable.bxs_tree
+        "caution" -> R.drawable.bx_info_circle
+        "coffee" -> R.drawable.bx_coffee
+        "control" -> R.drawable.bxs_flag_alt
+        "convenience_store" -> R.drawable.bx_store
+        "ferry" -> R.drawable.bxs_ship
+        "first_aid" -> R.drawable.bx_first_aid
+        "food" -> R.drawable.bx_baguette
+        "gas_station" -> R.drawable.bx_gas_pump
+        "generic" -> R.drawable.bx_info_circle
+        "geocache" -> R.drawable.bx_package
+        "home" -> R.drawable.bx_home
+        "hospital" -> R.drawable.bx_first_aid
+        "library" -> R.drawable.bx_library
+        "lodging" -> R.drawable.bx_hotel
+        "monument" -> R.drawable.bxs_tree
+        "park" -> R.drawable.bxs_tree
+        "parking" -> R.drawable.bxs_parking
+        "rest_stop" -> R.drawable.bx_hotel
+        "restroom" -> R.drawable.bx_walk
+        "shopping" -> R.drawable.bx_store
+        "shower" -> R.drawable.bx_shower
+        "summit" -> R.drawable.bx_landscape
+        "swimming" -> R.drawable.bx_swim
+        "trailhead" -> R.drawable.trip
+        "transit_center" -> R.drawable.bx_train
+        "viewpoint" -> R.drawable.bxs_tree
+        "water" -> R.drawable.bx_swim
+        "winery" -> R.drawable.bxs_wine
+        else -> R.drawable.bxmap // Default icon
+    }
+}
 
 fun LineString.getCenterPoint(): Point {
     if (this.coordinates().isEmpty()) {
