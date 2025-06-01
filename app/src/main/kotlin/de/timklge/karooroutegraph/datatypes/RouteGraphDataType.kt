@@ -27,6 +27,8 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.NearestPoint
+import de.timklge.karooroutegraph.POI
+import de.timklge.karooroutegraph.PoiType
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModel
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModelProvider
@@ -119,7 +121,17 @@ class RouteGraphDataType(
                     strokeWidth = 5f
                 }
 
+                val incidentPaint = Paint().apply {
+                    color = applicationContext.getColor(if(nightMode) R.color.elevate4dark else R.color.elevate4)
+                    style = Paint.Style.STROKE
+                    strokeWidth = 5f
+                }
+
                 val poiLinePaintDashed = Paint(poiLinePaint).apply {
+                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 0f)
+                }
+
+                val incidentLinePaintDashed = Paint(incidentPaint).apply {
                     pathEffect = android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 0f)
                 }
 
@@ -380,12 +392,14 @@ class RouteGraphDataType(
 
                         poisInRange.forEach { nearestPoint ->
                             val distanceFromRouteStart = nearestPoint.distanceFromRouteStart
-                            val text = poi.name ?: "X"
+                            val text = poi.symbol.name ?: "X"
                             val textWidth = textPaintInv.measureText(text)
                             val pixelsFromLeft = remap(distanceFromRouteStart, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
+                            val maxPois = if (config.gridSize.first <= 30) 2 else 4
+                            val drawLabel = allPoisInRange.size <= maxPois
 
                             val textStartFromLeft = (pixelsFromLeft - textWidth / 2)
-                                .coerceIn(graphBounds.left, (graphBounds.right - textWidth - 5f))
+                                .coerceIn(graphBounds.left, (graphBounds.right - textWidth - 5f).coerceAtLeast(graphBounds.left))
 
                             val currentPOI = RectF(
                                 textStartFromLeft - 5,
@@ -407,30 +421,31 @@ class RouteGraphDataType(
                                 }
                             }
 
-                            canvas.drawLine(pixelsFromLeft, currentPOI.bottom,
+                            canvas.drawLine(pixelsFromLeft, if (drawLabel) currentPOI.bottom else graphBounds.top,
                                 pixelsFromLeft, graphBounds.bottom, backgroundStrokePaintDashed)
-                            canvas.drawLine(pixelsFromLeft, currentPOI.bottom,
-                                pixelsFromLeft, graphBounds.bottom, poiLinePaintDashed)
+                            canvas.drawLine(pixelsFromLeft, if (drawLabel) currentPOI.bottom else graphBounds.top,
+                                pixelsFromLeft, graphBounds.bottom, if (poi.type == PoiType.INCIDENT) incidentLinePaintDashed else poiLinePaintDashed)
 
-                            val maxPois = if (config.gridSize.first <= 30) 2 else 4
-
-                            if (allPoisInRange.size <= maxPois){
+                            if (drawLabel){
                                 canvas.drawRoundRect(currentPOI, 5f, 5f, backgroundFillPaint)
                                 Log.i(TAG, "Drawing text $text at $textStartFromLeft, $currentPOI")
 
                                 canvas.drawText(text, textStartFromLeft, 20f + currentPOI.top + 5f, textPaintInv)
                             }
 
-                            canvas.drawRoundRect(currentPOIBottomIcon, 5f, 5f, backgroundFillPaint)
+                            if (config.gridSize.first > 30){
+                                canvas.drawRoundRect(currentPOIBottomIcon, 5f, 5f, backgroundFillPaint)
 
-                            val icon = mapPoiToIcon(poi.type)
-                            val sizeX = 35
-                            val sizeY = 35
-                            val bitmap = AppCompatResources.getDrawable(context, icon)?.toBitmap(sizeX, sizeY)
+                                val icon = mapPoiToIcon(poi.symbol.type)
+                                val sizeX = 35
+                                val sizeY = 35
+                                val bitmap = AppCompatResources.getDrawable(context, icon)?.toBitmap(sizeX, sizeY)
 
-                            val iconPaint = if (!isNightMode()) inversePaintFilter else textPaint
+                                val iconPaint = if (!isNightMode()) inversePaintFilter else textPaint
 
-                            if (bitmap != null) canvas.drawBitmap(bitmap, currentPOIBottomIcon.left + 5f, currentPOIBottomIcon.top, iconPaint)
+                                if (bitmap != null) canvas.drawBitmap(bitmap, currentPOIBottomIcon.left + 5f, currentPOIBottomIcon.top, iconPaint)
+                            }
+                            
 
                             previousPOIs.add(currentPOI)
                         }
@@ -458,7 +473,7 @@ class RouteGraphDataType(
                             String.format(Locale.US, "%.1f", progress)
                         } else "${progress.toInt()}"
 
-                        val textPos = (remap(tickInterval * i + viewDistanceStart, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right).toFloat() + 5f)
+                        val textPos = (remap(tickInterval * i + viewDistanceStart, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right) + 5f)
                             .coerceAtMost(config.viewSize.first.toFloat() - textPaint.measureText(text) - 5f)
 
                         canvas.drawRoundRect(
@@ -545,9 +560,9 @@ class RouteGraphDataType(
             val distanceAlongRoute = (0..50_000).random()
             val routeGraphViewModel = RouteGraphViewModel(50_000.0f, distanceAlongRoute.toFloat(), null,
                 mapOf(
-                    Symbol.POI("checkpoint", 0.0, 0.0, name = "Checkpoint", type = "control") to listOf(NearestPoint(null, 20.0f, 35_000.0f, null)),
-                    Symbol.POI("test", 0.0, 0.0, name = "Toilet", type = "restroom") to listOf(NearestPoint(null, 20.0f, 5_000.0f, null)),
-                    Symbol.POI("refuel", 0.0, 0.0, name = "Refuel", type = "food") to listOf(NearestPoint(null, 20.0f, 20_000.0f, null))
+                    POI(Symbol.POI("checkpoint", 0.0, 0.0, name = "Checkpoint", type = "control")) to listOf(NearestPoint(null, 20.0f, 35_000.0f, null)),
+                    POI(Symbol.POI("test", 0.0, 0.0, name = "Toilet", type = "restroom")) to listOf(NearestPoint(null, 20.0f, 5_000.0f, null)),
+                    POI(Symbol.POI("refuel", 0.0, 0.0, name = "Refuel", type = "food")) to listOf(NearestPoint(null, 20.0f, 20_000.0f, null))
                 ),
                 sampledElevationData = SparseElevationData(
                     floatArrayOf(0f, 10_000f, 20_000f, 30_000f, 40_000f, 50_000f),

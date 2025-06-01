@@ -10,10 +10,16 @@ import kotlin.math.absoluteValue
 
 data class NearestPoint(val pointOnRoute: Point?, val distanceFromPointOnRoute: Float, val distanceFromRouteStart: Float, val target: Point?)
 
+enum class PoiType {
+    POI, INCIDENT
+}
+
+data class POI(val symbol: Symbol.POI, val type: PoiType = PoiType.POI)
+
 /**
  * Calculate the distances of the given POIs to the given polyline.
  */
-fun calculatePoiDistances(polyline: LineString, pois: List<Symbol.POI>): Map<Symbol.POI, List<NearestPoint>> {
+fun calculatePoiDistances(polyline: LineString, pois: List<POI>): Map<POI, List<NearestPoint>> {
     val pointList: MutableList<Point> = mutableListOf(Point.fromLngLat(0.0, 0.0), Point.fromLngLat(0.0, 0.0))
 
     return buildMap {
@@ -28,7 +34,7 @@ fun calculatePoiDistances(polyline: LineString, pois: List<Symbol.POI>): Map<Sym
                 pointList[0] = startPoint
                 pointList[1] = endPoint
 
-                val poiPoint = Point.fromLngLat(poi.lng, poi.lat)
+                val poiPoint = Point.fromLngLat(poi.symbol.lng, poi.symbol.lat)
                 val nearestPoint = TurfMisc.nearestPointOnLine(poiPoint, pointList, TurfConstants.UNIT_METERS)
                 val nearestPointDist = nearestPoint.getNumberProperty("dist")?.toFloat()
                 val nearestPointPoint = nearestPoint.geometry() as? Point

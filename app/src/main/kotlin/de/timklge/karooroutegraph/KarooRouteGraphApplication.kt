@@ -2,6 +2,7 @@ package de.timklge.karooroutegraph
 
 import android.app.Application
 import de.timklge.karooroutegraph.datatypes.minimap.MinimapViewModelProvider
+import de.timklge.karooroutegraph.incidents.HereMapsIncidentProvider
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
@@ -15,6 +16,7 @@ val appModule = module {
     singleOf(::ValhallaAPIElevationProvider)
     singleOf(::MinimapViewModelProvider)
     singleOf(::TileDownloadService)
+    singleOf(::HereMapsIncidentProvider)
 }
 
 class KarooRouteGraphApplication : Application() {

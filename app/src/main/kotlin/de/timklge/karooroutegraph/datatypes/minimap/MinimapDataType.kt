@@ -39,6 +39,8 @@ import com.mapbox.turf.TurfMisc
 import de.timklge.karooroutegraph.KarooRouteGraphExtension
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.NearestPoint
+import de.timklge.karooroutegraph.POI
+import de.timklge.karooroutegraph.PoiType
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModel
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModelProvider
@@ -164,7 +166,7 @@ class MinimapDataType(
                     RouteGraphViewModel(routeDistance = polylineLength, distanceAlongRoute = 13_000f, knownRoute = polyline,
                         locationAndRemainingRouteDistance = KarooRouteGraphExtension.LocationAndRemainingRouteDistance(positionAlongRoute.latitude(), positionAlongRoute.longitude(), bearing, polylineLength.toDouble() - 3_000),
                         poiDistances = mapOf(
-                            Symbol.POI("gate", 52.5159305, 13.3774302, name = "Gate") to listOf(
+                            POI(Symbol.POI("gate", 52.5159305, 13.3774302, name = "Gate")) to listOf(
                                 NearestPoint(null, 0.0f, 0.0f, null)
                             )
                         )),
@@ -453,10 +455,11 @@ class MinimapDataType(
                             // Label: poi.name, Lat: poi.lat, Long: poi.lng
                             this@MinimapDataType.drawPoi(
                                 canvas,
-                                poi,
+                                poi.symbol,
                                 centerPosition,
                                 zoomLevel,
-                                settings.showPOILabelsOnMinimap
+                                settings.showPOILabelsOnMinimap,
+                                poi.type == PoiType.INCIDENT
                             )
                         }
 
@@ -540,7 +543,8 @@ class MinimapDataType(
         poi: Symbol.POI,
         mapCenter: Point,
         zoomLevel: Float,
-        showPOILabelsOnMinimap: Boolean
+        showPOILabelsOnMinimap: Boolean,
+        isIncident: Boolean
     ) {
         val poiPoint = Point.fromLngLat(poi.lng, poi.lat)
 
@@ -564,7 +568,7 @@ class MinimapDataType(
         val outlineStrokeWidth = xStrokeWidth + 4f // Outline slightly thicker
 
         val xPaintWhite = Paint().apply {
-            color = Color.WHITE
+            color = if (isIncident) Color.RED else Color.WHITE
             strokeWidth = xStrokeWidth
             style = Paint.Style.STROKE
             isAntiAlias = true
@@ -603,7 +607,9 @@ class MinimapDataType(
                 isAntiAlias = true
             }
 
-            val text = poi.name ?: "POI"
+            val text = poi.name?.let { 
+                if (it.isNotEmpty() && it.length <= 15) it else it.take(10) + "..."
+            } ?: "POI"
             val textBounds = Rect()
             textPaint.getTextBounds(text, 0, text.length, textBounds)
 
@@ -621,6 +627,7 @@ class MinimapDataType(
             canvas.drawRoundRect(backgroundRect, cornerRadius, cornerRadius, backgroundPaint)
 
             val textY = screenY + labelOffsetY
+
             canvas.drawText(text, screenX, textY, textPaint) // Use adjusted Y
         }
     }
@@ -677,7 +684,7 @@ class MinimapDataType(
                 screenY
             ) { // Save the current canvas state
                 // Calculate the top-left position to draw the bitmap so it's centered
-                drawBitmap(navigationBitmap, screenX - navigationBitmap.width / 2f, screenY - navigationBitmap.height / 2f, paint)
+                drawBitmap(navigationBitmap, screenX - navigationBitmap.width, screenY - navigationBitmap.height, paint)
             }
         }
     }
