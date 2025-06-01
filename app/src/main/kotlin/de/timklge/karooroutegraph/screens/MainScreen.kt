@@ -85,7 +85,6 @@ fun MainScreen(onFinish: () -> Unit) {
     var apiTestDialogVisible by remember { mutableStateOf(false) }
     var apiTestDialogPending by remember { mutableStateOf(false) }
     var apiTestErrorMessage by remember { mutableStateOf("") }
-    val karooSystemServiceProvider = koinInject<KarooSystemServiceProvider>()
     val hereMapsIncidentProvider = koinInject<HereMapsIncidentProvider>()
 
     suspend fun updateSettings(){
