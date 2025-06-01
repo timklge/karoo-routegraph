@@ -451,7 +451,30 @@ class VerticalRouteGraphDataType(
                                 .maxOf { it.endInclusive }
                             currentY = maxConflictEnd
                         }
-                        if (currentY + textHeight <= config.viewSize.second) {
+
+                        var shouldDrawLabel = true
+                        // Assuming climb labels have importance < 10 and POI labels have importance 11 or higher.
+                        if (cmd.importance < 10 && viewModel.poiDistances != null) {
+                            val climbStartProgressPixels = cmd.y - 15f
+
+                            poiLoop@ for ((poi, nearestPointList) in viewModel.poiDistances.entries) {
+                                for (nearestPoint in nearestPointList) {
+                                    val poiDistanceOnRoute = nearestPoint.distanceFromRouteStart
+                                    if (poiDistanceOnRoute in viewRange) {
+                                        val poiLineYOnGraph = remap(poiDistanceOnRoute, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
+
+                                        // If the climb starts before the POI line (smaller y-value on graph)
+                                        // and the label's current top (currentY) is now below the POI line (larger y-value on graph)
+                                        if (climbStartProgressPixels < poiLineYOnGraph && currentY > poiLineYOnGraph) {
+                                            shouldDrawLabel = false
+                                            break@poiLoop // Exit all POI checks for this command
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (shouldDrawLabel && currentY + textHeight <= config.viewSize.second) {
                             canvas.drawText(cmd.text, cmd.x, currentY, cmd.paint)
                             if (cmd.overdrawText != null){
                                 canvas.drawText(cmd.overdrawText, cmd.x, currentY, cmd.overdrawPaint)
