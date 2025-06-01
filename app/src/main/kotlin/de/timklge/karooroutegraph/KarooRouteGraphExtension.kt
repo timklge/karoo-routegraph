@@ -80,6 +80,8 @@ class GradientIndicator(val id: String, val distance: Float, val gradientPercent
 class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.VERSION_NAME) {
     companion object {
         const val TAG = "karoo-routegraph"
+
+        const val INCIDENT_GROUPING_RADIUS = 500.0 // in meters
     }
 
     private val karooSystem: KarooSystemServiceProvider by inject()
@@ -113,18 +115,9 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     }
 
     private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val R = 6371e3 // Earth radius in meters
-        val phi1 = Math.toRadians(lat1)
-        val phi2 = Math.toRadians(lat2)
-        val deltaPhi = Math.toRadians(lat2 - lat1)
-        val deltaLambda = Math.toRadians(lon2 - lon1)
-
-        val a = kotlin.math.sin(deltaPhi / 2) * kotlin.math.sin(deltaPhi / 2) +
-                kotlin.math.cos(phi1) * kotlin.math.cos(phi2) *
-                kotlin.math.sin(deltaLambda / 2) * kotlin.math.sin(deltaLambda / 2)
-        val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
-
-        return R * c
+        val point1 = Point.fromLngLat(lon1, lat1)
+        val point2 = Point.fromLngLat(lon2, lat2)
+        return TurfMeasurement.distance(point1, point2, TurfConstants.UNIT_METERS)
     }
 
     private fun getAverageLocation(incident: IncidentResult): Pair<Double, Double>? {
@@ -486,7 +479,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
                             if (otherAvgLoc != null) {
                                 val (otherAvgLat, otherAvgLng) = otherAvgLoc
-                                if (calculateDistance(currentAvgLat, currentAvgLng, otherAvgLat, otherAvgLng) < 500) {
+                                if (calculateDistance(currentAvgLat, currentAvgLng, otherAvgLat, otherAvgLng) < INCIDENT_GROUPING_RADIUS) {
                                     currentGroup.add(otherIncident)
                                     incidentsToProcess.removeAt(i)
                                 }
