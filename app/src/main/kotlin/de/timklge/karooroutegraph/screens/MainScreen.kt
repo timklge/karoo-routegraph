@@ -77,7 +77,7 @@ fun MainScreen(onFinish: () -> Unit) {
     var karooConnected by remember { mutableStateOf(false) }
     val ctx = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val karooSystem by remember { mutableStateOf(KarooSystemService(ctx)) }
+    val karooSystem = remember { KarooSystemService(ctx) }
     var welcomeDialogVisible by remember { mutableStateOf(false) }
     var showGradientIndicatorsOnMap by remember { mutableStateOf(false) }
     var showPOIsOnMinimap by remember { mutableStateOf(true) }
