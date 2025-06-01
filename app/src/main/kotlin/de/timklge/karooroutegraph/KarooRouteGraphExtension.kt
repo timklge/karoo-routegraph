@@ -2,6 +2,7 @@ package de.timklge.karooroutegraph
 
 import android.util.Log
 import androidx.annotation.DrawableRes
+import androidx.core.content.ContextCompat
 import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
 import com.mapbox.turf.TurfConstants
@@ -12,19 +13,26 @@ import de.timklge.karooroutegraph.datatypes.RouteGraphDataType
 import de.timklge.karooroutegraph.datatypes.VerticalRouteGraphDataType
 import de.timklge.karooroutegraph.datatypes.minimap.MinimapDataType
 import de.timklge.karooroutegraph.datatypes.minimap.MinimapViewModelProvider
+import de.timklge.karooroutegraph.incidents.HereMapsIncidentProvider
+import de.timklge.karooroutegraph.incidents.IncidentResult
+import de.timklge.karooroutegraph.incidents.IncidentsResponse
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import identifyClimbs
 import io.hammerhead.karooext.extension.KarooExtension
 import io.hammerhead.karooext.internal.Emitter
 import io.hammerhead.karooext.models.DataType
 import io.hammerhead.karooext.models.HardwareType
+import io.hammerhead.karooext.models.HidePolyline
 import io.hammerhead.karooext.models.HideSymbols
+import io.hammerhead.karooext.models.InRideAlert
 import io.hammerhead.karooext.models.MapEffect
 import io.hammerhead.karooext.models.OnGlobalPOIs
 import io.hammerhead.karooext.models.OnLocationChanged
 import io.hammerhead.karooext.models.OnMapZoomLevel
 import io.hammerhead.karooext.models.OnNavigationState
+import io.hammerhead.karooext.models.PlayBeepPattern
 import io.hammerhead.karooext.models.RideState
+import io.hammerhead.karooext.models.ShowPolyline
 import io.hammerhead.karooext.models.ShowSymbols
 import io.hammerhead.karooext.models.StreamState
 import io.hammerhead.karooext.models.Symbol
@@ -60,7 +68,7 @@ class GradientIndicator(val id: String, val distance: Float, val gradientPercent
     }
 
     override fun hashCode(): Int {
-        var result = id.hashCode()
+        val result = id.hashCode()
         return result
     }
 
@@ -78,6 +86,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     private val routeGraphViewModelProvider: RouteGraphViewModelProvider by inject()
     private val minimapViewModelProvider: MinimapViewModelProvider by inject()
     private val valhallaAPIElevationProvider: ValhallaAPIElevationProvider by inject()
+    private val incidentProvider: HereMapsIncidentProvider by inject()
     private val displayViewModelProvider: RouteGraphDisplayViewModelProvider by inject()
     private val tileDownloadService: TileDownloadService by inject()
 
@@ -103,23 +112,127 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         return BoundingBox(minLat, maxLat, minLng, maxLng)
     }
 
+    private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val R = 6371e3 // Earth radius in meters
+        val phi1 = Math.toRadians(lat1)
+        val phi2 = Math.toRadians(lat2)
+        val deltaPhi = Math.toRadians(lat2 - lat1)
+        val deltaLambda = Math.toRadians(lon2 - lon1)
+
+        val a = kotlin.math.sin(deltaPhi / 2) * kotlin.math.sin(deltaPhi / 2) +
+                kotlin.math.cos(phi1) * kotlin.math.cos(phi2) *
+                kotlin.math.sin(deltaLambda / 2) * kotlin.math.sin(deltaLambda / 2)
+        val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+
+        return R * c
+    }
+
+    private fun getAverageLocation(incident: IncidentResult): Pair<Double, Double>? {
+        val points = incident.location?.shape?.links?.flatMap { link -> link.points ?: emptyList() }
+        if (points.isNullOrEmpty()) return null
+
+        val lats = points.mapNotNull { point -> point.lat }
+        val lngs = points.mapNotNull { point -> point.lng }
+
+        if (lats.isEmpty() || lngs.isEmpty()) return null
+
+        val avgLat = lats.average()
+        val avgLng = lngs.average()
+
+        return if (!avgLat.isNaN() && !avgLng.isNaN()) Pair(avgLat, avgLng) else null
+    }
+
     data class BoundingBox(val minLat: Double, val maxLat: Double, val minLng: Double, val maxLng: Double){
         fun contains(lat: Double, lng: Double): Boolean {
             return lat in minLat..maxLat && lng in minLng..maxLng
         }
     }
 
-    private var lastDrawnSymbols = mutableSetOf<GradientIndicator>()
+    private var lastDrawnGradientIndicators = mutableSetOf<GradientIndicator>()
+    private var lastDrawnIncidentSymbols = mutableSetOf<Symbol>()
+    private var lastDrawnIncidentPolylines = mutableSetOf<String>()
 
     override fun startMap(emitter: Emitter<MapEffect>) {
         var currentSymbols: MutableSet<GradientIndicator>
 
         Log.d(TAG, "Starting map effect")
-        emitter.onNext(HideSymbols(lastDrawnSymbols.map { it.id }))
-        lastDrawnSymbols.clear()
+        emitter.onNext(HideSymbols(lastDrawnGradientIndicators.map { it.id }))
+        lastDrawnGradientIndicators.clear()
 
-        emitter.onNext(HideSymbols(lastDrawnSymbols.map { "incline-${it.distance}" }))
-        lastDrawnSymbols = mutableSetOf()
+        emitter.onNext(HideSymbols(lastDrawnIncidentSymbols.map { it.id }))
+        lastDrawnIncidentSymbols.clear()
+
+        lastDrawnIncidentPolylines.forEach {
+            emitter.onNext(HidePolyline(it))
+        }
+        lastDrawnIncidentPolylines.clear()
+
+        emitter.onNext(HideSymbols(lastDrawnGradientIndicators.map { "incline-${it.distance}" }))
+        lastDrawnGradientIndicators = mutableSetOf()
+
+        val incidentJob = CoroutineScope(Dispatchers.IO).launch {
+            var lastKnownIncidents: IncidentsResponse? = null
+
+            routeGraphViewModelProvider.viewModelFlow.collect {
+                val incidents = it.incidents
+                if (incidents != lastKnownIncidents) {
+                    lastKnownIncidents = incidents
+
+                    emitter.onNext(HideSymbols(lastDrawnIncidentSymbols.map { it.id }))
+                    lastDrawnIncidentSymbols.clear()
+
+                    emitter.onNext(HideSymbols(lastDrawnIncidentPolylines.toList()))
+                    lastDrawnIncidentPolylines.clear()
+
+                    val incidentSymbols = incidents?.results?.mapNotNull { incident ->
+                        val id = "incident-${incident.incidentDetails?.id}"
+                        val points = incident.location?.shape?.links?.flatMap { link -> link.points ?: emptyList() }
+
+                        // Average of points
+                        val lat = points?.mapNotNull { point -> point.lat }?.average()
+                        val lng = points?.mapNotNull { point -> point.lng }?.average()
+
+                        if (lat != null && lng != null){
+                            Symbol.POI(id, lat, lng, type = Symbol.POI.Types.CAUTION, incident.incidentDetails?.description?.value ?: "Unknown incident")
+                        } else {
+                            null
+                        }
+                    } ?: emptyList()
+
+                    val incidentPolylines = incidents?.results?.flatMap { incident ->
+                        val id = "incident-${incident.incidentDetails?.id}"
+                        val lines = incident.location?.shape?.links?.map { link -> link.points ?: emptyList() }
+
+                        lines?.mapIndexedNotNull { index, it ->
+                            val points = it.mapNotNull { point ->
+                                if (point.lat != null && point.lng != null) {
+                                    Point.fromLngLat(point.lng, point.lat)
+                                } else {
+                                    null
+                                }
+                            }
+
+                            if (points.isNotEmpty()) {
+                                "${id}_${index}" to LineString.fromLngLats(points).toPolyline(5)
+                            } else {
+                                null
+                            }
+                        } ?: emptyList()
+                    } ?: emptyList()
+
+                    Log.d(TAG, "Drawing incident symbols: ${incidentSymbols.size}")
+                    emitter.onNext(ShowSymbols(incidentSymbols))
+
+                    Log.d(TAG, "Drawing incident polylines: ${incidentPolylines.size}")
+                    incidentPolylines.forEach { (id, polyline) ->
+                        emitter.onNext(ShowPolyline(id, polyline, ContextCompat.getColor(applicationContext, R.color.elevate4), 10))
+                    }
+
+                    lastDrawnIncidentSymbols = incidentSymbols.toMutableSet()
+                    lastDrawnIncidentPolylines = incidentPolylines.map { it.first }.toMutableSet()
+                }
+            }
+        }
 
         val gradientIndicatorJob = CoroutineScope(Dispatchers.IO).launch {
             val zoomLevelFlow = karooSystem.stream<OnMapZoomLevel>()
@@ -177,7 +290,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                         currentSymbols = mutableSetOf()
                     }
 
-                    val removedSymbols = lastDrawnSymbols - currentSymbols
+                    val removedSymbols = lastDrawnGradientIndicators - currentSymbols
 
                     if (removedSymbols.isNotEmpty()) {
                         Log.d(TAG, "Removing symbols: $removedSymbols")
@@ -218,24 +331,26 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     emitter.onNext(ShowSymbols(icons))
                 }
 
-                    lastDrawnSymbols = currentSymbols
+                    lastDrawnGradientIndicators = currentSymbols
                 } else {
-                    emitter.onNext(HideSymbols(lastDrawnSymbols.map { it.id }))
-                    lastDrawnSymbols = mutableSetOf()
+                    emitter.onNext(HideSymbols(lastDrawnGradientIndicators.map { it.id }))
+                    lastDrawnGradientIndicators = mutableSetOf()
                 }
             }
         }
 
         emitter.setCancellable {
-            emitter.onNext(HideSymbols(lastDrawnSymbols.map { "incline-${it.distance}" }))
+            emitter.onNext(HideSymbols(lastDrawnGradientIndicators.map { "incline-${it.distance}" }))
 
             Log.d(TAG, "Stopping map effect")
 
             gradientIndicatorJob.cancel()
+            incidentJob.cancel()
         }
     }
 
-    data class NavigationStreamState(val state: OnNavigationState.NavigationState,
+    data class NavigationStreamState(val settings: RouteGraphSettings,
+                                     val state: OnNavigationState.NavigationState,
                                      val userProfile: UserProfile,
                                      val pois: OnGlobalPOIs,
                                      val locationAndRemainingRouteDistance: LocationAndRemainingRouteDistance)
@@ -271,25 +386,26 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
         var knownRoute: LineString? = null
         var knownRouteElevation: SampledElevationData? = null
-        var poiDistances: Map<Symbol.POI, List<NearestPoint>>? = null
+        var knownIncidents: IncidentsResponse? = null
+        var poiDistances: Map<POI, List<NearestPoint>>? = null
 
         graphUpdaterJob = CoroutineScope(Dispatchers.IO).launch {
             combine(
+                karooSystem.streamSettings(),
                 karooSystem.stream<OnNavigationState>(),
                 karooSystem.stream<UserProfile>(),
                 streamLocationAndRemainingRouteDistance(),
                 karooSystem.stream<OnGlobalPOIs>()
-            ) { navigationState, userProfile, locationAndRemainingRouteDistance, pois ->
-                NavigationStreamState(navigationState.state, userProfile, pois, locationAndRemainingRouteDistance)
+            ) { settings, navigationState, userProfile, locationAndRemainingRouteDistance, pois ->
+                NavigationStreamState(settings, navigationState.state, userProfile, pois, locationAndRemainingRouteDistance)
             }.distinctUntilChanged().transformLatest { value ->
                 while(true){
                     emit(value)
                     delay(60.seconds)
                 }
             }
-            .collect { (navigationStateEvent, userProfile, globalPOIs, locationAndRemainingRouteDistance) ->
+            .collect { (settings, navigationStateEvent, userProfile, globalPOIs, locationAndRemainingRouteDistance) ->
                 val isImperial = userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
-                val pois = globalPOIs.pois + (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.pois.orEmpty()
                 val navigatingToDestinationPolyline = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingToDestination)?.polyline?.let { LineString.fromPolyline(it, 5) }
                 val routeDistance = if (navigatingToDestinationPolyline != null) {
                     try {
@@ -301,6 +417,145 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 } else {
                     (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.routeDistance
                 }
+
+                val routeLineString = if (navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute) {
+                    val polyline = navigationStateEvent.routePolyline
+
+                    // Log.d(TAG, "Route polyline: ${Base64.encodeToString(polyline.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)}")
+
+                    LineString.fromPolyline(polyline, 5)
+                } else if (navigationStateEvent is OnNavigationState.NavigationState.NavigatingToDestination) {
+                    navigatingToDestinationPolyline
+                } else {
+                    null
+                }
+
+                // Request incidents
+                if (settings.hereMapsApiKey.isNotEmpty() && knownIncidents == null && routeLineString != null && routeDistance != null){
+                    try {
+                        val incidents = incidentProvider.requestIncidents(settings.hereMapsApiKey, routeLineString)
+
+                        incidents.results?.forEach {
+                            Log.d(TAG, "Incident: ${it.incidentDetails?.id} ${it.incidentDetails?.hrn} ${it.incidentDetails?.startTime} ${it.incidentDetails?.endTime} ${it.incidentDetails?.description}")
+                        }
+
+                        knownIncidents = incidents
+
+                        routeGraphViewModelProvider.update {
+                            it.copy(
+                                incidents = incidents,
+                            )
+                        }
+
+                        if (incidents.results?.isNotEmpty() == true){
+                            karooSystem.karooSystemService.dispatch(InRideAlert(
+                                "incident-update-${System.currentTimeMillis()}",
+                                R.drawable.bx_info_circle,
+                                "Incidents",
+                                "${incidents.results.size} traffic incidents along route",
+                                15_000L,
+                                R.color.elevate4,
+                                R.color.black
+                            ))
+
+                            karooSystem.karooSystemService.dispatch(PlayBeepPattern(
+                                listOf(PlayBeepPattern.Tone(3000, 300), PlayBeepPattern.Tone(3000, 300), PlayBeepPattern.Tone(3000, 300))
+                            ))
+                        }
+
+                        Log.i(TAG, "Incident data updated at ${incidents.sourceUpdated} with ${incidents.results?.size} incidents")
+                    } catch(e: Exception){
+                        Log.e(TAG, "Failed to request incidents", e)
+                    }
+                }
+
+                val incidentsToProcess = knownIncidents?.results?.toMutableList() ?: mutableListOf()
+                val groupedIncidentsLists = mutableListOf<List<IncidentResult>>()
+
+                while (incidentsToProcess.isNotEmpty()) {
+                    val currentIncident = incidentsToProcess.removeAt(0)
+                    val currentGroup = mutableListOf(currentIncident)
+                    val currentAvgLoc = getAverageLocation(currentIncident)
+
+                    if (currentAvgLoc != null) {
+                        val (currentAvgLat, currentAvgLng) = currentAvgLoc
+                        var i = incidentsToProcess.size - 1
+                        while (i >= 0) {
+                            val otherIncident = incidentsToProcess[i]
+                            val otherAvgLoc = getAverageLocation(otherIncident)
+
+                            if (otherAvgLoc != null) {
+                                val (otherAvgLat, otherAvgLng) = otherAvgLoc
+                                if (calculateDistance(currentAvgLat, currentAvgLng, otherAvgLat, otherAvgLng) < 500) {
+                                    currentGroup.add(otherIncident)
+                                    incidentsToProcess.removeAt(i)
+                                }
+                            }
+                            i--
+                        }
+                    }
+                    groupedIncidentsLists.add(currentGroup)
+                }
+
+                val incidentPois = groupedIncidentsLists.mapNotNull { group: List<IncidentResult> ->
+                    if (group.isEmpty()) {
+                        null
+                    } else {
+                        val representativeIncident = group.first()
+
+                        val allPointsInGroup = group.flatMap { incident: IncidentResult ->
+                            (incident.location?.shape?.links?.flatMap { link -> link.points ?: emptyList() } ?: emptyList())
+                        }
+
+                        if (allPointsInGroup.isEmpty()) {
+                            null
+                        } else {
+                            val validLats = allPointsInGroup.mapNotNull { point -> point.lat }
+                            val validLngs = allPointsInGroup.mapNotNull { point -> point.lng }
+
+                            if (validLats.isEmpty() || validLngs.isEmpty()) {
+                                null
+                            } else {
+                                val avgLat = validLats.average()
+                                val avgLng = validLngs.average()
+
+                                if (avgLat.isNaN() || avgLng.isNaN()) {
+                                    null
+                                } else {
+                                    val baseId = representativeIncident.incidentDetails?.id ?: "unknown_${System.currentTimeMillis()}"
+                                    val id = "incident-${baseId}${if (group.size > 1) "-group${group.size}" else ""}"
+
+                                    val baseType: String? = representativeIncident.incidentDetails?.type
+                                    val typeDescription = when (baseType) {
+                                        "accident" -> "Accident"
+                                        "construction" -> "Construction"
+                                        "disabledVehicle" -> "Disabled Vehicle"
+                                        "massTransit" -> "Mass Transit"
+                                        "plannedEvent" -> "Planned Event"
+                                        "roadHazard" -> "Road Hazard"
+                                        "roadClosure" -> "Road Closure"
+                                        "weather" -> "Weather"
+                                        else -> "Unknown Incident"
+                                    }
+
+                                    POI(
+                                        Symbol.POI(
+                                            id,
+                                            avgLat,
+                                            avgLng,
+                                            type = Symbol.POI.Types.CAUTION,
+                                            typeDescription
+                                        ),
+                                        PoiType.INCIDENT
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                val pois = (globalPOIs.pois + (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.pois.orEmpty()).map { symbol -> POI(symbol = symbol, type = PoiType.POI) } + incidentPois
+
                 val distanceAlongRoute = if (routeDistance != null && locationAndRemainingRouteDistance.remainingRouteDistance != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute){
                     if (navigationStateEvent.rejoinDistance == null) {
                         if (navigationStateEvent.reversed){
@@ -318,21 +573,10 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
                 Log.d(TAG, "Received navigation state: $navigationStateEvent")
 
-                val routeLineString = if (navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute) {
-                    val polyline = navigationStateEvent.routePolyline
-
-                    // Log.d(TAG, "Route polyline: ${Base64.encodeToString(polyline.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)}")
-
-                    LineString.fromPolyline(polyline, 5)
-                } else if (navigationStateEvent is OnNavigationState.NavigationState.NavigatingToDestination) {
-                    navigatingToDestinationPolyline
-                } else {
-                    null
-                }
-
                 val routeChanged =  if (knownRoute == null || routeLineString != knownRoute){
                     knownRoute = routeLineString
                     knownRouteElevation = null
+                    knownIncidents = null
 
                     true
                 } else false
@@ -343,9 +587,9 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
                         poiDistances = calculatePoiDistances(routeLineString, pois)
 
-                        val poiDistancesDebug = poiDistances?.map { (key, value) ->
-                            "${key.name} (${key.type}): $value"
-                        }?.joinToString(", ")
+                        val poiDistancesDebug = poiDistances!!.map { (key, value) ->
+                            "${key.symbol.name} (${key.symbol.type}): $value"
+                        }.joinToString(", ")
                         Log.d(TAG, "POI distances: $poiDistancesDebug")
                     }
                     knownRoute = routeLineString
@@ -395,7 +639,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                             it.copy(sampledElevationData = elevations, climbs = climbs)
                         }
                     } catch(e: Exception){
-                        Log.e(TAG, "Failed to sample route elevation")
+                        Log.e(TAG, "Failed to sample route elevation", e)
                     }
                 }
             }

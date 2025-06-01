@@ -29,6 +29,8 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.NearestPoint
+import de.timklge.karooroutegraph.POI
+import de.timklge.karooroutegraph.PoiType
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModel
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModelProvider
@@ -118,7 +120,17 @@ class VerticalRouteGraphDataType(
                     strokeWidth = 5f
                 }
 
+                val incidentPaint = Paint().apply {
+                    color = applicationContext.getColor(if(nightMode) R.color.elevate4dark else R.color.elevate4)
+                    style = Paint.Style.STROKE
+                    strokeWidth = 5f
+                }
+
                 val poiLinePaintDashed = Paint(poiLinePaint).apply {
+                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 5f)
+                }
+
+                val incidentLinePaintDashed = Paint(incidentPaint).apply {
                     pathEffect = android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 0f)
                 }
 
@@ -393,27 +405,28 @@ class VerticalRouteGraphDataType(
                     }
                 }
 
-                if (viewModel.distanceAlongRoute != null && viewModel.routeDistance != null){
+                if (viewModel.distanceAlongRoute != null){
                     val distanceAlongRoutePixelsFromLeft = remap(viewModel.distanceAlongRoute, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
 
                     canvas.drawLine(0f, distanceAlongRoutePixelsFromLeft, config.viewSize.first.toFloat(), distanceAlongRoutePixelsFromLeft, backgroundStrokePaint)
                     canvas.drawLine(0f, distanceAlongRoutePixelsFromLeft, config.viewSize.first.toFloat(), distanceAlongRoutePixelsFromLeft, currentLinePaint)
                 }
 
-                if (viewModel.poiDistances != null && viewModel.routeDistance != null){
+                if (viewModel.poiDistances != null){
                     viewModel.poiDistances.entries.flatMap { (poi, distances) ->
                         distances.map { poi to it }.filter { it.second.distanceFromRouteStart in viewRange }
                     }.sortedBy { (_, distance) ->
                         distance.distanceFromRouteStart
                     }.forEach { (poi, nearestPoint) ->
                         val distanceFromRouteStart = nearestPoint.distanceFromRouteStart
-                        val text = poi.name ?: ""
+                        val text = poi.symbol.name ?: ""
+                        val isIncident = poi.type == PoiType.INCIDENT
                         val progressPixels = remap(distanceFromRouteStart, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
 
                         canvas.drawLine(graphBounds.left, progressPixels, config.viewSize.first.toFloat(), progressPixels, backgroundStrokePaintDashed)
-                        canvas.drawLine(graphBounds.left, progressPixels, config.viewSize.first.toFloat(), progressPixels, poiLinePaintDashed)
+                        canvas.drawLine(graphBounds.left, progressPixels, config.viewSize.first.toFloat(), progressPixels, if (poi.type == PoiType.INCIDENT) incidentLinePaintDashed else poiLinePaintDashed)
 
-                        textDrawCommands.add(TextDrawCommand(graphBounds.right + 75f + 40f, progressPixels + 15f, text, textPaintBold, 11, leadingIcon = mapPoiToIcon(poi.type)))
+                        textDrawCommands.add(TextDrawCommand(graphBounds.right + 75f + 40f, progressPixels + 15f, text, textPaintBold, 11, leadingIcon = mapPoiToIcon(poi.symbol.type)))
 
                         if (viewModel.distanceAlongRoute != null && nearestPoint.distanceFromRouteStart > viewModel.distanceAlongRoute){
                             val distanceMeters = nearestPoint.distanceFromRouteStart - viewModel.distanceAlongRoute
@@ -525,9 +538,9 @@ class VerticalRouteGraphDataType(
             val distanceAlongRoute = (0..50_000).random()
             val routeGraphViewModel = RouteGraphViewModel(50_000.0f, distanceAlongRoute.toFloat(), null,
                 mapOf(
-                    Symbol.POI("checkpoint", 0.0, 0.0, name = "Checkpoint", type = "control") to listOf(NearestPoint(null, 20.0f, 35_000.0f, null)),
-                    Symbol.POI("test", 0.0, 0.0, name = "Toilet", type = "restroom") to listOf(NearestPoint(null, 20.0f, 5_000.0f, null)),
-                    Symbol.POI("refuel", 0.0, 0.0, name = "Refuel", type = "food") to listOf(NearestPoint(null, 20.0f, 20_000.0f, null))
+                    POI(Symbol.POI("checkpoint", 0.0, 0.0, name = "Checkpoint", type = "control")) to listOf(NearestPoint(null, 20.0f, 35_000.0f, null)),
+                    POI(Symbol.POI("test", 0.0, 0.0, name = "Toilet", type = "restroom")) to listOf(NearestPoint(null, 20.0f, 5_000.0f, null)),
+                    POI(Symbol.POI("refuel", 0.0, 0.0, name = "Refuel", type = "food")) to listOf(NearestPoint(null, 20.0f, 20_000.0f, null))
                 ),
                 sampledElevationData = SparseElevationData(
                     floatArrayOf(0f, 10_000f, 20_000f, 30_000f, 40_000f, 50_000f),

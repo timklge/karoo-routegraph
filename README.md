@@ -50,6 +50,12 @@ to them as well as climb lengths and total climb elevations are shown next to th
 
 Additionally, you can enable chevrons on the map to indicate gradients. The chevrons are drawn on top of the route (see third screenshot).
 
+## Experimental: Traffic incidents
+
+You can input a HERE Maps API key in the settings to enable traffic incident reporting. The extension will then
+fetch traffic incidents along the route and display them on the minimap, the route graphs and the main karoo map.
+You will also get a notification when loading a route if there are traffic incidents along the route.
+
 ## Open issues
 
 - Because karoo extensions can currently not access the route elevation data directly, once you load a route, the extension will attempt 
@@ -64,3 +70,4 @@ try to identify climbs using an alternate algorithm, so they will not perfectly 
   - Data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors (<a href="https://opendatacommons.org/licenses/odbl/index.html">ODbL</a>), <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, <a href="https://openstreetmap.org/fixthemap">participate/fix mistakes</a>
 - Icons are from [boxicons.com](https://boxicons.com) ([MIT-licensed](icon_credits.txt))
 - Uses [karoo-ext](https://github.com/hammerheadnav/karoo-ext) (Apache2-licensed)
+- Uses Flexpolyline encoder / decoder by HERE Europe B. V. (MIT-licensed)
