@@ -607,7 +607,9 @@ class MinimapDataType(
                 isAntiAlias = true
             }
 
-            val text = (if (poi.name != "" && poi.name?.length!! <= 15) poi.name else poi.name?.take(10) + "...") ?: "POI"
+            val text = poi.name?.let { 
+                if (it.isNotEmpty() && it.length <= 15) it else it.take(10) + "..."
+            } ?: "POI"
             val textBounds = Rect()
             textPaint.getTextBounds(text, 0, text.length, textBounds)
 
