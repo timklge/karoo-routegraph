@@ -239,9 +239,9 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
             )
 
             val redrawInterval = if (karooSystem.karooSystemService.hardwareType == HardwareType.K2) {
-                3.seconds
+                4.seconds
             } else {
-                1.seconds
+                2.seconds
             }
 
             combine(applicationContext.streamSettings(karooSystem.karooSystemService), locationFlow, zoomLevelFlow, routeGraphViewModelProvider.viewModelFlow) { settings, location, mapZoom, viewModel ->
