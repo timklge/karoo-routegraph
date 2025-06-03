@@ -113,32 +113,32 @@ class RouteGraphDataType(
                 val canvas = Canvas(bitmap)
                 val nightMode = isNightMode()
 
-                val graphBounds = RectF(35f, 15f, config.viewSize.first.toFloat() - 10f, config.viewSize.second.toFloat() - 30f)
+                val graphBounds = RectF(if (config.gridSize.first > 30) 35f else 0f, 15f, config.viewSize.first.toFloat() - 10f, config.viewSize.second.toFloat() - 30f)
 
                 val poiLinePaint = Paint().apply {
                     color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
                     style = Paint.Style.STROKE
-                    strokeWidth = 5f
+                    strokeWidth = 6f
                 }
 
                 val incidentPaint = Paint().apply {
                     color = applicationContext.getColor(if(nightMode) R.color.elevate4dark else R.color.elevate4)
                     style = Paint.Style.STROKE
-                    strokeWidth = 5f
+                    strokeWidth = 6f
                 }
 
                 val poiLinePaintDashed = Paint(poiLinePaint).apply {
-                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 0f)
+                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(15f, 10f), 0f)
                 }
 
                 val incidentLinePaintDashed = Paint(incidentPaint).apply {
-                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 0f)
+                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(15f, 10f), 0f)
                 }
 
                 val backgroundStrokePaint = Paint().apply {
                     color = applicationContext.getColor(if(nightMode) R.color.black else R.color.white)
                     style = Paint.Style.STROKE
-                    strokeWidth = 10f
+                    strokeWidth = poiLinePaint.strokeWidth + 5f
                 }
 
                 val backgroundStrokePaintDashed = Paint(backgroundStrokePaint).apply {
@@ -396,7 +396,7 @@ class RouteGraphDataType(
                             val textWidth = textPaintInv.measureText(text)
                             val pixelsFromLeft = remap(distanceFromRouteStart, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
                             val maxPois = if (config.gridSize.first <= 30) 2 else 4
-                            val drawLabel = allPoisInRange.size <= maxPois
+                            val drawLabel = allPoisInRange.size <= maxPois && config.gridSize.first > 30
 
                             val textStartFromLeft = (pixelsFromLeft - textWidth / 2)
                                 .coerceIn(graphBounds.left, (graphBounds.right - textWidth - 5f).coerceAtLeast(graphBounds.left))
@@ -452,8 +452,8 @@ class RouteGraphDataType(
                     }
                 }
 
-                // Ticks on X axis
-                if (viewModel.routeDistance != null){
+                run  {
+                    // Ticks on X axis
                     val unitFactor = if (!viewModel.isImperial) 1000.0f else 1609.344f
                     val ticks = if (config.gridSize.first == 60) 5 else 2
                     val tickInterval = (viewDistanceEnd - viewDistanceStart) / ticks
@@ -494,42 +494,44 @@ class RouteGraphDataType(
                     }
                 }
 
-                // Ticks on Y axis
-                val unitFactor = if (!viewModel.isImperial) 1.0f else (1 / 3.28084f)
-                val ticks = if (config.gridSize.second < 30) 2 else 4
-                val tickInterval = ceil((maxElevation - minElevation) / ticks / unitFactor / 50.0f) * 50.0f * unitFactor
+                if (config.gridSize.first > 30) {
+                    // Ticks on Y axis
+                    val unitFactor = if (!viewModel.isImperial) 1.0f else (1 / 3.28084f)
+                    val ticks = if (config.gridSize.second < 30) 2 else 4
+                    val tickInterval = ceil((maxElevation - minElevation) / ticks / unitFactor / 50.0f) * 50.0f * unitFactor
 
-                for (i in 0..ticks){
-                    val y = remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom).toFloat()
+                    for (i in 0..ticks){
+                        val y = remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom).toFloat()
 
-                    canvas.drawLine(
-                        0f,
-                        y,
-                        graphBounds.left,
-                        y,
-                        axisStrokePaint
-                    )
+                        canvas.drawLine(
+                            0f,
+                            y,
+                            graphBounds.left,
+                            y,
+                            axisStrokePaint
+                        )
 
-                    val ele = (minElevation + tickInterval * i).toInt()
-                    val eleText = if (maxElevation - minElevation > 1_500) "${ele / 1000}k" else ele.toString()
-                    val textStartFromLeft = 10f
-                    val textWidth = textPaint.measureText(eleText)
+                        val ele = (minElevation + tickInterval * i).toInt()
+                        val eleText = if (maxElevation - minElevation > 1_500) "${ele / 1000}k" else ele.toString()
+                        val textStartFromLeft = 10f
+                        val textWidth = textPaint.measureText(eleText)
 
-                    canvas.drawRoundRect(
-                        textStartFromLeft - 5,
-                        remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom) - 17.5f,
-                        textStartFromLeft + textWidth + 5,
-                        remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom) + 12.5f,
-                        5f, 5f,
-                        backgroundFillPaintInvSolid
-                    )
+                        canvas.drawRoundRect(
+                            textStartFromLeft - 5,
+                            remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom) - 17.5f,
+                            textStartFromLeft + textWidth + 5,
+                            remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom) + 12.5f,
+                            5f, 5f,
+                            backgroundFillPaintInvSolid
+                        )
 
-                    canvas.drawText(
-                        eleText,
-                        10f,
-                        remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom) + 5f,
-                        textPaint
-                    )
+                        canvas.drawText(
+                            eleText,
+                            10f,
+                            remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom) + 5f,
+                            textPaint
+                        )
+                    }
                 }
 
                 val result = glance.compose(context, DpSize.Unspecified) {
