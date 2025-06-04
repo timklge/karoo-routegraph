@@ -63,6 +63,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -162,33 +163,37 @@ class MinimapDataType(
             val bearing = TurfMeasurement.bearing(positionAlongRoute, TurfMeasurement.along(polyline, 13010.0, UNIT_METERS))
 
             flow {
-                emit(StreamData(
-                    RouteGraphViewModel(routeDistance = polylineLength, distanceAlongRoute = 13_000f, knownRoute = polyline,
-                        locationAndRemainingRouteDistance = KarooRouteGraphExtension.LocationAndRemainingRouteDistance(positionAlongRoute.latitude(), positionAlongRoute.longitude(), bearing, polylineLength.toDouble() - 3_000),
-                        poiDistances = mapOf(
-                            POI(Symbol.POI("gate", 52.5159305, 13.3774302, name = "Gate")) to listOf(
-                                NearestPoint(null, 0.0f, 0.0f, null)
-                            )
-                        )),
-                    MinimapViewModel(),
-                    UserProfile(
-                        weight = 70.0f,
-                        preferredUnit = UserProfile.PreferredUnit(
-                            distance = UserProfile.PreferredUnit.UnitType.METRIC,
-                            temperature = UserProfile.PreferredUnit.UnitType.METRIC,
-                            elevation = UserProfile.PreferredUnit.UnitType.METRIC,
-                            weight = UserProfile.PreferredUnit.UnitType.METRIC,
+                while(true){
+                    emit(StreamData(
+                        RouteGraphViewModel(routeDistance = polylineLength, distanceAlongRoute = 13_000f, knownRoute = polyline,
+                            locationAndRemainingRouteDistance = KarooRouteGraphExtension.LocationAndRemainingRouteDistance(positionAlongRoute.latitude(), positionAlongRoute.longitude(), bearing, polylineLength.toDouble() - 3_000),
+                            poiDistances = mapOf(
+                                POI(Symbol.POI("gate", 52.5159305, 13.3774302, name = "Gate")) to listOf(
+                                    NearestPoint(null, 0.0f, 0.0f, null)
+                                )
+                            )),
+                        MinimapViewModel(),
+                        UserProfile(
+                            weight = 70.0f,
+                            preferredUnit = UserProfile.PreferredUnit(
+                                distance = UserProfile.PreferredUnit.UnitType.METRIC,
+                                temperature = UserProfile.PreferredUnit.UnitType.METRIC,
+                                elevation = UserProfile.PreferredUnit.UnitType.METRIC,
+                                weight = UserProfile.PreferredUnit.UnitType.METRIC,
+                            ),
+                            maxHr = 190,
+                            restingHr = 60,
+                            heartRateZones = listOf(),
+                            ftp = 200,
+                            powerZones = listOf()
                         ),
-                        maxHr = 190,
-                        restingHr = 60,
-                        heartRateZones = listOf(),
-                        ftp = 200,
-                        powerZones = listOf()
-                    ),
-                    displayViewModel = RouteGraphDisplayViewModel(),
-                    settings = context.streamSettings(karooSystem).first(),
-                    dataPageIsVisible = true
-                ))
+                        displayViewModel = RouteGraphDisplayViewModel(),
+                        settings = context.streamSettings(karooSystem).first(),
+                        dataPageIsVisible = true
+                    ))
+
+                    delay(2_000)
+                }
             }
         } else {
             combine(
