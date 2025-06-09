@@ -423,6 +423,14 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     null
                 }
 
+                val routeChanged =  if (knownRoute == null || routeLineString != knownRoute){
+                    knownRoute = routeLineString
+                    knownRouteElevation = null
+                    knownIncidents = null
+
+                    true
+                } else false
+
                 // Request incidents
                 if (settings.hereMapsApiKey.isNotEmpty() && knownIncidents == null && routeLineString != null && routeDistance != null){
                     try {
@@ -566,14 +574,6 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
                 Log.d(TAG, "Received navigation state: $navigationStateEvent")
 
-                val routeChanged =  if (knownRoute == null || routeLineString != knownRoute){
-                    knownRoute = routeLineString
-                    knownRouteElevation = null
-                    knownIncidents = null
-
-                    true
-                } else false
-
                 if (routeChanged){
                     if (routeLineString != null){
                         Log.i(TAG, "Route changed, recalculating POI distances")
@@ -587,7 +587,6 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     }
                     knownRoute = routeLineString
                 }
-
 
                 when(navigationStateEvent){
                     is OnNavigationState.NavigationState.NavigatingRoute -> {
