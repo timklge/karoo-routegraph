@@ -142,7 +142,7 @@ class RouteGraphDataType(
                 }
 
                 val backgroundStrokePaintDashed = Paint(backgroundStrokePaint).apply {
-                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 0f)
+                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(15f, 10f), 0f)
                 }
 
                 val axisStrokePaint = Paint().apply {
