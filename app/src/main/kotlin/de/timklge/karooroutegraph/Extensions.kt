@@ -42,3 +42,8 @@ data class HeightRequest(
     @SerialName("height_precision") val heightPrecision: Int = 0,
 )
 
+private val counter = java.util.concurrent.atomic.AtomicInteger(0)
+
+fun getSeq(): Int {
+    return counter.getAndIncrement()
+}

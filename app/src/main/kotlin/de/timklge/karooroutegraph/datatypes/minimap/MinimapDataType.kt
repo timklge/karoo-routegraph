@@ -16,6 +16,7 @@ import android.util.Base64
 import android.util.Log
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.graphics.withRotation
@@ -30,6 +31,8 @@ import androidx.glance.appwidget.GlanceRemoteViews
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
+import androidx.glance.layout.height
+import androidx.glance.layout.width
 import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
 import com.mapbox.turf.TurfConstants
@@ -47,6 +50,7 @@ import de.timklge.karooroutegraph.RouteGraphDisplayViewModelProvider
 import de.timklge.karooroutegraph.RouteGraphViewModel
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.TileDownloadService
+import de.timklge.karooroutegraph.getSeq
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.streamDatatypeIsVisible
 import de.timklge.karooroutegraph.streamSettings
@@ -69,6 +73,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+import java.util.UUID
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -76,6 +81,8 @@ import kotlin.math.floor
 import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
+
+val viewIdParameter = ActionParameters.Key<Int>("view_id")
 
 enum class MinimapZoomLevel(val level: Float?) {
     CLOSEST(16.0f),
@@ -156,6 +163,8 @@ class MinimapDataType(
             awaitCancellation()
         }
 
+        val viewId = getSeq()
+
         val flow = if (config.preview) {
             val polyline = LineString.fromPolyline(String(Base64.decode(previewPolylineBase64, 0)), 5)
             val polylineLength = TurfMeasurement.length(polyline, UNIT_METERS).toFloat()
@@ -230,7 +239,7 @@ class MinimapDataType(
                 val height = config.viewSize.second
 
                 val zoomLevel =
-                    if (displayViewModel.minimapZoomLevel == MinimapZoomLevel.COMPLETE_ROUTE) {
+                    if (displayViewModel.minimapZoomLevel.getOrDefault(viewId, MinimapZoomLevel.FAR) == MinimapZoomLevel.COMPLETE_ROUTE) {
                         if (viewModel.rejoin != null) {
                             viewModel.rejoin.getOSMZoomLevelToFit(width, height)
                         } else if (viewModel.knownRoute != null) {
@@ -239,10 +248,10 @@ class MinimapDataType(
                             16.0f
                         }
                     } else {
-                        displayViewModel.minimapZoomLevel.level ?: 16.0f
+                        displayViewModel.minimapZoomLevel.getOrDefault(viewId, MinimapZoomLevel.FAR).level ?: 16.0f
                     }
 
-                val centerPosition = if (displayViewModel.minimapZoomLevel == MinimapZoomLevel.COMPLETE_ROUTE){
+                val centerPosition = if (displayViewModel.minimapZoomLevel.getOrDefault(viewId, MinimapZoomLevel.FAR) == MinimapZoomLevel.COMPLETE_ROUTE){
                     if (viewModel.rejoin != null) {
                         viewModel.rejoin.getCenterPoint()
                     } else if (viewModel.knownRoute != null) {
@@ -472,7 +481,7 @@ class MinimapDataType(
                             canvas,
                             height,
                             centerPosition.latitude(),
-                            displayViewModel.minimapZoomLevel,
+                            displayViewModel.minimapZoomLevel.getOrDefault(viewId, MinimapZoomLevel.FAR),
                             zoomLevel,
                             imperialUnits,
                             if (nightMode) Color.WHITE else Color.BLACK
@@ -506,7 +515,7 @@ class MinimapDataType(
                         if (!config.preview) modifier = modifier.clickable(
                             onClick = actionRunCallback<ChangeMinimapZoomLevel>(
                                 parameters = actionParametersOf(
-                                    ActionParameters.Key<String>("action_type") to "minimap_zoom"
+                                    viewIdParameter to viewId
                                 )
                             )
                         )
@@ -539,6 +548,9 @@ class MinimapDataType(
             Log.d(TAG, "Cancelling minimap view")
             configJob.cancel()
             viewJob.cancel()
+            displayViewModelProvider.update {
+                it.copy(minimapZoomLevel = it.minimapZoomLevel - viewId)
+            }
         }
     }
 

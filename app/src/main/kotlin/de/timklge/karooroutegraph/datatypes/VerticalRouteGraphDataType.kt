@@ -13,6 +13,7 @@ import android.util.Log
 import androidx.annotation.DrawableRes
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.graphics.withClip
@@ -27,6 +28,8 @@ import androidx.glance.appwidget.GlanceRemoteViews
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
+import androidx.glance.layout.height
+import androidx.glance.layout.width
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.NearestPoint
 import de.timklge.karooroutegraph.POI
@@ -40,9 +43,11 @@ import de.timklge.karooroutegraph.SparseElevationData
 import de.timklge.karooroutegraph.ZoomLevel
 import de.timklge.karooroutegraph.datatypes.minimap.ChangeZoomLevelAction
 import de.timklge.karooroutegraph.datatypes.minimap.mapPoiToIcon
+import de.timklge.karooroutegraph.datatypes.minimap.viewIdParameter
 import de.timklge.karooroutegraph.distanceIsZero
 import de.timklge.karooroutegraph.distanceToString
 import de.timklge.karooroutegraph.getInclineIndicatorColor
+import de.timklge.karooroutegraph.getSeq
 import de.timklge.karooroutegraph.streamDatatypeIsVisible
 import de.timklge.karooroutegraph.streamUserProfile
 import io.hammerhead.karooext.KarooSystemService
@@ -63,6 +68,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import java.util.Locale
+import java.util.UUID
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
@@ -106,6 +112,8 @@ class VerticalRouteGraphDataType(
         }
 
         val viewJob = CoroutineScope(Dispatchers.Default).launch {
+            val viewId = getSeq()
+
             flow.filter { it.isVisible }.collect { (viewModel, displayViewModel, userProfile) ->
                 val bitmap = createBitmap(config.viewSize.first, config.viewSize.second)
 
@@ -228,7 +236,7 @@ class VerticalRouteGraphDataType(
                     }
                 }
 
-                val zoomLevel = displayViewModel.zoomLevel
+                val zoomLevel = displayViewModel.zoomLevel.getOrDefault(viewId, ZoomLevel.COMPLETE_ROUTE)
                 val viewDistanceStart = if (zoomLevel == ZoomLevel.COMPLETE_ROUTE){
                     0.0f
                 } else {
@@ -336,7 +344,7 @@ class VerticalRouteGraphDataType(
 
                             val clipRect = RectF(graphBounds.left, clampedClimbStartProgressPixels, graphBounds.bottom, clampedClimbEndProgressPixels)
 
-                            if (displayViewModel.zoomLevel != ZoomLevel.TWO_UNITS) {
+                            if (displayViewModel.zoomLevel.getOrDefault(viewId, ZoomLevel.COMPLETE_ROUTE) != ZoomLevel.TWO_UNITS) {
                             canvas.withClip(clipRect) {
                                 canvas.withClip(filledPath) {
                                     categoryPaints[climb.category]?.let { paint ->
@@ -364,7 +372,7 @@ class VerticalRouteGraphDataType(
                     }
                 }
 
-                if (displayViewModel.zoomLevel == ZoomLevel.TWO_UNITS) {
+                if (displayViewModel.zoomLevel.getOrDefault(viewId, ZoomLevel.COMPLETE_ROUTE) == ZoomLevel.TWO_UNITS) {
                     for (i in 0 until viewModel.sampledElevationData.elevations.size-1){
                         val distance = i * viewModel.sampledElevationData.interval
                         if (distance !in viewRange) continue
@@ -420,7 +428,6 @@ class VerticalRouteGraphDataType(
                     }.forEach { (poi, nearestPoint) ->
                         val distanceFromRouteStart = nearestPoint.distanceFromRouteStart
                         val text = poi.symbol.name ?: ""
-                        val isIncident = poi.type == PoiType.INCIDENT
                         val progressPixels = remap(distanceFromRouteStart, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
 
                         canvas.drawLine(graphBounds.left, progressPixels, config.viewSize.first.toFloat(), progressPixels, backgroundStrokePaintDashed)
@@ -538,7 +545,7 @@ class VerticalRouteGraphDataType(
 
                     if (!config.preview) modifier = modifier.clickable(onClick = actionRunCallback<ChangeZoomLevelAction>(
                         parameters = actionParametersOf(
-                            ActionParameters.Key<String>("action_type") to "zoom"
+                            viewIdParameter to viewId
                         )
                     ))
 

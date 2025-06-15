@@ -440,7 +440,10 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
                 if (routeChanged) {
                     displayViewModelProvider.update {
-                        it.copy(minimapZoomLevel = if (knownRoute != null) MinimapZoomLevel.COMPLETE_ROUTE else MinimapZoomLevel.FAR)
+                        val minimapZoomLevels = it.minimapZoomLevel.mapValues {
+                            if (knownRoute != null) MinimapZoomLevel.COMPLETE_ROUTE else MinimapZoomLevel.FAR
+                        }
+                        it.copy(minimapZoomLevel = minimapZoomLevels)
                     }
                 }
 

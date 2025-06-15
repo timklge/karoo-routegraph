@@ -11,13 +11,13 @@ import android.graphics.RectF
 import android.util.Log
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.graphics.withClip
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
-import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
@@ -25,6 +25,9 @@ import androidx.glance.appwidget.GlanceRemoteViews
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
+import androidx.glance.layout.height
+import androidx.glance.layout.size
+import androidx.glance.layout.width
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.NearestPoint
 import de.timklge.karooroutegraph.POI
@@ -38,7 +41,9 @@ import de.timklge.karooroutegraph.SparseElevationData
 import de.timklge.karooroutegraph.ZoomLevel
 import de.timklge.karooroutegraph.datatypes.minimap.ChangeZoomLevelAction
 import de.timklge.karooroutegraph.datatypes.minimap.mapPoiToIcon
+import de.timklge.karooroutegraph.datatypes.minimap.viewIdParameter
 import de.timklge.karooroutegraph.getInclineIndicatorColor
+import de.timklge.karooroutegraph.getSeq
 import de.timklge.karooroutegraph.streamDatatypeIsVisible
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.DataTypeImpl
@@ -86,8 +91,6 @@ class RouteGraphDataType(
     override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
         Log.d(TAG, "Starting route view with $emitter")
 
-        val instanceId = UUID.randomUUID().toString()
-
         val configJob = CoroutineScope(Dispatchers.Default).launch {
             emitter.onNext(UpdateGraphicConfig(showHeader = false))
             emitter.onNext(ShowCustomStreamState("", null))
@@ -107,6 +110,8 @@ class RouteGraphDataType(
         }
 
         val viewJob = CoroutineScope(Dispatchers.Default).launch {
+            val viewId = getSeq()
+
             flow.filter { it.isVisible }.collect { (viewModel, displayViewModel) ->
                 val bitmap = createBitmap(config.viewSize.first, config.viewSize.second)
 
@@ -221,7 +226,7 @@ class RouteGraphDataType(
                     }
                 }
 
-                val zoomLevel = displayViewModel.zoomLevel
+                val zoomLevel = displayViewModel.zoomLevel.getOrDefault(viewId, ZoomLevel.COMPLETE_ROUTE)
 
                 val viewDistanceStart = if (zoomLevel == ZoomLevel.COMPLETE_ROUTE){
                     0.0f
@@ -300,7 +305,7 @@ class RouteGraphDataType(
                     filledPath.lineTo(firstPixelFromLeft, graphBounds.bottom)
                     filledPath.close()
 
-                    if (displayViewModel.zoomLevel != ZoomLevel.TWO_UNITS){
+                    if (displayViewModel.zoomLevel.getOrDefault(viewId, ZoomLevel.COMPLETE_ROUTE) != ZoomLevel.TWO_UNITS){
                         if (viewModel.climbs != null){
                             // Sort climbs so that harder climbs will be drawn on top if they overlap
                             val climbsSortedByCategory = viewModel.climbs.sortedByDescending { it.category.number }
@@ -539,7 +544,7 @@ class RouteGraphDataType(
 
                     if (!config.preview) modifier = modifier.clickable(onClick = actionRunCallback<ChangeZoomLevelAction>(
                         parameters = actionParametersOf(
-                            ActionParameters.Key<String>("action_type") to "zoom"
+                            viewIdParameter to viewId
                         )
                     ))
 

@@ -33,13 +33,19 @@ class ChangeMinimapZoomLevel : ActionCallback, KoinComponent {
         routeGraphDisplayViewModelProvider.update { displayViewModel ->
             val width = displayViewModel.minimapWidth
             val height = displayViewModel.minimapHeight
+            val viewId = parameters[viewIdParameter]
 
-            if (width != null && height != null) {
+            Log.d(KarooRouteGraphExtension.TAG, "ChangeMinimapZoomLevel called for viewId: $viewId, width: $width, height: $height")
+
+            if (width != null && height != null && viewId != null) {
                 val requiredZoomLevel = getRequiredZoomLevel(viewModel, displayViewModel.minimapWidth, displayViewModel.minimapHeight)
-                val newZoomLevel = displayViewModel.minimapZoomLevel.next(requiredZoomLevel)
-                Log.d(KarooRouteGraphExtension.Companion.TAG, "Updated zoom level: $newZoomLevel")
+                val zoomLevels = displayViewModel.minimapZoomLevel.toMutableMap()
+                val defaultZoomLevel = if (viewModel.knownRoute != null) MinimapZoomLevel.COMPLETE_ROUTE else MinimapZoomLevel.FAR
+                val newZoomLevel = zoomLevels.getOrDefault(viewId, defaultZoomLevel).next(requiredZoomLevel)
+                zoomLevels[viewId] = newZoomLevel
+                Log.d(KarooRouteGraphExtension.TAG, "Updated zoom level: $newZoomLevel")
 
-                displayViewModel.copy(minimapZoomLevel = newZoomLevel)
+                displayViewModel.copy(minimapZoomLevel = zoomLevels)
             } else {
                 displayViewModel
             }

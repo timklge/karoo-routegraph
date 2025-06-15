@@ -41,8 +41,8 @@ enum class ZoomLevel(val displayedUnits: Int?) {
     }
 }
 
-data class RouteGraphDisplayViewModel(val zoomLevel: ZoomLevel = ZoomLevel.COMPLETE_ROUTE,
-                                      val minimapZoomLevel: MinimapZoomLevel = MinimapZoomLevel.FAR,
+data class RouteGraphDisplayViewModel(val zoomLevel: Map<Int, ZoomLevel> = mapOf(), /* ZoomLevel.COMPLETE_ROUTE */
+                                      val minimapZoomLevel: Map<Int, MinimapZoomLevel> = mapOf(), /* MinimapZoomLevel.FAR */
                                       val minimapWidth: Int? = null, val minimapHeight: Int? = null,)
 
 class RouteGraphDisplayViewModelProvider {
