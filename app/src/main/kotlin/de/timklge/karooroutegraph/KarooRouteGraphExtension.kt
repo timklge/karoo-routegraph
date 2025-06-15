@@ -53,10 +53,9 @@ import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import kotlin.math.pow
-import kotlin.math.round
 import kotlin.time.Duration.Companion.seconds
 
-class GradientIndicator(val id: String, val distance: Float, val gradientPercent: Float, @DrawableRes val drawableRes: Int){
+class GradientIndicator(val id: String, val distance: Float, val gradientPercent: Float, val position: Point, @DrawableRes val drawableRes: Int){
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
@@ -257,28 +256,32 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                         Point.fromLngLat(boundingBox.maxLng, boundingBox.maxLat),
                         TurfConstants.UNIT_METERS
                     )
-                    val currentPosition = Point.fromLngLat(location.lng, location.lat)
+
                     Log.d(TAG, "Drawing gradient indicators, Diagonal: $mapDiagonal")
 
                     val distanceAlongRoute = viewModel.distanceAlongRoute ?: 0.0f
-                    val startDistance =
-                        (distanceAlongRoute - mapDiagonal).toFloat().coerceAtLeast(0.0f)
                     val endDistance = (distanceAlongRoute + mapDiagonal).toFloat()
 
-                    if (viewModel.sampledElevationData != null) {
-                        Log.d(TAG, "Range: $startDistance - $endDistance")
+                    if (viewModel.sampledElevationData != null && viewModel.knownRoute != null) {
+                        Log.d(TAG, "Range: $distanceAlongRoute - $endDistance")
 
                         val wantedStepInMeters = mapDiagonal.toFloat() / settings.gradientIndicatorFrequency.stepsPerDisplayDiagonal
 
-                        currentSymbols = viewModel.sampledElevationData.getGradientIndicators(wantedStepInMeters) { distance ->
-                            val targetPosition = TurfMeasurement.along(
-                                viewModel.knownRoute!!,
-                                distance.toDouble(),
-                                TurfConstants.UNIT_METERS
-                            )
-
-                            boundingBox.contains(targetPosition.latitude(), targetPosition.longitude()) || TurfMeasurement.distance(targetPosition, currentPosition, TurfConstants.UNIT_METERS) <= mapDiagonal * 3
+                        val calculatedSymbols = viewModel.sampledElevationData.getGradientIndicators(viewModel.knownRoute, wantedStepInMeters) { distance ->
+                            distance in distanceAlongRoute..endDistance
                         }.toMutableSet()
+
+                        val filteredSymbols = buildSet {
+                            calculatedSymbols.forEach { symbol ->
+                                val hasSymbolAtThatLocation = this.any { existingSymbol: GradientIndicator ->
+                                    TurfMeasurement.distance(symbol.position, existingSymbol.position, TurfConstants.UNIT_METERS) < wantedStepInMeters * 0.9
+                                }
+
+                                if (!hasSymbolAtThatLocation) add(symbol)
+                            }
+                        }
+
+                        currentSymbols = filteredSymbols.toMutableSet()
                     } else {
                         currentSymbols = mutableSetOf()
                     }

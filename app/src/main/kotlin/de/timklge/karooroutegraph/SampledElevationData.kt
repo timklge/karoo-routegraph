@@ -1,5 +1,9 @@
 package de.timklge.karooroutegraph
 
+import com.mapbox.geojson.LineString
+import com.mapbox.turf.TurfConstants
+import com.mapbox.turf.TurfMeasurement
+
 class SampledElevationData(val interval: Float, val elevations: FloatArray) {
     fun getMinimumElevationInRange(startDistance: Float, endDistance: Float): Float {
         var minElevation = Float.MAX_VALUE
@@ -43,7 +47,7 @@ class SampledElevationData(val interval: Float, val elevations: FloatArray) {
         return elevationSum
     }
 
-    fun getGradientIndicators(stepInMeters: Float, isInRange: (Float) -> Boolean): List<GradientIndicator> = buildList {
+    fun getGradientIndicators(route: LineString, stepInMeters: Float, isInRange: (Float) -> Boolean): List<GradientIndicator> = buildList {
         if (elevations.size < 2 || interval <= 0f || stepInMeters <= 0f) {
             return@buildList // Not enough data, invalid interval, or invalid step for processing
         }
@@ -85,7 +89,8 @@ class SampledElevationData(val interval: Float, val elevations: FloatArray) {
                     val distanceForIndicator = segmentStartDistance // Indicator positioned at the start of its segment
                     if (isInRange(distanceForIndicator)) {
                         val id = "${distanceForIndicator.toInt()}-${drawableRes}"
-                        add(GradientIndicator(id, distanceForIndicator, maxGradientInSegment, drawableRes))
+                        val position = TurfMeasurement.along(route, distanceForIndicator.toDouble(), TurfConstants.UNIT_METERS)
+                        add(GradientIndicator(id, distanceForIndicator, maxGradientInSegment, position, drawableRes))
                     }
                 }
             } else if (segmentStartDistance < segmentEndDistance) {
@@ -97,7 +102,8 @@ class SampledElevationData(val interval: Float, val elevations: FloatArray) {
                     val distanceForIndicator = segmentStartDistance
                     if (isInRange(distanceForIndicator)) {
                         val id = "${distanceForIndicator.toInt()}-${drawableRes}"
-                        add(GradientIndicator(id, distanceForIndicator, 0.0f, drawableRes))
+                        val position = TurfMeasurement.along(route, distanceForIndicator.toDouble(), TurfConstants.UNIT_METERS)
+                        add(GradientIndicator(id, distanceForIndicator, 0.0f, position, drawableRes))
                     }
                 }
             }
