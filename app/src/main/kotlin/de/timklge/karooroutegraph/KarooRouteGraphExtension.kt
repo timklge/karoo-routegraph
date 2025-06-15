@@ -13,6 +13,7 @@ import de.timklge.karooroutegraph.datatypes.RouteGraphDataType
 import de.timklge.karooroutegraph.datatypes.VerticalRouteGraphDataType
 import de.timklge.karooroutegraph.datatypes.minimap.MinimapDataType
 import de.timklge.karooroutegraph.datatypes.minimap.MinimapViewModelProvider
+import de.timklge.karooroutegraph.datatypes.minimap.MinimapZoomLevel
 import de.timklge.karooroutegraph.incidents.HereMapsIncidentProvider
 import de.timklge.karooroutegraph.incidents.IncidentResult
 import de.timklge.karooroutegraph.incidents.IncidentsResponse
