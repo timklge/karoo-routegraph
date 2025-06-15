@@ -38,7 +38,7 @@ import de.timklge.karooroutegraph.RouteGraphViewModel
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.SparseElevationData
 import de.timklge.karooroutegraph.ZoomLevel
-import de.timklge.karooroutegraph.datatypes.minimap.ChangeZoomLevelAction
+import de.timklge.karooroutegraph.datatypes.minimap.ChangeVerticalZoomLevelAction
 import de.timklge.karooroutegraph.datatypes.minimap.mapPoiToIcon
 import de.timklge.karooroutegraph.distanceIsZero
 import de.timklge.karooroutegraph.distanceToString
@@ -228,7 +228,7 @@ class VerticalRouteGraphDataType(
                     }
                 }
 
-                val zoomLevel = displayViewModel.zoomLevel
+                val zoomLevel = displayViewModel.verticalZoomLevel
                 val viewDistanceStart = if (zoomLevel == ZoomLevel.COMPLETE_ROUTE){
                     0.0f
                 } else {
@@ -336,59 +336,59 @@ class VerticalRouteGraphDataType(
 
                             val clipRect = RectF(graphBounds.left, clampedClimbStartProgressPixels, graphBounds.bottom, clampedClimbEndProgressPixels)
 
-                            if (displayViewModel.zoomLevel != ZoomLevel.TWO_UNITS) {
-                            canvas.withClip(clipRect) {
-                                canvas.withClip(filledPath) {
-                                    categoryPaints[climb.category]?.let { paint ->
-                                        canvas.drawRect(clipRect, paint)
+                            if (displayViewModel.verticalZoomLevel != ZoomLevel.TWO_UNITS) {
+                                canvas.withClip(clipRect) {
+                                    canvas.withClip(filledPath) {
+                                        categoryPaints[climb.category]?.let { paint ->
+                                            canvas.drawRect(clipRect, paint)
+                                        }
                                     }
                                 }
                             }
-                        }
 
-                        val climbGain = distanceToString(climb.totalGain(viewModel.sampledElevationData).toFloat(), userProfile, true)
-                        val climbLength = distanceToString(climb.length, userProfile, false)
+                            val climbGain = distanceToString(climb.totalGain(viewModel.sampledElevationData).toFloat(), userProfile, true)
+                            val climbLength = distanceToString(climb.length, userProfile, false)
 
-                        val climbAverageIncline = (climb.getAverageIncline(viewModel.sampledElevationData) * 100).roundToInt()   // String.format(Locale.getDefault(), "%.1f", climb.getAverageIncline(viewModel.sampledElevationData) * 100)
-                        val climbMaxIncline = climb.getMaxIncline(viewModel.sampledElevationData)
-                        val climbMaxInclineLength = distanceToString(climbMaxIncline.end - climbMaxIncline.start, userProfile, false)
+                            val climbAverageIncline = (climb.getAverageIncline(viewModel.sampledElevationData) * 100).roundToInt()   // String.format(Locale.getDefault(), "%.1f", climb.getAverageIncline(viewModel.sampledElevationData) * 100)
+                            val climbMaxIncline = climb.getMaxIncline(viewModel.sampledElevationData)
+                            val climbMaxInclineLength = distanceToString(climbMaxIncline.end - climbMaxIncline.start, userProfile, false)
 
-                        if (climb.category.number <= 3){
-                            textDrawCommands.add(TextDrawCommand(graphBounds.right + 75, climbStartProgressPixels + 15f, "⛰ $climbGain, $climbLength", textPaint, climb.category.importance, "⛰", Paint(textPaint).apply {
-                                color = applicationContext.getColor(climb.category.colorRes)
-                            }))
+                            if (climb.category.number <= 3){
+                                textDrawCommands.add(TextDrawCommand(graphBounds.right + 75, climbStartProgressPixels + 15f, "⛰ $climbGain, $climbLength", textPaint, climb.category.importance, "⛰", Paint(textPaint).apply {
+                                    color = applicationContext.getColor(climb.category.colorRes)
+                                }))
 
-                            val maxInclineString = if (climbMaxIncline.incline > climbAverageIncline) ", ${climbMaxIncline.incline}% $climbMaxInclineLength" else ""
-                            textDrawCommands.add(TextDrawCommand(graphBounds.right + 75, climbStartProgressPixels + 16f, "⌀ ${climbAverageIncline}%${maxInclineString}", textPaint, climb.category.importance))
-                        }
-                    }
-                }
-
-                if (displayViewModel.zoomLevel == ZoomLevel.TWO_UNITS) {
-                    for (i in 0 until viewModel.sampledElevationData.elevations.size-1){
-                        val distance = i * viewModel.sampledElevationData.interval
-                        if (distance !in viewRange) continue
-
-                        val incline = (viewModel.sampledElevationData.elevations[i+1] - viewModel.sampledElevationData.elevations[i]) / viewModel.sampledElevationData.interval
-                        val inclineIndicator = getInclineIndicatorColor(incline * 100) ?: continue
-
-                        val inclineColor = applicationContext.getColor(inclineIndicator)
-
-                        val clipRect = RectF(
-                            graphBounds.left,
-                            remap(distance, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom).roundToInt().toFloat(),
-                            graphBounds.right,
-                            remap(distance + viewModel.sampledElevationData.interval, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom).roundToInt() + 1f,
-                        )
-
-                        canvas.withClip(clipRect){
-                            canvas.withClip(filledPath) {
-                                canvas.drawRect(clipRect, Paint().apply {
-                                    color = inclineColor
-                                    style = Paint.Style.FILL
-                                })
+                                val maxInclineString = if (climbMaxIncline.incline > climbAverageIncline) ", ${climbMaxIncline.incline}% $climbMaxInclineLength" else ""
+                                textDrawCommands.add(TextDrawCommand(graphBounds.right + 75, climbStartProgressPixels + 16f, "⌀ ${climbAverageIncline}%${maxInclineString}", textPaint, climb.category.importance))
                             }
                         }
+                    }
+
+                    if (displayViewModel.verticalZoomLevel == ZoomLevel.TWO_UNITS) {
+                        for (i in 0 until viewModel.sampledElevationData.elevations.size-1){
+                            val distance = i * viewModel.sampledElevationData.interval
+                            if (distance !in viewRange) continue
+
+                            val incline = (viewModel.sampledElevationData.elevations[i+1] - viewModel.sampledElevationData.elevations[i]) / viewModel.sampledElevationData.interval
+                            val inclineIndicator = getInclineIndicatorColor(incline * 100) ?: continue
+
+                            val inclineColor = applicationContext.getColor(inclineIndicator)
+
+                            val clipRect = RectF(
+                                graphBounds.left,
+                                remap(distance, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom).roundToInt().toFloat(),
+                                graphBounds.right,
+                                remap(distance + viewModel.sampledElevationData.interval, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom).roundToInt() + 1f,
+                            )
+
+                            canvas.withClip(clipRect){
+                                canvas.withClip(filledPath) {
+                                    canvas.drawRect(clipRect, Paint().apply {
+                                        color = inclineColor
+                                        style = Paint.Style.FILL
+                                    })
+                                }
+                            }
                         }
                     }
 
@@ -536,7 +536,7 @@ class VerticalRouteGraphDataType(
                 val result = glance.compose(context, DpSize.Unspecified) {
                     var modifier = GlanceModifier.fillMaxSize()
 
-                    if (!config.preview) modifier = modifier.clickable(onClick = actionRunCallback<ChangeZoomLevelAction>(
+                    if (!config.preview) modifier = modifier.clickable(onClick = actionRunCallback<ChangeVerticalZoomLevelAction>(
                         parameters = actionParametersOf(
                             ActionParameters.Key<String>("action_type") to "zoom"
                         )
