@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.first
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
-class ChangeZoomLevelAction : ActionCallback, KoinComponent {
+class ChangeVerticalZoomLevelAction : ActionCallback, KoinComponent {
     private val displayViewModelProvider: RouteGraphDisplayViewModelProvider by inject()
     private val karooSystemServiceProvider: KarooSystemServiceProvider by inject()
     private val viewModelProvider: RouteGraphViewModelProvider by inject()
@@ -30,15 +30,14 @@ class ChangeZoomLevelAction : ActionCallback, KoinComponent {
             val routeDistance = viewModel.routeDistance
 
             val newZoomLevel = if(routeDistance != null){
-                displayViewModel.zoomLevel.next(routeDistance.toDouble(), viewModel.isImperial)
+                displayViewModel.verticalZoomLevel.next(routeDistance.toDouble(), viewModel.isImperial)
             } else {
                 ZoomLevel.COMPLETE_ROUTE
             }
 
-            Log.d(KarooRouteGraphExtension.Companion.TAG, "Updated zoom level: $newZoomLevel")
+            Log.d(KarooRouteGraphExtension.TAG, "Updated vertical zoom level: $newZoomLevel")
 
-            displayViewModel.copy(zoomLevel = newZoomLevel)
+            displayViewModel.copy(verticalZoomLevel = newZoomLevel)
         }
     }
 }
-
