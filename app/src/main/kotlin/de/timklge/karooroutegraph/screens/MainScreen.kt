@@ -25,6 +25,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -44,8 +45,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.mapbox.geojson.Point
+import de.timklge.karooroutegraph.GradientIndicatorFrequency
 import de.timklge.karooroutegraph.KarooRouteGraphExtension
-import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.incidents.HereMapsIncidentProvider
 import de.timklge.karooroutegraph.saveSettings
@@ -58,6 +59,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.koin.compose.koinInject
+import kotlin.math.roundToInt
 
 @Serializable
 data class RouteGraphSettings(
@@ -65,6 +67,7 @@ data class RouteGraphSettings(
     val showPOILabelsOnMinimap: Boolean = true,
     val welcomeDialogAccepted: Boolean = false,
     val hereMapsApiKey: String = "",
+    val gradientIndicatorFrequency: GradientIndicatorFrequency = GradientIndicatorFrequency.HIGH
 ){
     companion object {
         val defaultSettings = Json.encodeToString(RouteGraphSettings())
@@ -80,6 +83,7 @@ fun MainScreen(onFinish: () -> Unit) {
     val karooSystem = remember { KarooSystemService(ctx) }
     var welcomeDialogVisible by remember { mutableStateOf(false) }
     var showGradientIndicatorsOnMap by remember { mutableStateOf(false) }
+    var gradientIndicatorFrequency by remember { mutableStateOf(GradientIndicatorFrequency.HIGH) }
     var showPOIsOnMinimap by remember { mutableStateOf(true) }
     var hereMapsApiKey by remember { mutableStateOf("") }
     var apiTestDialogVisible by remember { mutableStateOf(false) }
@@ -94,7 +98,8 @@ fun MainScreen(onFinish: () -> Unit) {
             showGradientIndicatorsOnMap = showGradientIndicatorsOnMap,
             welcomeDialogAccepted = !welcomeDialogVisible,
             showPOILabelsOnMinimap = showPOIsOnMinimap,
-            hereMapsApiKey = hereMapsApiKey
+            hereMapsApiKey = hereMapsApiKey,
+            gradientIndicatorFrequency = gradientIndicatorFrequency
         )
 
         saveSettings(ctx, newSettings)
@@ -104,6 +109,7 @@ fun MainScreen(onFinish: () -> Unit) {
         ctx.streamSettings(karooSystem).collect { settings ->
             welcomeDialogVisible = !settings.welcomeDialogAccepted
             showGradientIndicatorsOnMap = settings.showGradientIndicatorsOnMap
+            gradientIndicatorFrequency = settings.gradientIndicatorFrequency
             showPOIsOnMinimap = settings.showPOILabelsOnMinimap
             hereMapsApiKey = settings.hereMapsApiKey
         }
@@ -159,6 +165,30 @@ fun MainScreen(onFinish: () -> Unit) {
                             })
                             Spacer(modifier = Modifier.width(10.dp))
                             Text("Show gradient indicators on map")
+                        }
+
+                        if (showGradientIndicatorsOnMap) {
+                            val frequencies = GradientIndicatorFrequency.entries.toTypedArray()
+                            val selectedIndex = frequencies.indexOf(gradientIndicatorFrequency)
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Text("Amount of indicators:")
+                                Slider(
+                                    value = selectedIndex.toFloat(),
+                                    onValueChange = { idx ->
+                                        val newIndex = idx.roundToInt().coerceIn(frequencies.indices)
+                                        gradientIndicatorFrequency = frequencies[newIndex]
+                                        coroutineScope.launch { updateSettings() }
+                                    },
+                                    valueRange = 0f..(frequencies.size - 1).toFloat(),
+                                    steps = frequencies.size - 2,
+                                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp),
+                                )
+                                Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    frequencies.forEach { freq ->
+                                        Text(freq.name, style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+                            }
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
