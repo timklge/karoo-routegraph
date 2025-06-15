@@ -256,7 +256,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                         Point.fromLngLat(boundingBox.minLng, boundingBox.minLat),
                         Point.fromLngLat(boundingBox.maxLng, boundingBox.maxLat),
                         TurfConstants.UNIT_METERS
-                    ) * 3
+                    )
                     val currentPosition = Point.fromLngLat(location.lng, location.lat)
                     Log.d(TAG, "Drawing gradient indicators, Diagonal: $mapDiagonal")
 
@@ -268,17 +268,16 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     if (viewModel.sampledElevationData != null) {
                         Log.d(TAG, "Range: $startDistance - $endDistance")
 
-                        val wantedStepInMeters = mapDiagonal / 20.0
-                        val steps = round(wantedStepInMeters / viewModel.sampledElevationData.interval).toInt().coerceAtLeast(1)
+                        val wantedStepInMeters = mapDiagonal.toFloat() / settings.gradientIndicatorFrequency.stepsPerDisplayDiagonal
 
-                        currentSymbols = viewModel.sampledElevationData.getGradientIndicators(steps) { distance ->
+                        currentSymbols = viewModel.sampledElevationData.getGradientIndicators(wantedStepInMeters) { distance ->
                             val targetPosition = TurfMeasurement.along(
                                 viewModel.knownRoute!!,
                                 distance.toDouble(),
                                 TurfConstants.UNIT_METERS
                             )
 
-                            boundingBox.contains(targetPosition.latitude(), targetPosition.longitude()) || TurfMeasurement.distance(targetPosition, currentPosition, TurfConstants.UNIT_METERS) <= 500
+                            boundingBox.contains(targetPosition.latitude(), targetPosition.longitude()) || TurfMeasurement.distance(targetPosition, currentPosition, TurfConstants.UNIT_METERS) <= mapDiagonal * 3
                         }.toMutableSet()
                     } else {
                         currentSymbols = mutableSetOf()
