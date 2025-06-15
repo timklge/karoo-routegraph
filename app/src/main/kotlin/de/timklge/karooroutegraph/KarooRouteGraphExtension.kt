@@ -13,6 +13,7 @@ import de.timklge.karooroutegraph.datatypes.RouteGraphDataType
 import de.timklge.karooroutegraph.datatypes.VerticalRouteGraphDataType
 import de.timklge.karooroutegraph.datatypes.minimap.MinimapDataType
 import de.timklge.karooroutegraph.datatypes.minimap.MinimapViewModelProvider
+import de.timklge.karooroutegraph.datatypes.minimap.MinimapZoomLevel
 import de.timklge.karooroutegraph.incidents.HereMapsIncidentProvider
 import de.timklge.karooroutegraph.incidents.IncidentResult
 import de.timklge.karooroutegraph.incidents.IncidentsResponse
@@ -255,7 +256,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                         Point.fromLngLat(boundingBox.minLng, boundingBox.minLat),
                         Point.fromLngLat(boundingBox.maxLng, boundingBox.maxLat),
                         TurfConstants.UNIT_METERS
-                    ) * 3
+                    )
                     val currentPosition = Point.fromLngLat(location.lng, location.lat)
                     Log.d(TAG, "Drawing gradient indicators, Diagonal: $mapDiagonal")
 
@@ -267,17 +268,16 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     if (viewModel.sampledElevationData != null) {
                         Log.d(TAG, "Range: $startDistance - $endDistance")
 
-                        val wantedStepInMeters = mapDiagonal / 20.0
-                        val steps = round(wantedStepInMeters / viewModel.sampledElevationData.interval).toInt().coerceAtLeast(1)
+                        val wantedStepInMeters = mapDiagonal.toFloat() / settings.gradientIndicatorFrequency.stepsPerDisplayDiagonal
 
-                        currentSymbols = viewModel.sampledElevationData.getGradientIndicators(steps) { distance ->
+                        currentSymbols = viewModel.sampledElevationData.getGradientIndicators(wantedStepInMeters) { distance ->
                             val targetPosition = TurfMeasurement.along(
                                 viewModel.knownRoute!!,
                                 distance.toDouble(),
                                 TurfConstants.UNIT_METERS
                             )
 
-                            boundingBox.contains(targetPosition.latitude(), targetPosition.longitude()) || TurfMeasurement.distance(targetPosition, currentPosition, TurfConstants.UNIT_METERS) <= 500
+                            boundingBox.contains(targetPosition.latitude(), targetPosition.longitude()) || TurfMeasurement.distance(targetPosition, currentPosition, TurfConstants.UNIT_METERS) <= mapDiagonal * 3
                         }.toMutableSet()
                     } else {
                         currentSymbols = mutableSetOf()
@@ -411,16 +411,22 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.routeDistance
                 }
 
-                val routeLineString = if (navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute) {
-                    val polyline = navigationStateEvent.routePolyline
+                val routeLineString = when (navigationStateEvent) {
+                    is OnNavigationState.NavigationState.NavigatingRoute -> {
+                        val polyline = navigationStateEvent.routePolyline
 
-                    // Log.d(TAG, "Route polyline: ${Base64.encodeToString(polyline.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)}")
+                        // Log.d(TAG, "Route polyline: ${Base64.encodeToString(polyline.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)}")
 
-                    LineString.fromPolyline(polyline, 5)
-                } else if (navigationStateEvent is OnNavigationState.NavigationState.NavigatingToDestination) {
-                    navigatingToDestinationPolyline
-                } else {
-                    null
+                        LineString.fromPolyline(polyline, 5)
+                    }
+
+                    is OnNavigationState.NavigationState.NavigatingToDestination -> {
+                        navigatingToDestinationPolyline
+                    }
+
+                    else -> {
+                        null
+                    }
                 }
 
                 val routeChanged =  if (knownRoute == null || routeLineString != knownRoute){
@@ -430,6 +436,12 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
                     true
                 } else false
+
+                if (routeChanged) {
+                    displayViewModelProvider.update {
+                        it.copy(minimapZoomLevel = if (knownRoute != null) MinimapZoomLevel.COMPLETE_ROUTE else MinimapZoomLevel.FAR)
+                    }
+                }
 
                 // Request incidents
                 if (settings.hereMapsApiKey.isNotEmpty() && knownIncidents == null && routeLineString != null && routeDistance != null){
@@ -648,9 +660,6 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
     private fun startMinimapUpdater() {
         pastRouteUpdateJob = CoroutineScope(Dispatchers.IO).launch {
-            var pastPoints = listOf<Point>()
-            val tempPoints = mutableListOf<Point>()
-
             data class StreamData(
                 val location: OnLocationChanged,
                 val rideState: RideState
@@ -661,24 +670,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
             }
 
             flow.throttle(30_000L).collect { (locationEvent, rideState) ->
-                if (rideState is RideState.Idle) {
-                    pastPoints = emptyList()
-                    tempPoints.clear()
-                    return@collect
-                }
-
-                /* TODO store ridden path
-
-                val location = Point.fromLngLat(locationEvent.lng, locationEvent.lat)
-
-                tempPoints.add(location)
-
-                val newPointList = pastPoints + tempPoints
-
-                if (tempPoints.size >= 30) {
-                    pastPoints = TurfTransformation.simplify(newPointList)
-                    tempPoints.clear()
-                } */
+                /* TODO store ridden path */
 
                 minimapViewModelProvider.update {
                     it.copy(
