@@ -218,7 +218,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
                     Log.d(TAG, "Drawing incident polylines: ${incidentPolylines.size}")
                     incidentPolylines.forEach { (id, polyline) ->
-                        emitter.onNext(ShowPolyline(id, polyline, ContextCompat.getColor(applicationContext, R.color.elevate4), 10))
+                        emitter.onNext(ShowPolyline(id, polyline, ContextCompat.getColor(applicationContext, R.color.eleRed), 10))
                     }
 
                     lastDrawnIncidentSymbols = incidentSymbols.toMutableSet()
@@ -260,7 +260,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     Log.d(TAG, "Drawing gradient indicators, Diagonal: $mapDiagonal")
 
                     val distanceAlongRoute = viewModel.distanceAlongRoute ?: 0.0f
-                    val endDistance = (distanceAlongRoute + mapDiagonal).toFloat()
+                    val endDistance = (distanceAlongRoute + mapDiagonal * 2).toFloat()
 
                     if (viewModel.sampledElevationData != null && viewModel.knownRoute != null) {
                         Log.d(TAG, "Range: $distanceAlongRoute - $endDistance")
@@ -470,7 +470,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                                 "Incidents",
                                 "${incidents.results.size} traffic incidents along route",
                                 15_000L,
-                                R.color.elevate4,
+                                R.color.eleRed,
                                 R.color.black
                             ))
 
@@ -634,7 +634,8 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     Log.i(TAG, "Route changed, recalculating elevation data")
 
                     try {
-                        val elevations = valhallaAPIElevationProvider.requestValhallaElevations(routeLineString)
+                        val samplingInterval = if (routeDistance > 250_000f) 100.0f else 60.0f
+                        val elevations = valhallaAPIElevationProvider.requestValhallaElevations(routeLineString, samplingInterval)
 
                         Log.i(TAG, "Elevation data: $elevations")
                         knownRouteElevation = elevations
