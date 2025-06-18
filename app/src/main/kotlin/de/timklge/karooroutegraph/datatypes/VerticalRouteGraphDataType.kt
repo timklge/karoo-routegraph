@@ -121,7 +121,7 @@ class VerticalRouteGraphDataType(
                 }
 
                 val incidentPaint = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.elevate4dark else R.color.elevate4)
+                    color = applicationContext.getColor(R.color.eleRed)
                     style = Paint.Style.STROKE
                     strokeWidth = 5f
                 }
