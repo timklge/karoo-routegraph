@@ -16,11 +16,16 @@ import java.util.zip.GZIPInputStream
 @DrawableRes
 fun getInclineIndicator(percent: Float): Int? {
     return when (percent){
-        in 1.5f..<3.0f -> R.drawable.chevron0
-        in 3.0f..<5.0f -> R.drawable.chevron1
-        in 5.0f..<8.0f -> R.drawable.chevron2
-        in 8.0f..<11.0f -> R.drawable.chevron3
-        in 11.0f..Float.MAX_VALUE -> R.drawable.chevron4
+        in -Float.MAX_VALUE..<-7.5f -> R.drawable.chevrondown2 // Dark blue
+        in -7.5f..<-4.6f -> R.drawable.chevrondown1 // Light blue
+        in -4.6f..<-2f -> R.drawable.chevrondown0 // White
+        in 2f..<4.6f -> R.drawable.chevron0 // Dark green
+        in 4.6f..<7.5f -> R.drawable.chevron1 // Light green
+        in 7.5f..<12.5f -> R.drawable.chevron2 // Yellow
+        in 12.5f..<15.5f -> R.drawable.chevron3 // Light Orange
+        in 15.5f..<19.5f -> R.drawable.chevron4 // Dark Orange
+        in 19.5f..<23.5f -> R.drawable.chevron5 // Red
+        in 23.5f..Float.MAX_VALUE -> R.drawable.chevron6 // Purple
         else -> null
     }
 }
@@ -28,14 +33,16 @@ fun getInclineIndicator(percent: Float): Int? {
 @ColorRes
 fun getInclineIndicatorColor(percent: Float): Int? {
     return when(percent) {
-        in 2.5f..<3.0f -> R.color.elevate0
-        in 3.0f..<3.5f -> R.color.elevate1
-        in 3.5f..<5.0f -> R.color.elevate2
-        in 5.0f..<7.0f -> R.color.elevate2
-        in 7.0f..<10.0f -> R.color.elevate3
-        in 10.0f..<13.0f -> R.color.elevate2
-        in 13.0f..<16.0f -> R.color.elevate4
-        in 16.0f..Float.MAX_VALUE -> R.color.elevate4
+        in -Float.MAX_VALUE..<-7.5f -> R.color.eleDarkBlue // Dark blue
+        in -7.5f..<-4.6f -> R.color.eleLightBlue // Light blue
+        in -4.6f..<-2f -> R.color.eleWhite // White
+        in 2f..<4.6f -> R.color.eleDarkGreen // Dark green
+        in 4.6f..<7.5f -> R.color.eleLightGreen // Light green
+        in 7.5f..<12.5f -> R.color.eleYellow // Yellow
+        in 12.5f..<15.5f -> R.color.eleLightOrange // Light Orange
+        in 15.5f..<19.5f -> R.color.eleDarkOrange // Dark Orange
+        in 19.5f..<23.5f -> R.color.eleRed // Red
+        in 23.5f..Float.MAX_VALUE -> R.color.elePurple // Purple
         else -> null
     }
 }
@@ -59,7 +66,10 @@ class ValhallaAPIElevationProvider(
                     headers = mapOf("User-Agent" to KarooRouteGraphExtension.TAG, "Accept-Encoding" to "gzip"),
                     body = requestBody,
                 ),
-            ) { event: OnHttpResponse ->
+            onError = { err ->
+                Log.e(KarooRouteGraphExtension.TAG, "Failed to send request: $err")
+                close(Exception(err))
+            }) { event: OnHttpResponse ->
                 if (event.state is HttpResponseState.Complete){
                     val completeEvent = (event.state as HttpResponseState.Complete)
 
