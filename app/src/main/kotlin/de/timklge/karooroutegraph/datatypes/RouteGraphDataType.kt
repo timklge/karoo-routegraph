@@ -455,7 +455,7 @@ class RouteGraphDataType(
                 run  {
                     // Ticks on X axis
                     val unitFactor = if (!viewModel.isImperial) 1000.0f else 1609.344f
-                    val ticks = if (config.gridSize.first == 60) 5 else 2
+                    val ticks = if (config.gridSize.first == 60) 4 else 2
                     val tickInterval = (viewDistanceEnd - viewDistanceStart) / ticks
 
                     for (i in 0..ticks){
@@ -474,7 +474,6 @@ class RouteGraphDataType(
                         } else "${progress.toInt()}"
 
                         val textPos = (remap(tickInterval * i + viewDistanceStart, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right) + 5f)
-                            .coerceAtMost(config.viewSize.first.toFloat() - textPaint.measureText(text) - 5f)
 
                         canvas.drawRoundRect(
                             textPos - 3f,
@@ -485,12 +484,14 @@ class RouteGraphDataType(
                             backgroundFillPaintInv
                         )
 
-                        canvas.drawText(
-                            text,
-                            textPos,
-                            config.viewSize.second - 10f + 5f,
-                            textPaint
-                        )
+                        if (i < ticks){
+                            canvas.drawText(
+                                text,
+                                textPos,
+                                config.viewSize.second - 10f + 5f,
+                                textPaint
+                            )
+                        }
                     }
                 }
 

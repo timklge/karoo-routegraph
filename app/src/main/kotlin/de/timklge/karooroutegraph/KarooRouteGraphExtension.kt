@@ -384,6 +384,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         var knownRouteElevation: SampledElevationData? = null
         var knownIncidents: IncidentsResponse? = null
         var poiDistances: Map<POI, List<NearestPoint>>? = null
+        var lastKnownPositionAlongRoute: Double? = null
 
         graphUpdaterJob = CoroutineScope(Dispatchers.IO).launch {
             combine(
@@ -436,6 +437,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     knownRoute = routeLineString
                     knownRouteElevation = null
                     knownIncidents = null
+                    lastKnownPositionAlongRoute = null
 
                     true
                 } else false
@@ -572,7 +574,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
                 val pois = (globalPOIs.pois + (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.pois.orEmpty()).map { symbol -> POI(symbol = symbol, type = PoiType.POI) } + incidentPois
 
-                val distanceAlongRoute = if (routeDistance != null && locationAndRemainingRouteDistance.remainingRouteDistance != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute){
+                val currentDistanceAlongRoute = if (routeDistance != null && locationAndRemainingRouteDistance.remainingRouteDistance != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute){
                     if (navigationStateEvent.rejoinDistance == null) {
                         if (navigationStateEvent.reversed){
                             routeDistance
@@ -580,12 +582,17 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                             routeDistance - locationAndRemainingRouteDistance.remainingRouteDistance
                         }
                     } else {
-                        val lastKnownRouteDistance = routeGraphViewModelProvider.viewModelFlow.first().distanceAlongRoute
-                        lastKnownRouteDistance
+                        null
                     }
                 } else if (routeDistance != null && locationAndRemainingRouteDistance.remainingRouteDistance != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingToDestination){
                     routeDistance - locationAndRemainingRouteDistance.remainingRouteDistance
                 } else null
+
+                val distanceAlongRoute = currentDistanceAlongRoute ?: lastKnownPositionAlongRoute
+
+                if (currentDistanceAlongRoute != null) {
+                    lastKnownPositionAlongRoute = currentDistanceAlongRoute
+                }
 
                 Log.d(TAG, "Received navigation state: $navigationStateEvent")
 
@@ -593,9 +600,10 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     if (routeLineString != null){
                         Log.i(TAG, "Route changed, recalculating POI distances")
 
-                        poiDistances = calculatePoiDistances(routeLineString, pois)
+                        val updatedPoiDistances = calculatePoiDistances(routeLineString, pois)
+                        poiDistances = updatedPoiDistances
 
-                        val poiDistancesDebug = poiDistances!!.map { (key, value) ->
+                        val poiDistancesDebug = updatedPoiDistances.map { (key, value) ->
                             "${key.symbol.name} (${key.symbol.type}): $value"
                         }.joinToString(", ")
                         Log.d(TAG, "POI distances: $poiDistancesDebug")
