@@ -259,7 +259,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
                     Log.d(TAG, "Drawing gradient indicators, Diagonal: $mapDiagonal")
 
-                    val distanceAlongRoute = viewModel.distanceAlongRoute ?: 0.0f
+                    val distanceAlongRoute = (viewModel.distanceAlongRoute?.minus(mapDiagonal))?.coerceAtLeast(0.0)?.toFloat() ?: 0.0f
                     val endDistance = (distanceAlongRoute + mapDiagonal * 2).toFloat()
 
                     if (viewModel.sampledElevationData != null && viewModel.knownRoute != null) {
