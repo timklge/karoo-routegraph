@@ -62,7 +62,6 @@ You will also get a notification when loading a route if there are traffic incid
 to fetch the elevation profile from the Valhalla API hosted by FOSSGIS e. V. Your karoo thus needs an active internet connection.
 - Because karoo extensions can currently not access the climb segments identified by the Karoo, the extension will
 try to identify climbs using an alternate algorithm, so they will not perfectly match up with the Karoo Climber feature.
-- "Show gradient indicators on the map" feature is not available yet.
 
 ## Credits
 
