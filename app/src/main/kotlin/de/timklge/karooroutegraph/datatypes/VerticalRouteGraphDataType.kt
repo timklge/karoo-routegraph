@@ -63,6 +63,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
@@ -279,16 +280,15 @@ class VerticalRouteGraphDataType(
                         for (i in 1 until viewModel.sampledElevationData.elevations.size){
                             val previousDistance = (i - 1) * viewModel.sampledElevationData.interval
                             val distance = i * viewModel.sampledElevationData.interval
-                            if (distance !in viewRange) continue;
 
-                            val progressPixels = remap(distance, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
+                            val progressPixels = remap(distance, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top)
 
                             val elevation = viewModel.sampledElevationData.elevations[i]
 
                             val elevationPixels = remap(elevation, maxElevation, minElevation, graphBounds.right, graphBounds.left)
 
                             if (firstElevationPixels == null){
-                                val previousProgressPixels = remap(previousDistance, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
+                                val previousProgressPixels = remap(previousDistance, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top)
                                 val previousElevation = viewModel.sampledElevationData.elevations[i - 1]
                                 val previousElevationPixels = remap(previousElevation, maxElevation, minElevation, graphBounds.right, graphBounds.left)
 
@@ -299,8 +299,8 @@ class VerticalRouteGraphDataType(
                                 previousDrawnProgressPixels = progressPixels
                             }
 
-                            if (progressPixels - previousDrawnProgressPixels > 3){
-                                lineTo(elevationPixels, previousDrawnProgressPixels)
+                            if (abs(progressPixels - previousDrawnProgressPixels) > 3){
+                                lineTo(elevationPixels, progressPixels)
                                 // lineTo(previousDrawnProgressPixels, elevationPixels)
                                 previousDrawnProgressPixels = progressPixels
                             }
@@ -313,7 +313,7 @@ class VerticalRouteGraphDataType(
 
                     val filledPath = Path(elevationProfilePath)
                     filledPath.lineTo(graphBounds.left, lastProgressPixels)
-                    filledPath.lineTo(graphBounds.top, firstProgressPixels)
+                    filledPath.lineTo(graphBounds.left, firstProgressPixels)
                     filledPath.close()
 
                     if (viewModel.climbs != null){
@@ -321,20 +321,18 @@ class VerticalRouteGraphDataType(
                         val climbsSortedByCategory = viewModel.climbs.sortedByDescending { it.category.number }
 
                         climbsSortedByCategory.forEach { climb ->
-                            var climbStartProgressPixels = remap(climb.startDistance, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
-                            var climbEndProgressPixels = remap(climb.endDistance, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
+                            var climbStartProgressPixels = remap(climb.startDistance, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top)
+                            var climbEndProgressPixels = remap(climb.endDistance, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top)
 
-                            if (climbEndProgressPixels > climbStartProgressPixels){
-                                while(climbEndProgressPixels - climbStartProgressPixels < 6){
-                                    climbStartProgressPixels -= 1
-                                    climbEndProgressPixels += 1
-                                }
+                            while(abs(climbStartProgressPixels - climbEndProgressPixels) < 6){
+                                climbStartProgressPixels -= 1
+                                climbEndProgressPixels += 1
                             }
 
                             val clampedClimbStartProgressPixels = climbStartProgressPixels.coerceIn(graphBounds.top, graphBounds.bottom)
                             val clampedClimbEndProgressPixels = climbEndProgressPixels.coerceIn(graphBounds.top, graphBounds.bottom)
 
-                            val clipRect = RectF(graphBounds.left, clampedClimbStartProgressPixels, graphBounds.bottom, clampedClimbEndProgressPixels)
+                            val clipRect = RectF(graphBounds.left, clampedClimbEndProgressPixels, graphBounds.right, clampedClimbStartProgressPixels)
 
                             if (displayViewModel.verticalZoomLevel != ZoomLevel.TWO_UNITS) {
                                 canvas.withClip(clipRect) {
@@ -376,9 +374,9 @@ class VerticalRouteGraphDataType(
 
                             val clipRect = RectF(
                                 graphBounds.left,
-                                remap(distance, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom).roundToInt().toFloat(),
+                                remap(distance, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top).roundToInt().toFloat() + 1,
                                 graphBounds.right,
-                                remap(distance + viewModel.sampledElevationData.interval, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom).roundToInt() + 1f,
+                                remap(distance + viewModel.sampledElevationData.interval, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top).roundToInt().toFloat(),
                             )
 
                             canvas.withClip(clipRect){
@@ -393,9 +391,9 @@ class VerticalRouteGraphDataType(
                     }
 
                     if (viewModel.distanceAlongRoute != null){
-                        val distanceAlongRouteProgressPixels = remap(viewModel.distanceAlongRoute, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
+                        val distanceAlongRouteProgressPixels = remap(viewModel.distanceAlongRoute, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top)
 
-                        canvas.withClip(0f, 0f, config.viewSize.second.toFloat(), distanceAlongRouteProgressPixels){
+                        canvas.withClip(distanceAlongRouteProgressPixels, 0f, config.viewSize.first.toFloat(), config.viewSize.second.toFloat()){
                             canvas.withClip(filledPath) {
                                 canvas.drawRect(graphBounds, elevationFillPaint)
                             }
@@ -406,7 +404,7 @@ class VerticalRouteGraphDataType(
                 }
 
                 if (viewModel.distanceAlongRoute != null){
-                    val distanceAlongRoutePixelsFromLeft = remap(viewModel.distanceAlongRoute, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
+                    val distanceAlongRoutePixelsFromLeft = remap(viewModel.distanceAlongRoute, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top)
 
                     canvas.drawLine(0f, distanceAlongRoutePixelsFromLeft, config.viewSize.first.toFloat(), distanceAlongRoutePixelsFromLeft, backgroundStrokePaint)
                     canvas.drawLine(0f, distanceAlongRoutePixelsFromLeft, config.viewSize.first.toFloat(), distanceAlongRoutePixelsFromLeft, currentLinePaint)
@@ -420,8 +418,7 @@ class VerticalRouteGraphDataType(
                     }.forEach { (poi, nearestPoint) ->
                         val distanceFromRouteStart = nearestPoint.distanceFromRouteStart
                         val text = poi.symbol.name ?: ""
-                        val isIncident = poi.type == PoiType.INCIDENT
-                        val progressPixels = remap(distanceFromRouteStart, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
+                        val progressPixels = remap(distanceFromRouteStart, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top)
 
                         canvas.drawLine(graphBounds.left, progressPixels, config.viewSize.first.toFloat(), progressPixels, backgroundStrokePaintDashed)
                         canvas.drawLine(graphBounds.left, progressPixels, config.viewSize.first.toFloat(), progressPixels, if (poi.type == PoiType.INCIDENT) incidentLinePaintDashed else poiLinePaintDashed)
@@ -470,15 +467,15 @@ class VerticalRouteGraphDataType(
                         if (cmd.importance < 10 && viewModel.poiDistances != null) {
                             val climbStartProgressPixels = cmd.y - 15f
 
-                            poiLoop@ for ((poi, nearestPointList) in viewModel.poiDistances.entries) {
+                            poiLoop@ for ((_, nearestPointList) in viewModel.poiDistances.entries) {
                                 for (nearestPoint in nearestPointList) {
                                     val poiDistanceOnRoute = nearestPoint.distanceFromRouteStart
                                     if (poiDistanceOnRoute in viewRange) {
-                                        val poiLineYOnGraph = remap(poiDistanceOnRoute, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom)
+                                        val poiLineYOnGraph = remap(poiDistanceOnRoute, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top)
 
                                         // If the climb starts before the POI line (smaller y-value on graph)
                                         // and the label's current top (currentY) is now below the POI line (larger y-value on graph)
-                                        if (climbStartProgressPixels < poiLineYOnGraph && currentY > poiLineYOnGraph) {
+                                        if (climbStartProgressPixels > poiLineYOnGraph && currentY > poiLineYOnGraph) {
                                             shouldDrawLabel = false
                                             break@poiLoop // Exit all POI checks for this command
                                         }
@@ -512,9 +509,9 @@ class VerticalRouteGraphDataType(
                 for (i in 0..ticks){
                     canvas.drawLine(
                         graphBounds.right,
-                        remap(tickInterval * i + viewDistanceStart, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom),
+                        remap(tickInterval * i + viewDistanceStart, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top),
                         graphBounds.right + 10,
-                        remap(tickInterval * i + viewDistanceStart, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom),
+                        remap(tickInterval * i + viewDistanceStart, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top),
                         axisStrokePaint
                     )
 
@@ -523,12 +520,12 @@ class VerticalRouteGraphDataType(
                         String.format(Locale.US, "%.1f", progress)
                     } else "${progress.toInt()}"
 
-                    val textPos = (remap(tickInterval * i + viewDistanceStart, viewDistanceStart, viewDistanceEnd, graphBounds.top, graphBounds.bottom))
+                    val textPos = (remap(tickInterval * i + viewDistanceStart, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top))
 
                     canvas.drawText(
                         text,
                         graphBounds.right + 15f,
-                        (textPos + 15f).coerceAtMost(graphBounds.bottom - 5f),
+                        (textPos - (textPaint.ascent() + textPaint.descent()) / 2f).coerceAtMost(graphBounds.bottom - 5f),
                         textPaint
                     )
                 }
@@ -579,4 +576,3 @@ class VerticalRouteGraphDataType(
         }
     }
 }
-
