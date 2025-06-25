@@ -63,7 +63,13 @@ import kotlin.math.floor
 import kotlin.math.roundToInt
 
 fun remap(value: Float, fromLow: Float, fromHigh: Float, toLow: Float, toHigh: Float): Float {
-    return toLow + (value - fromLow) / (fromHigh - fromLow) * (toHigh - toLow)
+    val result = (toLow + (value - fromLow) / (fromHigh - fromLow) * (toHigh - toLow))
+
+    return if (toHigh > toLow){
+        result.coerceIn(toLow, toHigh)
+    } else {
+        result.coerceIn(toHigh, toLow)
+    }
 }
 
 @OptIn(ExperimentalGlanceRemoteViewsApi::class)
