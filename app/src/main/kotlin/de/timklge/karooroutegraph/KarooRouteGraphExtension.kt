@@ -39,8 +39,10 @@ import io.hammerhead.karooext.models.StreamState
 import io.hammerhead.karooext.models.Symbol
 import io.hammerhead.karooext.models.UserProfile
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -376,13 +378,14 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         }
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
+    @OptIn(ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
     fun startGraphUpdater(){
         Log.d(TAG, "Starting graph updater")
 
         var knownRoute: LineString? = null
         var knownRouteElevation: SampledElevationData? = null
         var knownIncidents: IncidentsResponse? = null
+        var knownIncidentWarningShown: Boolean = false
         var poiDistances: Map<POI, List<NearestPoint>>? = null
         var lastKnownPositionAlongRoute: Double? = null
 
@@ -437,6 +440,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     knownRoute = routeLineString
                     knownRouteElevation = null
                     knownIncidents = null
+                    knownIncidentWarningShown = false
                     lastKnownPositionAlongRoute = null
 
                     true
@@ -449,7 +453,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 }
 
                 // Request incidents
-                if (settings.hereMapsApiKey.isNotEmpty() && knownIncidents == null && routeLineString != null && routeDistance != null){
+                if (settings.enableTrafficIncidentReporting && knownIncidents == null && routeLineString != null && routeDistance != null){
                     try {
                         val incidents = incidentProvider.requestIncidents(settings.hereMapsApiKey, routeLineString)
 
@@ -466,23 +470,44 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                         }
 
                         if (incidents.results?.isNotEmpty() == true){
-                            karooSystem.karooSystemService.dispatch(InRideAlert(
-                                "incident-update-${System.currentTimeMillis()}",
-                                R.drawable.bx_info_circle,
-                                "Incidents",
-                                "${incidents.results.size} traffic incidents along route",
-                                15_000L,
-                                R.color.eleRed,
-                                R.color.black
-                            ))
+                            GlobalScope.launch {
+                                delay(10_000L) // Wait for 10 seconds before showing the alert
 
-                            karooSystem.karooSystemService.dispatch(PlayBeepPattern(
-                                listOf(PlayBeepPattern.Tone(3000, 300), PlayBeepPattern.Tone(3000, 300), PlayBeepPattern.Tone(3000, 300))
-                            ))
+                                karooSystem.karooSystemService.dispatch(InRideAlert(
+                                    "incident-update-${System.currentTimeMillis()}",
+                                    R.drawable.bx_info_circle,
+                                    "Incidents",
+                                    "${incidents.results.size} traffic incidents along route",
+                                    10_000L,
+                                    R.color.eleLightRed,
+                                    R.color.black
+                                ))
+
+                                karooSystem.karooSystemService.dispatch(PlayBeepPattern(
+                                    listOf(PlayBeepPattern.Tone(3000, 300), PlayBeepPattern.Tone(3000, 300), PlayBeepPattern.Tone(3000, 300))
+                                ))
+                            }
                         }
 
                         Log.i(TAG, "Incident data updated at ${incidents.sourceUpdated} with ${incidents.results?.size} incidents")
                     } catch(e: Exception){
+                        if (!knownIncidentWarningShown){
+                            GlobalScope.launch {
+                                delay(10_000L) // Wait for 10 seconds before showing the alert
+
+                                karooSystem.karooSystemService.dispatch(InRideAlert(
+                                    "incident-update-${System.currentTimeMillis()}",
+                                    R.drawable.bx_info_circle,
+                                    "Incidents",
+                                    "Failed to request incidents",
+                                    10_000L,
+                                    R.color.eleLightRed,
+                                    R.color.black
+                                ))
+                            }
+                            knownIncidentWarningShown = true
+                        }
+
                         Log.e(TAG, "Failed to request incidents", e)
                     }
                 }
