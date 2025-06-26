@@ -146,8 +146,9 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     private var lastDrawnIncidentSymbols = mutableSetOf<Symbol>()
     private var lastDrawnIncidentPolylines = mutableSetOf<String>()
 
+    private val mapScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
     override fun startMap(emitter: Emitter<MapEffect>) {
-        val mapScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         var currentSymbols: MutableSet<GradientIndicator>
 
         Log.d(TAG, "Starting map effect")
@@ -165,7 +166,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         emitter.onNext(HideSymbols(lastDrawnGradientIndicators.map { "incline-${it.distance}" }))
         lastDrawnGradientIndicators = mutableSetOf()
 
-        val incidentJob = mapScope.launch {
+        mapScope.launch {
             var lastKnownIncidents: IncidentsResponse? = null
 
             routeGraphViewModelProvider.viewModelFlow.collect {
@@ -725,5 +726,6 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     override fun onDestroy() {
         super.onDestroy()
         extensionScope.cancel()
+        mapScope.cancel()
     }
 }
