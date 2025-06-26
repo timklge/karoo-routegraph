@@ -42,6 +42,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -92,8 +94,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     private val displayViewModelProvider: RouteGraphDisplayViewModelProvider by inject()
     private val tileDownloadService: TileDownloadService by inject()
 
-    private var graphUpdaterJob: Job? = null
-    private var pastRouteUpdateJob: Job? = null
+    private val extensionScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     override val types by lazy {
         listOf(
@@ -145,6 +146,8 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     private var lastDrawnIncidentSymbols = mutableSetOf<Symbol>()
     private var lastDrawnIncidentPolylines = mutableSetOf<String>()
 
+    private val mapScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
     override fun startMap(emitter: Emitter<MapEffect>) {
         var currentSymbols: MutableSet<GradientIndicator>
 
@@ -163,7 +166,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         emitter.onNext(HideSymbols(lastDrawnGradientIndicators.map { "incline-${it.distance}" }))
         lastDrawnGradientIndicators = mutableSetOf()
 
-        val incidentJob = CoroutineScope(Dispatchers.IO).launch {
+        mapScope.launch {
             var lastKnownIncidents: IncidentsResponse? = null
 
             routeGraphViewModelProvider.viewModelFlow.collect {
@@ -227,7 +230,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
             }
         }
 
-        val gradientIndicatorJob = CoroutineScope(Dispatchers.IO).launch {
+        val gradientIndicatorJob = mapScope.launch {
             val zoomLevelFlow = karooSystem.stream<OnMapZoomLevel>()
             val locationFlow = karooSystem.stream<OnLocationChanged>()
 
@@ -340,8 +343,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
             Log.d(TAG, "Stopping map effect")
 
-            gradientIndicatorJob.cancel()
-            incidentJob.cancel()
+            mapScope.cancel()
         }
     }
 
@@ -381,12 +383,14 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         Log.d(TAG, "Starting graph updater")
 
         var knownRoute: LineString? = null
+        var knownSettings: RouteGraphSettings? = null
         var knownRouteElevation: SampledElevationData? = null
         var knownIncidents: IncidentsResponse? = null
+        var knownIncidentWarningShown: Boolean = false
         var poiDistances: Map<POI, List<NearestPoint>>? = null
         var lastKnownPositionAlongRoute: Double? = null
 
-        graphUpdaterJob = CoroutineScope(Dispatchers.IO).launch {
+        extensionScope.launch {
             combine(
                 karooSystem.streamSettings(),
                 karooSystem.stream<OnNavigationState>(),
@@ -433,11 +437,13 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     }
                 }
 
-                val routeChanged =  if (knownRoute == null || routeLineString != knownRoute){
+                val routeChanged =  if (knownRoute == null || routeLineString != knownRoute || knownSettings != settings){
                     knownRoute = routeLineString
                     knownRouteElevation = null
                     knownIncidents = null
+                    knownIncidentWarningShown = false
                     lastKnownPositionAlongRoute = null
+                    knownSettings = settings
 
                     true
                 } else false
@@ -449,7 +455,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 }
 
                 // Request incidents
-                if (settings.hereMapsApiKey.isNotEmpty() && knownIncidents == null && routeLineString != null && routeDistance != null){
+                if (settings.enableTrafficIncidentReporting && knownIncidents == null && routeLineString != null && routeDistance != null){
                     try {
                         val incidents = incidentProvider.requestIncidents(settings.hereMapsApiKey, routeLineString)
 
@@ -466,23 +472,44 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                         }
 
                         if (incidents.results?.isNotEmpty() == true){
-                            karooSystem.karooSystemService.dispatch(InRideAlert(
-                                "incident-update-${System.currentTimeMillis()}",
-                                R.drawable.bx_info_circle,
-                                "Incidents",
-                                "${incidents.results.size} traffic incidents along route",
-                                15_000L,
-                                R.color.eleRed,
-                                R.color.black
-                            ))
+                            extensionScope.launch {
+                                delay(10_000L) // Wait for 10 seconds before showing the alert
 
-                            karooSystem.karooSystemService.dispatch(PlayBeepPattern(
-                                listOf(PlayBeepPattern.Tone(3000, 300), PlayBeepPattern.Tone(3000, 300), PlayBeepPattern.Tone(3000, 300))
-                            ))
+                                karooSystem.karooSystemService.dispatch(InRideAlert(
+                                    "incident-update-${System.currentTimeMillis()}",
+                                    R.drawable.bx_info_circle,
+                                    "Incidents",
+                                    "${incidents.results.size} traffic incidents along route",
+                                    10_000L,
+                                    R.color.eleLightRed,
+                                    R.color.black
+                                ))
+
+                                karooSystem.karooSystemService.dispatch(PlayBeepPattern(
+                                    listOf(PlayBeepPattern.Tone(3000, 300), PlayBeepPattern.Tone(3000, 300), PlayBeepPattern.Tone(3000, 300))
+                                ))
+                            }
                         }
 
                         Log.i(TAG, "Incident data updated at ${incidents.sourceUpdated} with ${incidents.results?.size} incidents")
                     } catch(e: Exception){
+                        if (!knownIncidentWarningShown){
+                            extensionScope.launch {
+                                delay(10_000L) // Wait for 10 seconds before showing the alert
+
+                                karooSystem.karooSystemService.dispatch(InRideAlert(
+                                    "incident-update-${System.currentTimeMillis()}",
+                                    R.drawable.bx_info_circle,
+                                    "Incidents",
+                                    "Failed to request incidents",
+                                    10_000L,
+                                    R.color.eleLightRed,
+                                    R.color.black
+                                ))
+                            }
+                            knownIncidentWarningShown = true
+                        }
+
                         Log.e(TAG, "Failed to request incidents", e)
                     }
                 }
@@ -671,7 +698,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     }
 
     private fun startMinimapUpdater() {
-        pastRouteUpdateJob = CoroutineScope(Dispatchers.IO).launch {
+        extensionScope.launch {
             data class StreamData(
                 val location: OnLocationChanged,
                 val rideState: RideState
@@ -697,12 +724,8 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     }
 
     override fun onDestroy() {
-        graphUpdaterJob?.cancel()
-        graphUpdaterJob = null
-
-        pastRouteUpdateJob?.cancel()
-        pastRouteUpdateJob = null
-
         super.onDestroy()
+        extensionScope.cancel()
+        mapScope.cancel()
     }
 }

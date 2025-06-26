@@ -66,6 +66,7 @@ data class RouteGraphSettings(
     val showGradientIndicatorsOnMap: Boolean = false,
     val showPOILabelsOnMinimap: Boolean = true,
     val welcomeDialogAccepted: Boolean = false,
+    val enableTrafficIncidentReporting: Boolean = false,
     val hereMapsApiKey: String = "",
     val gradientIndicatorFrequency: GradientIndicatorFrequency = GradientIndicatorFrequency.HIGH
 ){
@@ -86,6 +87,7 @@ fun MainScreen(onFinish: () -> Unit) {
     var gradientIndicatorFrequency by remember { mutableStateOf(GradientIndicatorFrequency.HIGH) }
     var showPOIsOnMinimap by remember { mutableStateOf(true) }
     var hereMapsApiKey by remember { mutableStateOf("") }
+    var enableTrafficIncidentReporting by remember { mutableStateOf(false) }
     var apiTestDialogVisible by remember { mutableStateOf(false) }
     var apiTestDialogPending by remember { mutableStateOf(false) }
     var apiTestErrorMessage by remember { mutableStateOf("") }
@@ -99,7 +101,8 @@ fun MainScreen(onFinish: () -> Unit) {
             welcomeDialogAccepted = !welcomeDialogVisible,
             showPOILabelsOnMinimap = showPOIsOnMinimap,
             hereMapsApiKey = hereMapsApiKey,
-            gradientIndicatorFrequency = gradientIndicatorFrequency
+            gradientIndicatorFrequency = gradientIndicatorFrequency,
+            enableTrafficIncidentReporting = enableTrafficIncidentReporting
         )
 
         saveSettings(ctx, newSettings)
@@ -112,6 +115,7 @@ fun MainScreen(onFinish: () -> Unit) {
             gradientIndicatorFrequency = settings.gradientIndicatorFrequency
             showPOIsOnMinimap = settings.showPOILabelsOnMinimap
             hereMapsApiKey = settings.hereMapsApiKey
+            enableTrafficIncidentReporting = settings.enableTrafficIncidentReporting
         }
     }
 
@@ -202,72 +206,87 @@ fun MainScreen(onFinish: () -> Unit) {
                             Text("Show POI labels on minimap")
                         }
 
-                        OutlinedTextField(
-                            value = hereMapsApiKey,
-                            onValueChange = {
-                                hereMapsApiKey = it
-                            },
-                            label = { Text("HERE Maps API Key") },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            singleLine = true
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Switch(checked = enableTrafficIncidentReporting, onCheckedChange = {
+                                enableTrafficIncidentReporting = it
+                                coroutineScope.launch {
+                                    updateSettings()
+                                }
+                            })
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text("Enable traffic incident reporting")
+                                Text(
+                                    text = "Requires HERE Maps API Key",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                )
+                            }
+                        }
 
-                        Text(
-                            text = "If you want to use traffic incident reporting from HERE Maps, you need to provide an API key.",
-                            style = MaterialTheme.typography.bodySmall
-                        )
+                        if (enableTrafficIncidentReporting){
+                            OutlinedTextField(
+                                value = hereMapsApiKey,
+                                onValueChange = {
+                                    hereMapsApiKey = it
+                                },
+                                label = { Text("HERE Maps API Key") },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                singleLine = true
+                            )
 
-                        if (apiTestDialogVisible) {
-                            Dialog(onDismissRequest = { apiTestDialogVisible = false }) {
-                                Surface(
-                                    shape = MaterialTheme.shapes.medium,
-                                    color = MaterialTheme.colorScheme.surface,
-                                    modifier = Modifier.padding(10.dp)
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(10.dp),
-                                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                            if (apiTestDialogVisible) {
+                                Dialog(onDismissRequest = { apiTestDialogVisible = false }) {
+                                    Surface(
+                                        shape = MaterialTheme.shapes.medium,
+                                        color = MaterialTheme.colorScheme.surface,
+                                        modifier = Modifier.padding(10.dp)
                                     ) {
-                                        Text(text = apiTestErrorMessage)
-                                        if (apiTestDialogPending) {
-                                            LinearProgressIndicator()
-                                        }
-                                        Button(
-                                            onClick = { apiTestDialogVisible = false },
-                                            modifier = Modifier.fillMaxWidth()
+                                        Column(
+                                            modifier = Modifier.padding(10.dp),
+                                            verticalArrangement = Arrangement.spacedBy(10.dp)
                                         ) {
-                                            Text("OK")
+                                            Text(text = apiTestErrorMessage)
+                                            if (apiTestDialogPending) {
+                                                LinearProgressIndicator()
+                                            }
+                                            Button(
+                                                onClick = { apiTestDialogVisible = false },
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Text("OK")
+                                            }
                                         }
                                     }
                                 }
                             }
-                        }
 
-                        FilledTonalButton(modifier = Modifier
-                            .fillMaxWidth()
-                            .height(40.dp),
-                            onClick = {
-                                apiTestDialogVisible = true
-                                apiTestDialogPending = true
-                                apiTestErrorMessage = "Testing API key..."
+                            FilledTonalButton(modifier = Modifier
+                                .fillMaxWidth()
+                                .height(40.dp),
+                                onClick = {
+                                    apiTestDialogVisible = true
+                                    apiTestDialogPending = true
+                                    apiTestErrorMessage = "Testing API key..."
 
-                                coroutineScope.launch {
-                                    try {
-                                        val response = hereMapsIncidentProvider.requestIncidents(hereMapsApiKey, Point.fromLngLat(13.399, 52.5186), 2000.0)
-                                        apiTestDialogPending = false
-                                        apiTestErrorMessage = "API key is valid. ${response.results?.size} incidents reported in the center of Berlin (updated at ${response.sourceUpdated})"
+                                    coroutineScope.launch {
+                                        try {
+                                            val response = hereMapsIncidentProvider.requestIncidents(hereMapsApiKey, Point.fromLngLat(13.399, 52.5186), 2000.0)
+                                            apiTestDialogPending = false
+                                            apiTestErrorMessage = "API key is valid. ${response.results?.size} incidents reported in the center of Berlin (updated at ${response.sourceUpdated})"
 
-                                        Log.d(KarooRouteGraphExtension.TAG, apiTestErrorMessage)
-                                    } catch (e: Exception) {
-                                        Log.e(KarooRouteGraphExtension.TAG, "Error testing API key: ${e.message}")
-                                        apiTestDialogPending = false
-                                        apiTestErrorMessage = "Error testing API key. Check if your key is valid."
+                                            Log.d(KarooRouteGraphExtension.TAG, apiTestErrorMessage)
+                                        } catch (e: Exception) {
+                                            Log.e(KarooRouteGraphExtension.TAG, "Error testing API key: ${e.message}")
+                                            apiTestDialogPending = false
+                                            apiTestErrorMessage = "Error testing API key. Check if your key is valid."
+                                        }
                                     }
-                                }
-                            }) {
-                            Text("Test API Key")
+                                }) {
+                                Text("Test API Key")
+                            }
                         }
 
                         Spacer(modifier = Modifier.padding(30.dp))

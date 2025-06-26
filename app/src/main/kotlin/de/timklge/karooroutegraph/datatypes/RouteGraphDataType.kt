@@ -170,6 +170,7 @@ class RouteGraphDataType(
                 val backgroundFillPaintInvSolid = Paint().apply {
                     color = applicationContext.getColor(if(nightMode) R.color.black else R.color.white)
                     style = Paint.Style.FILL
+                    alpha = (255 * 0.8f).roundToInt()
                 }
 
                 val elevationFillPaint = Paint().apply {
@@ -271,11 +272,10 @@ class RouteGraphDataType(
                         for (i in 1 until viewModel.sampledElevationData.elevations.size){
                             val previousDistance = (i - 1) * viewModel.sampledElevationData.interval
                             val distance = i * viewModel.sampledElevationData.interval
-                            if (distance !in viewRange) continue;
 
                             val pixelsFromLeft = remap(distance, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
 
-                            val elevation = viewModel.sampledElevationData.elevations[i]
+                            val elevation = viewModel.sampledElevationData.elevations[i.coerceAtMost(viewModel.sampledElevationData.elevations.size - 1)]
 
                             val pixelsFromTop = remap(elevation, maxElevation, minElevation, graphBounds.top, graphBounds.bottom)
 
@@ -295,7 +295,7 @@ class RouteGraphDataType(
                                 previousDrawnPixelsFromLeft = pixelsFromLeft
                             }
 
-                            lastPixelFromLeft = pixelsFromLeft
+                            lastPixelFromLeft = previousDrawnPixelsFromLeft
                         }
                     }
 
