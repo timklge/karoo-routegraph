@@ -62,13 +62,17 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
 
-fun remap(value: Float, fromLow: Float, fromHigh: Float, toLow: Float, toHigh: Float): Float {
+fun remap(value: Float, fromLow: Float, fromHigh: Float, toLow: Float, toHigh: Float, clamp: Boolean = true): Float {
     val result = (toLow + (value - fromLow) / (fromHigh - fromLow) * (toHigh - toLow))
 
-    return if (toHigh > toLow){
-        result.coerceIn(toLow, toHigh)
+    return if (clamp) {
+        if (toHigh > toLow){
+            result.coerceIn(toLow, toHigh)
+        } else {
+            result.coerceIn(toHigh, toLow)
+        }
     } else {
-        result.coerceIn(toHigh, toLow)
+        result
     }
 }
 
@@ -508,12 +512,12 @@ class RouteGraphDataType(
                     val tickInterval = ceil((maxElevation - minElevation) / ticks / unitFactor / 50.0f) * 50.0f * unitFactor
 
                     for (i in 0..ticks){
-                        val y = remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom).toFloat()
+                        val y = remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom, clamp = false).toFloat()
 
                         canvas.drawLine(
                             0f,
                             y,
-                            graphBounds.left,
+                            10f,
                             y,
                             axisStrokePaint
                         )
@@ -525,9 +529,9 @@ class RouteGraphDataType(
 
                         canvas.drawRoundRect(
                             textStartFromLeft - 5,
-                            remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom) - 17.5f,
+                            remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom, clamp = false) - 17.5f,
                             textStartFromLeft + textWidth + 5,
-                            remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom) + 12.5f,
+                            remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom, clamp = false) + 12.5f,
                             5f, 5f,
                             backgroundFillPaintInvSolid
                         )
@@ -535,7 +539,7 @@ class RouteGraphDataType(
                         canvas.drawText(
                             eleText,
                             10f,
-                            remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom) + 5f,
+                            remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom, clamp = false) + 5f,
                             textPaint
                         )
                     }
