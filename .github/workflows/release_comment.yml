@@ -30,7 +30,7 @@ jobs:
           fi
           
           # Find the commits in this release
-          COMMITS=$(git log "$COMMIT_RANGE" --pretty=format:"%s")
+          COMMITS=$(git log "$COMMIT_RANGE" --pretty=format:"%B")
           
           # Extract issues/PRs closed (simple regex, can be improved)
           echo "$COMMITS" | grep -oE "#[0-9]+" | sort -u | while read ISSUE; do
