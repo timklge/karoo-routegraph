@@ -1,8 +1,10 @@
 name: Comment on Fixed Issues/PRs on Release
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - '*'
+  workflow_dispatch:
 
 jobs:
   comment-on-fixed:
@@ -16,7 +18,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Get the latest release tag
-          RELEASE_TAG="${{ github.event.release.tag_name }}"
+          RELEASE_TAG="${{ github.ref }}"
+          
+          # Remove the 'refs/tags/' part to get the tag name
+          RELEASE_TAG="${RELEASE_TAG#refs/tags/}"
           
           # Get the previous tag. If there is no previous tag, this will be empty.
           PREVIOUS_TAG=$(git tag --sort=-v:refname | grep -v "$RELEASE_TAG" | head -n 1)
