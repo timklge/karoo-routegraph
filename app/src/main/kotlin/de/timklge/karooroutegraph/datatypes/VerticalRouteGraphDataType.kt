@@ -352,12 +352,12 @@ class VerticalRouteGraphDataType(
                             val climbMaxInclineLength = distanceToString(climbMaxIncline.end - climbMaxIncline.start, userProfile, false)
 
                             if (climb.category.number <= 3){
-                                textDrawCommands.add(TextDrawCommand(graphBounds.right + 75, climbStartProgressPixels + 15f, "⛰ $climbGain, $climbLength", textPaint, climb.category.importance, "⛰", Paint(textPaint).apply {
+                                textDrawCommands.add(TextDrawCommand(graphBounds.right + 100f, climbStartProgressPixels + 15f, "⛰ $climbGain, $climbLength", textPaint, climb.category.importance, "⛰", Paint(textPaint).apply {
                                     color = applicationContext.getColor(climb.category.colorRes)
                                 }))
 
                                 val maxInclineString = if (climbMaxIncline.incline > climbAverageIncline) ", ${climbMaxIncline.incline}% $climbMaxInclineLength" else ""
-                                textDrawCommands.add(TextDrawCommand(graphBounds.right + 75, climbStartProgressPixels + 16f, "⌀ ${climbAverageIncline}%${maxInclineString}", textPaint, climb.category.importance))
+                                textDrawCommands.add(TextDrawCommand(graphBounds.right + 100f, climbStartProgressPixels + 16f, "⌀ ${climbAverageIncline}%${maxInclineString}", textPaint, climb.category.importance))
                             }
                         }
                     }
@@ -423,7 +423,7 @@ class VerticalRouteGraphDataType(
                         canvas.drawLine(graphBounds.left, progressPixels, config.viewSize.first.toFloat(), progressPixels, backgroundStrokePaintDashed)
                         canvas.drawLine(graphBounds.left, progressPixels, config.viewSize.first.toFloat(), progressPixels, if (poi.type == PoiType.INCIDENT) incidentLinePaintDashed else poiLinePaintDashed)
 
-                        textDrawCommands.add(TextDrawCommand(graphBounds.right + 75f + 40f, progressPixels + 15f, text, textPaintBold, 11, leadingIcon = mapPoiToIcon(poi.symbol.type)))
+                        textDrawCommands.add(TextDrawCommand(graphBounds.right + 100f + 40f, progressPixels + 15f, text, textPaintBold, 11, leadingIcon = mapPoiToIcon(poi.symbol.type)))
 
                         if (viewModel.distanceAlongRoute != null && nearestPoint.distanceFromRouteStart > viewModel.distanceAlongRoute){
                             val distanceMeters = nearestPoint.distanceFromRouteStart - viewModel.distanceAlongRoute
@@ -434,7 +434,7 @@ class VerticalRouteGraphDataType(
                                 distanceStr += " ↗ ${distanceToString(elevationMetersRemaining.toFloat(), userProfile, true)}"
                             }
 
-                            textDrawCommands.add(TextDrawCommand(graphBounds.right + 75, progressPixels + 15f, distanceStr, textPaint, 11))
+                            textDrawCommands.add(TextDrawCommand(graphBounds.right + 100f, progressPixels + 15f, distanceStr, textPaint, 11))
                         }
                     }
 
