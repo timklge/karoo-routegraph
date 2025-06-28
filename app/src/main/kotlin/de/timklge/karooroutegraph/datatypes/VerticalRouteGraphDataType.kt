@@ -393,7 +393,7 @@ class VerticalRouteGraphDataType(
                     if (viewModel.distanceAlongRoute != null){
                         val distanceAlongRouteProgressPixels = remap(viewModel.distanceAlongRoute, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top)
 
-                        canvas.withClip(distanceAlongRouteProgressPixels, 0f, config.viewSize.first.toFloat(), config.viewSize.second.toFloat()){
+                        canvas.withClip(0f, distanceAlongRouteProgressPixels, config.viewSize.first.toFloat(), config.viewSize.second.toFloat()){
                             canvas.withClip(filledPath) {
                                 canvas.drawRect(graphBounds, elevationFillPaint)
                             }
