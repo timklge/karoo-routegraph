@@ -41,14 +41,12 @@ import io.hammerhead.karooext.models.UserProfile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformLatest
@@ -146,10 +144,10 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     private var lastDrawnIncidentSymbols = mutableSetOf<Symbol>()
     private var lastDrawnIncidentPolylines = mutableSetOf<String>()
 
-    private val mapScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-
     override fun startMap(emitter: Emitter<MapEffect>) {
         var currentSymbols: MutableSet<GradientIndicator>
+
+        val mapScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
         Log.d(TAG, "Starting map effect")
         emitter.onNext(HideSymbols(lastDrawnGradientIndicators.map { it.id }))
@@ -230,7 +228,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
             }
         }
 
-        val gradientIndicatorJob = mapScope.launch {
+        mapScope.launch {
             val zoomLevelFlow = karooSystem.stream<OnMapZoomLevel>()
             val locationFlow = karooSystem.stream<OnLocationChanged>()
 
@@ -726,6 +724,5 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     override fun onDestroy() {
         super.onDestroy()
         extensionScope.cancel()
-        mapScope.cancel()
     }
 }
