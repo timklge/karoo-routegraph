@@ -19,6 +19,13 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".POIActivity"
+            android:theme="@style/SplashTheme"
+            android:exported="true"
+            android:launchMode="singleInstance">
+        </activity>
+
         <service
             android:name=".KarooRouteGraphExtension"
             android:exported="true"

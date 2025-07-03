@@ -41,4 +41,11 @@
         icon="@drawable/trip"
         typeId="elevationtopoi" />
 
+    <DataType
+        description="@string/poi_button_description"
+        displayName="@string/poi_button"
+        graphical="true"
+        icon="@drawable/trip"
+        typeId="poiButton" />
+
 </ExtensionInfo>

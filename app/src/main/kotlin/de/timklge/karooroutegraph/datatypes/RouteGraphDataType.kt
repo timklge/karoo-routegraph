@@ -11,6 +11,7 @@ import android.graphics.RectF
 import android.util.Log
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.graphics.withClip
@@ -19,15 +20,20 @@ import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
+import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
 import androidx.glance.appwidget.GlanceRemoteViews
 import androidx.glance.appwidget.action.actionRunCallback
+import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
+import androidx.glance.layout.padding
+import androidx.glance.layout.size
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.NearestPoint
 import de.timklge.karooroutegraph.POI
+import de.timklge.karooroutegraph.POIActivity
 import de.timklge.karooroutegraph.PoiType
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModel
@@ -258,7 +264,13 @@ class RouteGraphDataType(
                 if (viewModel.routeDistance == null) {
                     emitter.onNext(ShowCustomStreamState("No route loaded", if (isNightMode()) Color.WHITE else Color.BLACK))
                     Log.d(TAG, "Not drawing route graph: No route loaded")
-                    emitter.updateView(glance.compose(context, DpSize.Unspecified) { Box(modifier = GlanceModifier.fillMaxSize()){} }.remoteViews)
+                    emitter.updateView(glance.compose(context, DpSize.Unspecified) {
+                        Box(modifier = GlanceModifier.fillMaxSize()){
+                            if (config.gridSize.first > 30) {
+                                MapPinButton(config, isNightMode())
+                            }
+                        }
+                    }.remoteViews)
                     return@collect
                 }
 
@@ -554,8 +566,12 @@ class RouteGraphDataType(
                         )
                     ))
 
-                    Box(modifier = GlanceModifier.fillMaxSize()){
-                        Image(ImageProvider(bitmap), "Route Graph", modifier = modifier)
+                    Box(modifier = modifier) {
+                        Image(ImageProvider(bitmap), "Route Graph", modifier = GlanceModifier.fillMaxSize())
+                    }
+
+                    if (config.gridSize.first > 30) {
+                        MapPinButton(config, isNightMode())
                     }
                 }
                 emitter.updateView(result.remoteViews)
