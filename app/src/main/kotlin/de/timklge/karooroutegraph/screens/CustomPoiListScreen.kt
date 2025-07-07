@@ -18,9 +18,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +42,8 @@ import io.hammerhead.karooext.models.OnGlobalPOIs
 import io.hammerhead.karooext.models.OnNavigationState
 import io.hammerhead.karooext.models.Symbol
 import io.hammerhead.karooext.models.UserProfile
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import org.koin.compose.koinInject
@@ -56,21 +60,32 @@ fun CustomPoiListScreen() {
     val viewModelProvider = koinInject<RouteGraphViewModelProvider>()
     val locationViewModelProvider = koinInject<LocationViewModelProvider>()
 
-    val localPois by karooSystemServiceProvider.stream<OnNavigationState>()
-        .mapNotNull { onNavigationState ->
-            val newLocalPois = (onNavigationState.state as? OnNavigationState.NavigationState.NavigatingRoute)?.pois
-            newLocalPois
-        }
-        .collectAsStateWithLifecycle(listOf())
+    var localPois by remember { mutableStateOf<List<Symbol.POI>>(listOf()) }
+    var globalPois by remember { mutableStateOf<List<Symbol.POI>>(listOf()) }
+
+    LaunchedEffect(Unit) {
+        karooSystemServiceProvider.stream<OnNavigationState>()
+            .mapNotNull { onNavigationState ->
+                val newLocalPois = (onNavigationState.state as? OnNavigationState.NavigationState.NavigatingRoute)?.pois
+                newLocalPois
+            }
+            .collect {
+                localPois = it
+            }
+    }
+
+    LaunchedEffect(Unit) {
+        karooSystemServiceProvider.stream<OnGlobalPOIs>()
+            .map { onGlobalPois ->
+                onGlobalPois.pois
+            }
+            .collect {
+                globalPois = it
+            }
+    }
+
 
     val routeGraphViewModel by viewModelProvider.viewModelFlow.collectAsStateWithLifecycle(null)
-
-    val globalPois by karooSystemServiceProvider.stream<OnGlobalPOIs>()
-        .map { onGlobalPois ->
-            onGlobalPois.pois
-        }
-        .collectAsStateWithLifecycle(listOf())
-
     val currentPosition by locationViewModelProvider.viewModelFlow.collectAsStateWithLifecycle(null)
 
     val isImperial by karooSystemServiceProvider.stream<UserProfile>()
