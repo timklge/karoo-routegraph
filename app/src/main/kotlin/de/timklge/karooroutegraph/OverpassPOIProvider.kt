@@ -1,60 +1,58 @@
 package de.timklge.karooroutegraph
 
 import android.util.Log
-import androidx.annotation.ColorRes
-import androidx.annotation.DrawableRes
-import com.mapbox.geojson.LineString
 import io.hammerhead.karooext.models.HttpResponseState
 import io.hammerhead.karooext.models.OnHttpResponse
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.single
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import java.net.URLEncoder
+import java.util.Locale
 import java.util.zip.GZIPInputStream
 
-@DrawableRes
-fun getInclineIndicator(percent: Float): Int? {
-    return when (percent){
-        in -Float.MAX_VALUE..<-7.5f -> R.drawable.chevrondown2 // Dark blue
-        in -7.5f..<-4.6f -> R.drawable.chevrondown1 // Light blue
-        in -4.6f..<-2f -> R.drawable.chevrondown0 // White
-        in 2f..<4.6f -> R.drawable.chevron0 // Dark green
-        in 4.6f..<7.5f -> R.drawable.chevron1 // Light green
-        in 7.5f..<12.5f -> R.drawable.chevron2 // Yellow
-        in 12.5f..<15.5f -> R.drawable.chevron3 // Light Orange
-        in 15.5f..<19.5f -> R.drawable.chevron4 // Dark Orange
-        in 19.5f..<23.5f -> R.drawable.chevron5 // Red
-        in 23.5f..Float.MAX_VALUE -> R.drawable.chevron6 // Purple
-        else -> null
+@Serializable
+data class OverpassResponse(
+    val version: Double? = null,
+    val generator: String? = null,
+    val osm3s: Osm3s? = null,
+    val elements: List<Element>
+)
+
+@Serializable
+data class Osm3s(
+    @SerialName("timestamp_osm_base")
+    val timestampOsmBase: String? = null,
+    val copyright: String? = null
+)
+
+@Serializable
+data class Element(
+    val type: String? = null,
+    val id: Long,
+    val lat: Double,
+    val lon: Double,
+    val tags: Map<String, String>? = null
+) {
+    fun hasAdditionalInfo(): Boolean {
+        return tags != null && (tags.contains("opening_hours"))
     }
 }
 
-@ColorRes
-fun getInclineIndicatorColor(percent: Float): Int? {
-    return when(percent) {
-        in -Float.MAX_VALUE..<-7.5f -> R.color.eleDarkBlue // Dark blue
-        in -7.5f..<-4.6f -> R.color.eleLightBlue // Light blue
-        in -4.6f..<-2f -> R.color.eleWhite // White
-        in 2f..<4.6f -> R.color.eleDarkGreen // Dark green
-        in 4.6f..<7.5f -> R.color.eleLightGreen // Light green
-        in 7.5f..<12.5f -> R.color.eleYellow // Yellow
-        in 12.5f..<15.5f -> R.color.eleLightOrange // Light Orange
-        in 15.5f..<19.5f -> R.color.eleDarkOrange // Dark Orange
-        in 19.5f..<23.5f -> R.color.eleRed // Red
-        in 23.5f..Float.MAX_VALUE -> R.color.elePurple // Purple
-        else -> null
-    }
-}
-
-class ValhallaAPIElevationProvider(
+class OverpassPOIProvider(
     private val karooSystemServiceProvider: KarooSystemServiceProvider,
 ) {
-    suspend fun requestValhallaElevations(polyline: LineString, interval: Float = 60.0f): SampledElevationData {
+    suspend fun requestOverpassPOIs(requestedTags: List<String>, lat: Double, lng: Double, radius: Int = 5_000, limit: Int = 20): OverpassResponse {
         return callbackFlow {
-            val url = "https://valhalla1.openstreetmap.de/height"
-            val request = HeightRequest(range = true, shapeFormat = "polyline5", encodedPolyline = polyline.toPolyline(5), heightPrecision = 2, resampleDistance = interval.toDouble())
-            val requestBody = Json.encodeToString(HeightRequest.serializer(), request).encodeToByteArray()
+            val url = "https://overpass-api.de/api/interpreter"
+            val requestBodyDataPart = "[out:json];(" +
+                requestedTags.joinToString("") { tag -> "node[$tag](around:$radius,${String.format(Locale.US, "%.5f", lat)},${String.format(Locale.US, "%.5f", lng)});" } +
+                ");out center $limit;"
+
+            @Suppress("BlockingMethodInNonBlockingContext")
+            val requestBody = "data=${URLEncoder.encode(requestBodyDataPart, "UTF-8")}".encodeToByteArray()
 
             Log.d(KarooRouteGraphExtension.TAG, "Http request to ${url}...")
 
@@ -66,10 +64,10 @@ class ValhallaAPIElevationProvider(
                     headers = mapOf("User-Agent" to KarooRouteGraphExtension.TAG, "Accept-Encoding" to "gzip"),
                     body = requestBody,
                 ),
-            onError = { err ->
-                Log.e(KarooRouteGraphExtension.TAG, "Failed to send request: $err")
-                close(Exception(err))
-            }) { event: OnHttpResponse ->
+                onError = { err ->
+                    Log.e(KarooRouteGraphExtension.TAG, "Failed to send request: $err")
+                    close(Exception(err))
+                }) { event: OnHttpResponse ->
                 if (event.state is HttpResponseState.Complete){
                     val completeEvent = (event.state as HttpResponseState.Complete)
 
@@ -99,31 +97,18 @@ class ValhallaAPIElevationProvider(
                         }
 
                         val response = try {
-                            Json.decodeFromString(HeightResponse.serializer(), responseString)
+                            jsonWithUnknownKeys.decodeFromString(OverpassResponse.serializer(), responseString)
                         } catch (e: Exception) {
                             Log.e(KarooRouteGraphExtension.TAG, "Failed to parse response: ${completeEvent.body}", e)
                             throw e
                         }
 
-                        Log.d(KarooRouteGraphExtension.TAG, "Parsed elevation data response with ${response.rangeHeight.size} points")
+                        Log.d(KarooRouteGraphExtension.TAG, "Parsed overpass response with ${response.elements.size} elements")
 
-                        val resultElevations = FloatArray(response.rangeHeight.size) { index -> response.rangeHeight[index][1].toFloat() }
-
-                        // Smooth the elevation data using a 3-value moving average
-                        val smoothedElevations = FloatArray(resultElevations.size)
-                        for (i in resultElevations.indices) {
-                            val windowValues = mutableListOf<Float>()
-                            if (i > 0) windowValues.add(resultElevations[i-1])
-                            windowValues.add(resultElevations[i])
-                            if (i < resultElevations.size - 1) windowValues.add(resultElevations[i+1])
-
-                            smoothedElevations[i] = windowValues.average().toFloat()
-                        }
-                        val result = SampledElevationData(interval, smoothedElevations)
-
-                        trySendBlocking(result)
+                        trySendBlocking(response)
                     } catch(e: Throwable){
                         Log.e(KarooRouteGraphExtension.TAG, "Failed to process response", e)
+                        close(e)
                     }
 
                     close()

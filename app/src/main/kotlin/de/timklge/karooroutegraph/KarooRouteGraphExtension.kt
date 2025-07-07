@@ -9,6 +9,7 @@ import com.mapbox.turf.TurfConstants
 import com.mapbox.turf.TurfMeasurement
 import de.timklge.karooroutegraph.datatypes.DistanceToNextPOIDataType
 import de.timklge.karooroutegraph.datatypes.ElevationToNextPOIDataType
+import de.timklge.karooroutegraph.datatypes.PoiButtonDataType
 import de.timklge.karooroutegraph.datatypes.RouteGraphDataType
 import de.timklge.karooroutegraph.datatypes.VerticalRouteGraphDataType
 import de.timklge.karooroutegraph.datatypes.minimap.MinimapDataType
@@ -91,6 +92,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     private val incidentProvider: HereMapsIncidentProvider by inject()
     private val displayViewModelProvider: RouteGraphDisplayViewModelProvider by inject()
     private val tileDownloadService: TileDownloadService by inject()
+    private val locationViewModelProvider: LocationViewModelProvider by inject()
 
     private val extensionScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -101,6 +103,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
             DistanceToNextPOIDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, applicationContext),
             ElevationToNextPOIDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, applicationContext),
             MinimapDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, displayViewModelProvider, minimapViewModelProvider, tileDownloadService, applicationContext),
+            PoiButtonDataType(karooSystem.karooSystemService, applicationContext),
         )
     }
 
@@ -692,7 +695,9 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
         startGraphUpdater()
         startMinimapUpdater()
+
         tileDownloadService.startDownloadJob()
+        locationViewModelProvider.startUpdateJob()
     }
 
     private fun startMinimapUpdater() {

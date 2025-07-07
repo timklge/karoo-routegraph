@@ -12,7 +12,9 @@ import android.graphics.Typeface
 import android.util.Log
 import androidx.annotation.DrawableRes
 import androidx.appcompat.content.res.AppCompatResources
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.graphics.withClip
@@ -21,15 +23,20 @@ import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
+import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
 import androidx.glance.appwidget.GlanceRemoteViews
 import androidx.glance.appwidget.action.actionRunCallback
+import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
+import androidx.glance.layout.padding
+import androidx.glance.layout.size
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.NearestPoint
 import de.timklge.karooroutegraph.POI
+import de.timklge.karooroutegraph.POIActivity
 import de.timklge.karooroutegraph.PoiType
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModel
@@ -43,7 +50,9 @@ import de.timklge.karooroutegraph.datatypes.minimap.mapPoiToIcon
 import de.timklge.karooroutegraph.distanceIsZero
 import de.timklge.karooroutegraph.distanceToString
 import de.timklge.karooroutegraph.getInclineIndicatorColor
+import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.streamDatatypeIsVisible
+import de.timklge.karooroutegraph.streamSettings
 import de.timklge.karooroutegraph.streamUserProfile
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.DataTypeImpl
@@ -82,7 +91,11 @@ class VerticalRouteGraphDataType(
         return nightModeFlags == Configuration.UI_MODE_NIGHT_YES
     }
 
-    data class StreamData(val routeGraphViewModel: RouteGraphViewModel, val routeGraphDisplayViewModel: RouteGraphDisplayViewModel, val profile: UserProfile, val isVisible: Boolean)
+    data class StreamData(val routeGraphViewModel: RouteGraphViewModel,
+                          val routeGraphDisplayViewModel: RouteGraphDisplayViewModel,
+                          val profile: UserProfile,
+                          val settings: RouteGraphSettings,
+                          val isVisible: Boolean)
 
     override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
         Log.d(TAG, "Starting route view with $emitter")
@@ -100,14 +113,15 @@ class VerticalRouteGraphDataType(
                 viewModelProvider.viewModelFlow,
                 displayViewModelProvider.viewModelFlow,
                 karooSystem.streamUserProfile(),
+                context.streamSettings(karooSystem),
                 karooSystem.streamDatatypeIsVisible(dataTypeId)
-            ) { viewModel, displayViewModel, profile, isVisible ->
-                StreamData(viewModel, displayViewModel, profile, isVisible)
+            ) { viewModel, displayViewModel, profile, settings, isVisible ->
+                StreamData(viewModel, displayViewModel, profile, settings, isVisible)
             }
         }
 
         val viewJob = CoroutineScope(Dispatchers.Default).launch {
-            flow.filter { it.isVisible }.collect { (viewModel, displayViewModel, userProfile) ->
+            flow.filter { it.isVisible }.collect { (viewModel, displayViewModel, userProfile, settings) ->
                 val bitmap = createBitmap(config.viewSize.first, config.viewSize.second)
 
                 val canvas = Canvas(bitmap)
@@ -254,7 +268,14 @@ class VerticalRouteGraphDataType(
                 if (viewModel.routeDistance == null) {
                     emitter.onNext(ShowCustomStreamState("No route loaded", if (isNightMode()) Color.WHITE else Color.BLACK))
                     Log.d(TAG, "Not drawing route graph: No route loaded")
-                    emitter.updateView(glance.compose(context, DpSize.Unspecified) { Box(modifier = GlanceModifier.fillMaxSize()){} }.remoteViews)
+
+                    emitter.updateView(glance.compose(context, DpSize.Unspecified) {
+                        Box(modifier = GlanceModifier.fillMaxSize()){
+                            if (config.gridSize.first > 30 && settings.showNavigateButtonOnGraphs) {
+                                MapPinButton(config, isNightMode())
+                            }
+                        }
+                    }.remoteViews)
                     return@collect
                 }
 
@@ -543,6 +564,10 @@ class VerticalRouteGraphDataType(
                     Box(modifier = modifier) {
                         Image(ImageProvider(bitmap), "Route Graph", modifier = GlanceModifier.fillMaxSize())
                     }
+
+                    if (config.gridSize.first > 30 && settings.showNavigateButtonOnGraphs) {
+                        MapPinButton(config, isNightMode())
+                    }
                 }
                 emitter.updateView(result.remoteViews)
             }
@@ -555,6 +580,8 @@ class VerticalRouteGraphDataType(
     }
 
     private fun previewFlow() = flow {
+        val settings = applicationContext.streamSettings(karooSystem).first()
+
         while (true){
             val distanceAlongRoute = (0..50_000).random()
             val routeGraphViewModel = RouteGraphViewModel(50_000.0f, distanceAlongRoute.toFloat(), null,
@@ -569,11 +596,28 @@ class VerticalRouteGraphDataType(
                 ).toSampledElevationData(100.0f)
             )
             val routeGraphDisplayViewModel = RouteGraphDisplayViewModel()
-            val streamData = StreamData(routeGraphViewModel, routeGraphDisplayViewModel, karooSystem.streamUserProfile().first(), true)
+            val streamData = StreamData(routeGraphViewModel, routeGraphDisplayViewModel, karooSystem.streamUserProfile().first(), settings, true)
 
             emit(streamData)
 
             delay(5_000)
+        }
+    }
+}
+
+@Composable
+fun MapPinButton(config: ViewConfig, isNightMode: Boolean){
+    Box(modifier = GlanceModifier.fillMaxSize()){
+        Box(modifier = GlanceModifier.fillMaxSize().padding(5.dp), contentAlignment = Alignment.TopEnd) {
+            val imgModifier = if (config.preview) GlanceModifier.size(50.dp) else GlanceModifier.size(50.dp).clickable(
+                actionStartActivity(POIActivity::class.java)
+            )
+
+            Image(
+                provider = if (isNightMode) ImageProvider(R.drawable.bxs_map_pin_night) else ImageProvider(R.drawable.bxs_map_pin),
+                modifier = imgModifier,
+                contentDescription = "Map Pin",
+            )
         }
     }
 }

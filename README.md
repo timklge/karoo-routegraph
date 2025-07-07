@@ -65,8 +65,11 @@ try to identify climbs using an alternate algorithm, so they will not perfectly 
 
 ## Credits
 
-- Uses valhalla1.openstreetmap.de for elevation data (hosted by [FOSSGIS e.V.](https://www.fossgis.de/news/2021-11-12_funding_valhalla/)) and OpenStreetMap raster tiles served by https://tile.openstreetmap.org
-  - Data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors (<a href="https://opendatacommons.org/licenses/odbl/index.html">ODbL</a>), <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, <a href="https://openstreetmap.org/fixthemap">participate/fix mistakes</a>
+- OpenStreetMap Data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors (<a href="https://opendatacommons.org/licenses/odbl/index.html">ODbL</a>), <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, <a href="https://openstreetmap.org/fixthemap">participate/fix mistakes</a>
+  - Uses valhalla1.openstreetmap.de for elevation data (hosted by [FOSSGIS e.V.](https://www.fossgis.de/news/2021-11-12_funding_valhalla/))
+  - OpenStreetMap raster tiles for the minimap served by https://tile.openstreetmap.org
+  - Nearby POI search uses https://overpass-api.de
+  - POI search box uses nominatim API for geocoding: https://nominatim.openstreetmap.org/
 - Icons are from [boxicons.com](https://boxicons.com) ([MIT-licensed](icon_credits.txt))
 - Uses [karoo-ext](https://github.com/hammerheadnav/karoo-ext) (Apache2-licensed)
 - Uses Flexpolyline encoder / decoder by HERE Europe B. V. (MIT-licensed)
