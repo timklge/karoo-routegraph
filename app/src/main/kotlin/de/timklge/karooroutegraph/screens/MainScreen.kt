@@ -67,6 +67,7 @@ data class RouteGraphSettings(
     val showPOILabelsOnMinimap: Boolean = true,
     val welcomeDialogAccepted: Boolean = false,
     val enableTrafficIncidentReporting: Boolean = false,
+    val showNavigateButtonOnGraphs: Boolean = true,
     val hereMapsApiKey: String = "",
     val gradientIndicatorFrequency: GradientIndicatorFrequency = GradientIndicatorFrequency.HIGH
 ){
@@ -86,6 +87,7 @@ fun MainScreen(onFinish: () -> Unit) {
     var showGradientIndicatorsOnMap by remember { mutableStateOf(false) }
     var gradientIndicatorFrequency by remember { mutableStateOf(GradientIndicatorFrequency.HIGH) }
     var showPOIsOnMinimap by remember { mutableStateOf(true) }
+    var showNavigateButtonOnGraphs by remember { mutableStateOf(true) }
     var hereMapsApiKey by remember { mutableStateOf("") }
     var enableTrafficIncidentReporting by remember { mutableStateOf(false) }
     var apiTestDialogVisible by remember { mutableStateOf(false) }
@@ -102,7 +104,8 @@ fun MainScreen(onFinish: () -> Unit) {
             showPOILabelsOnMinimap = showPOIsOnMinimap,
             hereMapsApiKey = hereMapsApiKey,
             gradientIndicatorFrequency = gradientIndicatorFrequency,
-            enableTrafficIncidentReporting = enableTrafficIncidentReporting
+            enableTrafficIncidentReporting = enableTrafficIncidentReporting,
+            showNavigateButtonOnGraphs = showNavigateButtonOnGraphs
         )
 
         saveSettings(ctx, newSettings)
@@ -116,6 +119,7 @@ fun MainScreen(onFinish: () -> Unit) {
             showPOIsOnMinimap = settings.showPOILabelsOnMinimap
             hereMapsApiKey = settings.hereMapsApiKey
             enableTrafficIncidentReporting = settings.enableTrafficIncidentReporting
+            showNavigateButtonOnGraphs = settings.showNavigateButtonOnGraphs
         }
     }
 
@@ -204,6 +208,17 @@ fun MainScreen(onFinish: () -> Unit) {
                             })
                             Spacer(modifier = Modifier.width(10.dp))
                             Text("Show POI labels on minimap")
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Switch(checked = showNavigateButtonOnGraphs, onCheckedChange = {
+                                showNavigateButtonOnGraphs = it
+                                coroutineScope.launch {
+                                    updateSettings()
+                                }
+                            })
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Show navigate button on graphs")
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically) {

@@ -11,7 +11,6 @@ import android.graphics.RectF
 import android.util.Log
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.dp
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.graphics.withClip
@@ -20,20 +19,15 @@ import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
-import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
 import androidx.glance.appwidget.GlanceRemoteViews
 import androidx.glance.appwidget.action.actionRunCallback
-import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
-import androidx.glance.layout.padding
-import androidx.glance.layout.size
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.NearestPoint
 import de.timklge.karooroutegraph.POI
-import de.timklge.karooroutegraph.POIActivity
 import de.timklge.karooroutegraph.PoiType
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModel
@@ -45,7 +39,9 @@ import de.timklge.karooroutegraph.ZoomLevel
 import de.timklge.karooroutegraph.datatypes.minimap.ChangeZoomLevelAction
 import de.timklge.karooroutegraph.datatypes.minimap.mapPoiToIcon
 import de.timklge.karooroutegraph.getInclineIndicatorColor
+import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.streamDatatypeIsVisible
+import de.timklge.karooroutegraph.streamSettings
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.DataTypeImpl
 import io.hammerhead.karooext.internal.ViewEmitter
@@ -60,6 +56,7 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -96,7 +93,8 @@ class RouteGraphDataType(
         return nightModeFlags == Configuration.UI_MODE_NIGHT_YES
     }
 
-    data class ViewModels(val routeGraphViewModel: RouteGraphViewModel, val routeGraphDisplayViewModel: RouteGraphDisplayViewModel, val isVisible: Boolean)
+    data class StreamData(val routeGraphViewModel: RouteGraphViewModel, val routeGraphDisplayViewModel: RouteGraphDisplayViewModel,
+                          val settings: RouteGraphSettings, val isVisible: Boolean)
 
     @OptIn(DelicateCoroutinesApi::class)
     override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
@@ -116,14 +114,15 @@ class RouteGraphDataType(
             combine(
                 viewModelProvider.viewModelFlow,
                 displayViewModelProvider.viewModelFlow,
+                context.streamSettings(karooSystem),
                 karooSystem.streamDatatypeIsVisible(dataTypeId)
-            ) { viewModel, displayViewModel, visible ->
-                ViewModels(viewModel, displayViewModel, visible)
+            ) { viewModel, displayViewModel, settings, visible ->
+                StreamData(viewModel, displayViewModel, settings, visible)
             }
         }
 
         val viewJob = CoroutineScope(Dispatchers.Default).launch {
-            flow.filter { it.isVisible }.collect { (viewModel, displayViewModel) ->
+            flow.filter { it.isVisible }.collect { (viewModel, displayViewModel, settings) ->
                 val bitmap = createBitmap(config.viewSize.first, config.viewSize.second)
 
                 val canvas = Canvas(bitmap)
@@ -266,7 +265,7 @@ class RouteGraphDataType(
                     Log.d(TAG, "Not drawing route graph: No route loaded")
                     emitter.updateView(glance.compose(context, DpSize.Unspecified) {
                         Box(modifier = GlanceModifier.fillMaxSize()){
-                            if (config.gridSize.first > 30) {
+                            if (config.gridSize.first > 30 && settings.showNavigateButtonOnGraphs) {
                                 MapPinButton(config, isNightMode())
                             }
                         }
@@ -570,7 +569,7 @@ class RouteGraphDataType(
                         Image(ImageProvider(bitmap), "Route Graph", modifier = GlanceModifier.fillMaxSize())
                     }
 
-                    if (config.gridSize.first > 30) {
+                    if (config.gridSize.first > 30 && settings.showNavigateButtonOnGraphs) {
                         MapPinButton(config, isNightMode())
                     }
                 }
@@ -584,7 +583,9 @@ class RouteGraphDataType(
         }
     }
 
-    private fun previewFlow() = flow {
+    private fun previewFlow() = flow { ->
+        val settings = applicationContext.streamSettings(karooSystem).first()
+
         while (true){
             val distanceAlongRoute = (0..50_000).random()
             val routeGraphViewModel = RouteGraphViewModel(50_000.0f, distanceAlongRoute.toFloat(), null,
@@ -599,9 +600,9 @@ class RouteGraphDataType(
                 ).toSampledElevationData(100.0f)
             )
             val routeGraphDisplayViewModel = RouteGraphDisplayViewModel()
-            val viewModels = ViewModels(routeGraphViewModel, routeGraphDisplayViewModel, true)
+            val streamData = StreamData(routeGraphViewModel, routeGraphDisplayViewModel, settings, true)
 
-            emit(viewModels)
+            emit(streamData)
 
             delay(5_000)
         }
