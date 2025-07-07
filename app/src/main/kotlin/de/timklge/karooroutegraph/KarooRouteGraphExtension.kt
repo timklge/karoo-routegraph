@@ -92,6 +92,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     private val incidentProvider: HereMapsIncidentProvider by inject()
     private val displayViewModelProvider: RouteGraphDisplayViewModelProvider by inject()
     private val tileDownloadService: TileDownloadService by inject()
+    private val locationViewModelProvider: LocationViewModelProvider by inject()
 
     private val extensionScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -694,7 +695,9 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
         startGraphUpdater()
         startMinimapUpdater()
+
         tileDownloadService.startDownloadJob()
+        locationViewModelProvider.startUpdateJob()
     }
 
     private fun startMinimapUpdater() {
