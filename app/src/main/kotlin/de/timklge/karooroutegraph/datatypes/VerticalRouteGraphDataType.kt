@@ -419,11 +419,12 @@ class VerticalRouteGraphDataType(
                         val distanceFromRouteStart = nearestPoint.distanceFromRouteStart
                         val text = poi.symbol.name ?: ""
                         val progressPixels = remap(distanceFromRouteStart, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top)
+                        val labelPriority = if (poi.type == PoiType.INCIDENT) 10 else 11
 
                         canvas.drawLine(graphBounds.left, progressPixels, config.viewSize.first.toFloat(), progressPixels, backgroundStrokePaintDashed)
                         canvas.drawLine(graphBounds.left, progressPixels, config.viewSize.first.toFloat(), progressPixels, if (poi.type == PoiType.INCIDENT) incidentLinePaintDashed else poiLinePaintDashed)
 
-                        textDrawCommands.add(TextDrawCommand(graphBounds.right + 100f + 40f, progressPixels + 15f, text, textPaintBold, 11, leadingIcon = mapPoiToIcon(poi.symbol.type)))
+                        textDrawCommands.add(TextDrawCommand(graphBounds.right + 100f + 40f, progressPixels + 15f, text, textPaintBold, labelPriority, leadingIcon = mapPoiToIcon(poi.symbol.type)))
 
                         if (viewModel.distanceAlongRoute != null && nearestPoint.distanceFromRouteStart > viewModel.distanceAlongRoute){
                             val distanceMeters = nearestPoint.distanceFromRouteStart - viewModel.distanceAlongRoute
@@ -434,7 +435,7 @@ class VerticalRouteGraphDataType(
                                 distanceStr += " ↗ ${distanceToString(elevationMetersRemaining.toFloat(), userProfile, true)}"
                             }
 
-                            textDrawCommands.add(TextDrawCommand(graphBounds.right + 100f, progressPixels + 15f, distanceStr, textPaint, 11))
+                            textDrawCommands.add(TextDrawCommand(graphBounds.right + 100f, progressPixels + 15f, distanceStr, textPaint, labelPriority))
                         }
                     }
 
