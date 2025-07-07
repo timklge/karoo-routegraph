@@ -74,6 +74,7 @@ enum class NearbyPoiCategory(val label: String, val osmTag: String) {
     HOTEL("Hotel", "tourism=hotel"),
     TRAIN_STATION("Train Station", "railway=station"),
     WASTE_BASKET("Waste Basket", "amenity=waste_basket"),
+    BIKE_SHOP("Bike Shop", "shop=bicycle"),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

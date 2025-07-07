@@ -45,6 +45,9 @@ elevation profile data field of the Karoo, but adds markers for route-specific a
 between the full route and the upcoming 2km, 20km, 50km and 100km of the route.
 - Vertical Route Graph (see third screenshot): Similar to the route graph, but flipped so that the vertical axis depicts the route distance. The name of POIs, the remaining distance and elevation
 to them as well as climb lengths and total climb elevations are shown next to the elevation profile.
+- POI Button: Shows a single button that opens a dialog with a list of all POIs along the route. You can tap on each POI to start navigation to it. In addition to the route-specific and global POIs set up on the Karoo, 
+you can also look for nearby POIs of certain categories (e. g. cafes, restaurants etc.) using the Overpass API, or search for POIs by name using the Nominatim geocoding API.
+By default, route graph datafields also feature a POI button in the top right corner.
 - Distance to POI: Shows the distance to the next POI along the route. Note that this is the distance along the route and not the straight-line distance.
 - Elevation to POI: Shows the remaining climbing to the next POI along the route. Note that this is the elevation along the route and not the straight-line elevation.
 
