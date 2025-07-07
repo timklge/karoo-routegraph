@@ -22,7 +22,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,8 +41,6 @@ import io.hammerhead.karooext.models.OnGlobalPOIs
 import io.hammerhead.karooext.models.OnNavigationState
 import io.hammerhead.karooext.models.Symbol
 import io.hammerhead.karooext.models.UserProfile
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import org.koin.compose.koinInject
@@ -84,13 +81,16 @@ fun CustomPoiListScreen() {
             }
     }
 
+    var isImperial by remember { mutableStateOf(false)}
+
+    LaunchedEffect(Unit) {
+        karooSystemServiceProvider.stream<UserProfile>()
+            .map { it.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL }
+            .collect { isImperial = it }
+    }
 
     val routeGraphViewModel by viewModelProvider.viewModelFlow.collectAsStateWithLifecycle(null)
     val currentPosition by locationViewModelProvider.viewModelFlow.collectAsStateWithLifecycle(null)
-
-    val isImperial by karooSystemServiceProvider.stream<UserProfile>()
-        .map { it.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL }
-        .collectAsStateWithLifecycle(false)
 
     // State for dropdown
     var expanded by remember { mutableStateOf(false) }

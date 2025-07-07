@@ -21,6 +21,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,9 +67,13 @@ fun PoiSearchScreen() {
 
     var pois by remember { mutableStateOf(emptyList<OsmPlace>()) }
 
-    val isImperial by karooSystemServiceProvider.stream<UserProfile>()
-        .map { it.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL }
-        .collectAsStateWithLifecycle(false)
+    var isImperial by remember { mutableStateOf(false)}
+
+    LaunchedEffect(Unit) {
+        karooSystemServiceProvider.stream<UserProfile>()
+            .map { it.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL }
+            .collect { isImperial = it }
+    }
 
     val currentPosition by locationViewModelProvider.viewModelFlow.collectAsStateWithLifecycle(null)
 

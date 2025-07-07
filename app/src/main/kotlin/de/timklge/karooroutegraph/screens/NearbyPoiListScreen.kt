@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -93,9 +94,13 @@ fun NearbyPoiListScreen() {
     var showOpeningHoursDialog by remember { mutableStateOf(false) }
     var openingHoursText by remember { mutableStateOf("") }
 
-    val isImperial by karooSystemServiceProvider.stream<UserProfile>()
-        .map { it.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL }
-        .collectAsStateWithLifecycle(false)
+    var isImperial by remember { mutableStateOf(false)}
+
+    LaunchedEffect(Unit) {
+        karooSystemServiceProvider.stream<UserProfile>()
+                .map { it.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL }
+                .collect { isImperial = it }
+    }
 
     val currentPosition by locationViewModelProvider.viewModelFlow.collectAsStateWithLifecycle(null)
 
