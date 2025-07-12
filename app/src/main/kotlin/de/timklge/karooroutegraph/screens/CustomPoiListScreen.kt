@@ -120,8 +120,27 @@ fun CustomPoiListScreen() {
     }
 
     val pois by remember(localPois, globalPois, currentPosition, routeGraphViewModel, selectedSort) {
+        val lastKnownPositionAlongRoute = routeGraphViewModel?.lastKnownPositionOnMainRoute?.let { point ->
+            Symbol.POI(
+                lat = point.latitude(),
+                lng = point.longitude(),
+                name = "Last known position along route",
+                id = "last_known_position",
+            )
+        }
+
         val poiList = currentPosition?.let { _ ->
-            (localPois + globalPois).filter { poi -> distanceToPoi(poi) != null }.sortedBy { poi ->
+            val poiList = buildList {
+                addAll(localPois)
+                addAll(globalPois)
+
+                // If not on route but have a last known position along the route, add it as POI to navigate to
+                if (lastKnownPositionAlongRoute != null && routeGraphViewModel?.routeDistance == null) {
+                    add(lastKnownPositionAlongRoute)
+                }
+            }
+
+            poiList.filter { poi -> distanceToPoi(poi) != null }.sortedBy { poi ->
                 distanceToPoi(poi)
             }
         } ?: run {

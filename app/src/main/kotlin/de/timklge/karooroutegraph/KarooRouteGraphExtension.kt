@@ -651,6 +651,14 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     }
                 }
 
+                val lastKnownPointAlongRoute = knownRoute?.let { knownRoute ->
+                    if (distanceAlongRoute != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute) {
+                        TurfMeasurement.along(knownRoute, distanceAlongRoute.toDouble(), TurfConstants.UNIT_METERS)
+                    } else {
+                        null
+                    }
+                }
+
                 routeGraphViewModelProvider.update {
                     it.copy(
                         routeDistance = routeDistance?.toFloat(),
@@ -661,7 +669,8 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                         isImperial = isImperial,
                         navigatingToDestination = navigationStateEvent is OnNavigationState.NavigationState.NavigatingToDestination,
                         rejoin = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.rejoinPolyline?.let { LineString.fromPolyline(it, 5) },
-                        locationAndRemainingRouteDistance = locationAndRemainingRouteDistance
+                        locationAndRemainingRouteDistance = locationAndRemainingRouteDistance,
+                        lastKnownPositionOnMainRoute = lastKnownPointAlongRoute ?: it.lastKnownPositionOnMainRoute
                     )
                 }
 
