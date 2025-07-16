@@ -584,7 +584,7 @@ class VerticalRouteGraphDataType(
 
         while (true){
             val distanceAlongRoute = (0..50_000).random()
-            val routeGraphViewModel = RouteGraphViewModel(50_000.0f, distanceAlongRoute.toFloat(), null,
+            val routeGraphViewModel = RouteGraphViewModel(50_000.0f, distanceAlongRoute.toFloat(), null, null,
                 mapOf(
                     POI(Symbol.POI("checkpoint", 0.0, 0.0, name = "Checkpoint", type = "control")) to listOf(NearestPoint(null, 20.0f, 35_000.0f, null)),
                     POI(Symbol.POI("test", 0.0, 0.0, name = "Toilet", type = "restroom")) to listOf(NearestPoint(null, 20.0f, 5_000.0f, null)),

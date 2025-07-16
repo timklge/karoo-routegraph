@@ -44,14 +44,8 @@ class NominatimProvider(
 ) {
     suspend fun requestNominatim(request: String, lat: Double? = null, lng: Double? = null, limit: Int = 10): List<OsmPlace> {
         return callbackFlow {
-            val nearQuery = if (lat != null && lng != null) {
-                "${String.format(Locale.US, "%.5f", lat)},${String.format(Locale.US, "%.5f", lng)}"
-            } else {
-                ""
-            }
-
             @Suppress("BlockingMethodInNonBlockingContext")
-            val query = URLEncoder.encode("$request $nearQuery", "UTF-8")
+            val query = URLEncoder.encode(request, "UTF-8")
             val url = "https://nominatim.openstreetmap.org/search?q=$query&limit=$limit&format=json"
 
 
