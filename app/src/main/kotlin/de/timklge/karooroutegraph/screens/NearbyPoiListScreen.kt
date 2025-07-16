@@ -14,6 +14,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
@@ -24,11 +26,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,15 +52,18 @@ import com.mapbox.turf.TurfMeasurement
 import de.timklge.karooroutegraph.Element
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.LocationViewModelProvider
+import de.timklge.karooroutegraph.NearestPoint
 import de.timklge.karooroutegraph.OverpassPOIProvider
 import de.timklge.karooroutegraph.OverpassResponse
+import de.timklge.karooroutegraph.POI
 import de.timklge.karooroutegraph.R
-import io.hammerhead.karooext.models.DataType
+import de.timklge.karooroutegraph.RouteGraphViewModelProvider
+import de.timklge.karooroutegraph.calculatePoiDistances
 import io.hammerhead.karooext.models.LaunchPinDrop
-import io.hammerhead.karooext.models.StreamState
 import io.hammerhead.karooext.models.Symbol
 import io.hammerhead.karooext.models.UserProfile
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
@@ -77,6 +84,18 @@ enum class NearbyPoiCategory(val label: String, val osmTag: String) {
     BIKE_SHOP("Bike Shop", "shop=bicycle"),
 }
 
+data class NearbyPoi(val element: Element, val poi: Symbol.POI)
+
+fun formatDistance(distanceMeters: Double, isImperial: Boolean): String {
+    return distanceMeters.let {
+        if (isImperial){
+            String.format(java.util.Locale.getDefault(), "%.1f mi", distanceMeters * 0.000621371)
+        } else {
+            String.format(java.util.Locale.getDefault(), "%.1f km", distanceMeters / 1000)
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NearbyPoiListScreen() {
@@ -85,12 +104,20 @@ fun NearbyPoiListScreen() {
     var showDialog by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
     var lastErrorMessage by remember { mutableStateOf<String?>(null) }
+    var showSortDialog by remember { mutableStateOf(false) }
+    var selectedSort by remember { mutableStateOf(PoiSortOption.LINEAR_DISTANCE) }
 
     val karooSystemServiceProvider = koinInject<KarooSystemServiceProvider>()
     val overpassPOIProvider = koinInject<OverpassPOIProvider>()
     val locationViewModelProvider = koinInject<LocationViewModelProvider>()
+    val routeGraphViewModelProvider = koinInject<RouteGraphViewModelProvider>()
 
-    var pois by remember { mutableStateOf(emptyList<Element>()) }
+    LaunchedEffect(Unit) {
+        val settings = karooSystemServiceProvider.streamSettings().first()
+        selectedSort = settings.poiSortOptionForNearbyPois
+    }
+
+    var pois by remember { mutableStateOf(emptyList<NearbyPoi>()) }
 
     var showOpeningHoursDialog by remember { mutableStateOf(false) }
     var openingHoursText by remember { mutableStateOf("") }
@@ -104,15 +131,82 @@ fun NearbyPoiListScreen() {
     }
 
     val currentPosition by locationViewModelProvider.viewModelFlow.collectAsStateWithLifecycle(null)
+    val viewModel by routeGraphViewModelProvider.viewModelFlow.collectAsStateWithLifecycle(null)
 
-    fun distanceToPoi(poi: Element): Double? {
+    val nearestPointsOnRouteToFoundPois by remember { derivedStateOf { viewModel?.knownRoute?.let { route ->
+        calculatePoiDistances(route, pois.map { POI(it.poi) })
+    } ?: emptyMap() } }
+
+    fun linearDistanceToPoi(poi: NearbyPoi): Double? {
         return currentPosition?.let { currentPosition ->
-            val poiPoint = Point.fromLngLat(poi.lon, poi.lat)
             TurfMeasurement.distance(
-                poiPoint,
+                Point.fromLngLat(poi.element.lon, poi.element.lat),
                 currentPosition,
                 TurfConstants.UNIT_METERS
             )
+        }
+    }
+
+    data class DistanceOnRouteToPoiResult(val distanceOnRoute: Double, val distanceFromPointOnRoute: Double)
+
+    fun distanceOnRouteToPoi(poi: NearbyPoi, nearestPointsOnRouteToFoundPois: Map<POI, List<NearestPoint>>, distanceAlongRoute: Float?): DistanceOnRouteToPoiResult? {
+        val nearestPoints = nearestPointsOnRouteToFoundPois.entries.find { it.key.symbol == poi.poi }?.value
+        val nearestPointsAheadOnRoute = nearestPoints?.filter { it.distanceFromRouteStart >= (distanceAlongRoute ?: 0f) }
+        val nearestPointAheadOnRoute = nearestPointsAheadOnRoute?.minByOrNull { it.distanceFromPointOnRoute + it.distanceFromRouteStart }
+
+        return nearestPointAheadOnRoute?.let {
+            DistanceOnRouteToPoiResult(
+                distanceOnRoute = it.distanceFromRouteStart.toDouble() - (distanceAlongRoute ?: 0.0f),
+                distanceFromPointOnRoute = it.distanceFromPointOnRoute.toDouble()
+            )
+        }
+    }
+
+    if (showSortDialog) {
+        Dialog(
+            onDismissRequest = { showSortDialog = false },
+        ) {
+            Card(modifier = Modifier.padding(16.dp)) {
+                val scrollState = rememberScrollState()
+                Column(modifier = Modifier
+                    .padding(16.dp)
+                    .verticalScroll(scrollState)) {
+                    PoiSortOption.entries.forEach { option ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    selectedSort = option
+                                    showSortDialog = false
+
+                                    coroutineScope.launch {
+                                        karooSystemServiceProvider.saveSettings { settings ->
+                                            settings.copy(poiSortOptionForNearbyPois = option)
+                                        }
+                                    }
+                                }
+                                .padding(vertical = 4.dp)
+                        ) {
+                            RadioButton(
+                                selected = selectedSort == option,
+                                onClick = {
+                                    selectedSort = option
+                                    showSortDialog = false
+
+                                    coroutineScope.launch {
+                                        karooSystemServiceProvider.saveSettings { settings ->
+                                            settings.copy(poiSortOptionForNearbyPois = option)
+                                        }
+                                    }
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(option.displayName)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -132,8 +226,8 @@ fun NearbyPoiListScreen() {
                     return@launch
                 }
 
-                val radiusSteps = listOf(2_000, 5_000, 20_000)
-                val desiredCount = 20 // Desired number of POIs to fetch
+                val radiusSteps = listOf(5_000, 10_000)
+                val desiredCount = 50 // Desired number of POIs to fetch
 
                 var overpassResponse: OverpassResponse? = null
 
@@ -151,9 +245,40 @@ fun NearbyPoiListScreen() {
                     }
                 }
 
-                pois = overpassResponse?.elements?.sortedBy { poi ->
-                    distanceToPoi(poi)
+                val mappedPois = overpassResponse?.elements?.map { element ->
+                    NearbyPoi(
+                        element = element,
+                        poi = Symbol.POI(
+                            id = "nearby-${element.id}",
+                            lat = element.lat,
+                            lng = element.lon,
+                            name = element.tags?.get("name") ?: "Unnamed POI"
+                        )
+                    )
                 } ?: emptyList()
+
+                when (selectedSort) {
+                    PoiSortOption.LINEAR_DISTANCE -> {
+                        pois = mappedPois.sortedBy { linearDistanceToPoi(it) ?: Double.MAX_VALUE }
+                    }
+                    PoiSortOption.AHEAD_ON_ROUTE -> {
+                        if (viewModel?.knownRoute == null) {
+                            lastErrorMessage = "Failed to fetch POIs: No route available. Please start a route first."
+                            delay(1_000)
+                            isRefreshing = false
+                        } else {
+                            val newNearestPointsOnRouteToFoundPois = viewModel?.knownRoute?.let { route ->
+                                calculatePoiDistances(route, mappedPois.map { POI(it.poi) })
+                            } ?: emptyMap()
+
+                            pois = mappedPois.sortedBy { poi ->
+                                val result = distanceOnRouteToPoi(poi, newNearestPointsOnRouteToFoundPois, viewModel?.distanceAlongRoute)
+
+                                result?.distanceOnRoute?.plus(result.distanceFromPointOnRoute) ?: Double.MAX_VALUE
+                            }
+                        }
+                    }
+                }
             } catch(e: Exception){
                 lastErrorMessage = "Failed to fetch POIs: ${e.message}"
                 delay(1_000)
@@ -171,29 +296,40 @@ fun NearbyPoiListScreen() {
     ) {
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             item {
-                Box(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .clickable { showDialog = true },
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    OutlinedTextField(
-                        value = if (selectedCategories.isEmpty()) "Select categories" else selectedCategories.joinToString { it.label },
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Categories") },
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = false)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = false,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            disabledBorderColor = MaterialTheme.colorScheme.outline,
-                            disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                            disabledLabelColor = MaterialTheme.colorScheme.onSurface,
-                            disabledTrailingIconColor = MaterialTheme.colorScheme.onSurface
+                    Box(modifier = Modifier
+                        .weight(1f)
+                        .clickable { showDialog = true }) {
+                        OutlinedTextField(
+                            value = if (selectedCategories.isEmpty()) "Select" else selectedCategories.joinToString { it.label },
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Categories") },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = false)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = false,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                disabledLabelColor = MaterialTheme.colorScheme.onSurface,
+                                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurface
+                            )
                         )
-                    )
+                    }
+
+                    IconButton(onClick = { showSortDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Sort Options"
+                        )
+                    }
                 }
             }
 
@@ -219,20 +355,22 @@ fun NearbyPoiListScreen() {
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = poi.tags?.get("name") ?: "Unnamed POI",
+                            text = poi.element.tags?.get("name") ?: "Unnamed POI",
                             style = MaterialTheme.typography.bodyLarge,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
 
                         val distanceLabel = currentPosition?.let {
-                            val distanceMeters = distanceToPoi(poi)
+                            if (selectedSort == PoiSortOption.LINEAR_DISTANCE) {
+                                val distanceMeters = linearDistanceToPoi(poi)
 
-                            distanceMeters?.let {
-                                if (isImperial){
-                                    String.format(java.util.Locale.getDefault(), "%.1f mi", distanceMeters * 0.000621371)
-                                } else {
-                                    String.format(java.util.Locale.getDefault(), "%.1f km", distanceMeters / 1000)
+                                distanceMeters?.let { distance -> formatDistance(distance, isImperial) }
+                            } else {
+                                val result = distanceOnRouteToPoi(poi, nearestPointsOnRouteToFoundPois, viewModel?.distanceAlongRoute)
+
+                                result?.let {
+                                    "In ${formatDistance(it.distanceOnRoute, isImperial)}, ${formatDistance(it.distanceFromPointOnRoute, isImperial)} from route"
                                 }
                             }
                         }
@@ -246,10 +384,10 @@ fun NearbyPoiListScreen() {
                         }
                     }
 
-                    if (poi.hasAdditionalInfo()) {
+                    if (poi.element.hasAdditionalInfo()) {
                         IconButton(
                             onClick = {
-                                openingHoursText = poi.tags?.map { (k, v) -> "$k=$v" }?.joinToString("\r\n") ?: "No info available" // poi.tags?.get("opening_hours") ?: "No opening hours info"
+                                openingHoursText = poi.element.tags?.map { (k, v) -> "$k=$v" }?.joinToString("\r\n") ?: "No info available" // poi.tags?.get("opening_hours") ?: "No opening hours info"
                                 showOpeningHoursDialog = true
                             },
                         ) {
@@ -263,9 +401,7 @@ fun NearbyPoiListScreen() {
 
                     IconButton(
                         onClick = {
-                            karooSystemServiceProvider.karooSystemService.dispatch(LaunchPinDrop(
-                                Symbol.POI("poi-${poi.id}", poi.lat, poi.lon, name = poi.tags?.get("name") ?: "Unnamed POI"))
-                            )
+                            karooSystemServiceProvider.karooSystemService.dispatch(LaunchPinDrop(poi.poi))
                         },
                     ) {
                         Icon(
@@ -294,11 +430,12 @@ fun NearbyPoiListScreen() {
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
-                                        tempSelectedCategories = if (tempSelectedCategories.contains(category)) {
-                                            tempSelectedCategories - category
-                                        } else {
-                                            tempSelectedCategories + category
-                                        }
+                                        tempSelectedCategories =
+                                            if (tempSelectedCategories.contains(category)) {
+                                                tempSelectedCategories - category
+                                            } else {
+                                                tempSelectedCategories + category
+                                            }
                                     }
                             ) {
                                 Checkbox(
@@ -341,7 +478,9 @@ fun NearbyPoiListScreen() {
         Dialog(onDismissRequest = { showOpeningHoursDialog = false }) {
             Card(modifier = Modifier.padding(16.dp)) {
                 val scrollState = rememberScrollState()
-                Column(modifier = Modifier.padding(16.dp).verticalScroll(scrollState)) {
+                Column(modifier = Modifier
+                    .padding(16.dp)
+                    .verticalScroll(scrollState)) {
                     Text(text = openingHoursText, style = MaterialTheme.typography.bodyMedium)
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(onClick = { showOpeningHoursDialog = false }) {

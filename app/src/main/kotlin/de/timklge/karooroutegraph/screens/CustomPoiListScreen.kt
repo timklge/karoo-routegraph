@@ -22,6 +22,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,8 +42,10 @@ import io.hammerhead.karooext.models.OnGlobalPOIs
 import io.hammerhead.karooext.models.OnNavigationState
 import io.hammerhead.karooext.models.Symbol
 import io.hammerhead.karooext.models.UserProfile
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 enum class PoiSortOption(val displayName: String) {
@@ -59,6 +62,7 @@ fun CustomPoiListScreen() {
 
     var localPois by remember { mutableStateOf<List<Symbol.POI>>(listOf()) }
     var globalPois by remember { mutableStateOf<List<Symbol.POI>>(listOf()) }
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         karooSystemServiceProvider.stream<OnNavigationState>()
@@ -95,6 +99,11 @@ fun CustomPoiListScreen() {
     // State for dropdown
     var expanded by remember { mutableStateOf(false) }
     var selectedSort by remember { mutableStateOf(PoiSortOption.LINEAR_DISTANCE) }
+
+    LaunchedEffect(Unit) {
+        val settings = karooSystemServiceProvider.streamSettings().first()
+        selectedSort = settings.poiSortOptionForCustomPois
+    }
 
     fun distanceToPoi(poi: Symbol.POI): Double? {
         when (selectedSort) {
@@ -155,7 +164,7 @@ fun CustomPoiListScreen() {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
             ) {
                 ExposedDropdownMenuBox(
                     expanded = expanded,
@@ -182,6 +191,12 @@ fun CustomPoiListScreen() {
                                 onClick = {
                                     selectedSort = option
                                     expanded = false
+
+                                    coroutineScope.launch {
+                                        karooSystemServiceProvider.saveSettings { settings ->
+                                            settings.copy(poiSortOptionForCustomPois = option)
+                                        }
+                                    }
                                 }
                             )
                         }

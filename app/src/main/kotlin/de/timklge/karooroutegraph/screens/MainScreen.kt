@@ -69,7 +69,10 @@ data class RouteGraphSettings(
     val enableTrafficIncidentReporting: Boolean = false,
     val showNavigateButtonOnGraphs: Boolean = true,
     val hereMapsApiKey: String = "",
-    val gradientIndicatorFrequency: GradientIndicatorFrequency = GradientIndicatorFrequency.HIGH
+    val gradientIndicatorFrequency: GradientIndicatorFrequency = GradientIndicatorFrequency.HIGH,
+
+    val poiSortOptionForCustomPois: PoiSortOption = PoiSortOption.LINEAR_DISTANCE,
+    val poiSortOptionForNearbyPois: PoiSortOption = PoiSortOption.LINEAR_DISTANCE
 ){
     companion object {
         val defaultSettings = Json.encodeToString(RouteGraphSettings())
