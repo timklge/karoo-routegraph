@@ -1,5 +1,6 @@
 package de.timklge.karooroutegraph.screens
 
+import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -49,7 +50,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mapbox.geojson.Point
 import com.mapbox.turf.TurfConstants
 import com.mapbox.turf.TurfMeasurement
+import com.mapbox.turf.TurfMisc
 import de.timklge.karooroutegraph.Element
+import de.timklge.karooroutegraph.KarooRouteGraphExtension
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.LocationViewModelProvider
 import de.timklge.karooroutegraph.NearestPoint
@@ -112,8 +115,10 @@ fun NearbyPoiListScreen() {
     val locationViewModelProvider = koinInject<LocationViewModelProvider>()
     val routeGraphViewModelProvider = koinInject<RouteGraphViewModelProvider>()
 
+    val maxDistanceFromRoute = 1_000.0
+
     LaunchedEffect(Unit) {
-        val settings = karooSystemServiceProvider.streamSettings().first()
+        val settings = karooSystemServiceProvider.streamViewSettings().first()
         selectedSort = settings.poiSortOptionForNearbyPois
     }
 
@@ -134,7 +139,7 @@ fun NearbyPoiListScreen() {
     val viewModel by routeGraphViewModelProvider.viewModelFlow.collectAsStateWithLifecycle(null)
 
     val nearestPointsOnRouteToFoundPois by remember { derivedStateOf { viewModel?.knownRoute?.let { route ->
-        calculatePoiDistances(route, pois.map { POI(it.poi) })
+        calculatePoiDistances(route, pois.map { POI(it.poi) }, maxDistanceFromRoute)
     } ?: emptyMap() } }
 
     fun linearDistanceToPoi(poi: NearbyPoi): Double? {
@@ -162,54 +167,6 @@ fun NearbyPoiListScreen() {
         }
     }
 
-    if (showSortDialog) {
-        Dialog(
-            onDismissRequest = { showSortDialog = false },
-        ) {
-            Card(modifier = Modifier.padding(16.dp)) {
-                val scrollState = rememberScrollState()
-                Column(modifier = Modifier
-                    .padding(16.dp)
-                    .verticalScroll(scrollState)) {
-                    PoiSortOption.entries.forEach { option ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    selectedSort = option
-                                    showSortDialog = false
-
-                                    coroutineScope.launch {
-                                        karooSystemServiceProvider.saveSettings { settings ->
-                                            settings.copy(poiSortOptionForNearbyPois = option)
-                                        }
-                                    }
-                                }
-                                .padding(vertical = 4.dp)
-                        ) {
-                            RadioButton(
-                                selected = selectedSort == option,
-                                onClick = {
-                                    selectedSort = option
-                                    showSortDialog = false
-
-                                    coroutineScope.launch {
-                                        karooSystemServiceProvider.saveSettings { settings ->
-                                            settings.copy(poiSortOptionForNearbyPois = option)
-                                        }
-                                    }
-                                }
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(option.displayName)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     fun onRefresh() {
         if (isRefreshing) return // Prevent multiple refreshes
 
@@ -226,23 +183,51 @@ fun NearbyPoiListScreen() {
                     return@launch
                 }
 
-                val radiusSteps = listOf(5_000, 10_000)
-                val desiredCount = 50 // Desired number of POIs to fetch
+                val radiusSteps = listOf(2_000, 5_000, 10_000)
+                val desiredCount = 10 // Desired number of POIs to fetch
+                val limit = 30
 
                 var overpassResponse: OverpassResponse? = null
 
-                for (step in radiusSteps) {
-                    overpassResponse = overpassPOIProvider.requestOverpassPOIs(
-                        selectedCategories.map { it.osmTag },
-                        lat = currentPos.latitude(),
-                        lng = currentPos.longitude(),
-                        radius = step,
-                        limit = desiredCount
-                    )
+                if (selectedSort == PoiSortOption.LINEAR_DISTANCE) {
+                    for (step in radiusSteps) {
+                        overpassResponse = overpassPOIProvider.requestOverpassPOIs(
+                            selectedCategories.map { it.osmTag },
+                            points = listOf(currentPos),
+                            radius = step,
+                            limit = limit
+                        )
 
-                    if (overpassResponse.elements.size >= desiredCount) {
-                        break // Enough POIs found, exit loop
+                        if (overpassResponse.elements.size >= desiredCount) {
+                            break // Enough POIs found, exit loop
+                        }
                     }
+                } else {
+                    val route = viewModel?.knownRoute
+
+                    if (route == null) {
+                        lastErrorMessage = "Failed to fetch POIs ahead on route: No route loaded."
+                        delay(1_000)
+                        isRefreshing = false
+                        return@launch
+                    }
+
+                    val routeAhead = try {
+                        val routeLength = viewModel?.routeDistance?.toDouble() ?: TurfMeasurement.length(route, TurfConstants.UNIT_METERS)
+                        val startDistance = viewModel?.distanceAlongRoute?.toDouble() ?: 0.0
+                        val endDistance = (startDistance + 50_000).coerceAtMost(routeLength) // 50 km ahead
+                        TurfMisc.lineSliceAlong(route, startDistance, endDistance, TurfConstants.UNIT_METERS)
+                    } catch(e: Exception) {
+                        Log.e(KarooRouteGraphExtension.TAG, "Failed to slice route ahead", e)
+                        route
+                    }
+
+                    overpassResponse = overpassPOIProvider.requestOverpassPOIs(
+                        requestedTags = selectedCategories.map { it.osmTag },
+                        points = routeAhead.coordinates(),
+                        radius = 1_000,
+                        limit = 100
+                    )
                 }
 
                 val mappedPois = overpassResponse?.elements?.map { element ->
@@ -268,7 +253,7 @@ fun NearbyPoiListScreen() {
                             isRefreshing = false
                         } else {
                             val newNearestPointsOnRouteToFoundPois = viewModel?.knownRoute?.let { route ->
-                                calculatePoiDistances(route, mappedPois.map { POI(it.poi) })
+                                calculatePoiDistances(route, mappedPois.map { POI(it.poi) }, maxDistanceFromRoute)
                             } ?: emptyMap()
 
                             pois = mappedPois.sortedBy { poi ->
@@ -287,6 +272,56 @@ fun NearbyPoiListScreen() {
             }
 
             isRefreshing = false
+        }
+    }
+
+    if (showSortDialog) {
+        fun selectSortOption(option: PoiSortOption) {
+            val optionChanged = selectedSort != option
+            selectedSort = option
+            showSortDialog = false
+
+            coroutineScope.launch {
+                karooSystemServiceProvider.saveViewSettings { settings ->
+                    settings.copy(poiSortOptionForNearbyPois = option)
+                }
+            }
+
+            if (optionChanged) {
+                onRefresh() // Refresh POIs if sort option changed
+            }
+        }
+
+        Dialog(
+            onDismissRequest = { showSortDialog = false },
+        ) {
+            Card(modifier = Modifier.padding(16.dp)) {
+                val scrollState = rememberScrollState()
+                Column(modifier = Modifier
+                    .padding(16.dp)
+                    .verticalScroll(scrollState)) {
+                    PoiSortOption.entries.forEach { option ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    selectSortOption(option)
+                                }
+                                .padding(vertical = 4.dp)
+                        ) {
+                            RadioButton(
+                                selected = selectedSort == option,
+                                onClick = {
+                                    selectSortOption(option)
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(option.displayName)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -357,7 +392,7 @@ fun NearbyPoiListScreen() {
                         Text(
                             text = poi.element.tags?.get("name") ?: "Unnamed POI",
                             style = MaterialTheme.typography.bodyLarge,
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
 

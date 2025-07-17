@@ -70,12 +70,21 @@ data class RouteGraphSettings(
     val showNavigateButtonOnGraphs: Boolean = true,
     val hereMapsApiKey: String = "",
     val gradientIndicatorFrequency: GradientIndicatorFrequency = GradientIndicatorFrequency.HIGH,
+    val poiDistanceToRouteMaxMeters: Double = 500.0
+){
 
+    companion object {
+        val defaultSettings = Json.encodeToString(RouteGraphSettings())
+    }
+}
+
+@Serializable
+data class RouteGraphViewSettings(
     val poiSortOptionForCustomPois: PoiSortOption = PoiSortOption.LINEAR_DISTANCE,
     val poiSortOptionForNearbyPois: PoiSortOption = PoiSortOption.LINEAR_DISTANCE
 ){
     companion object {
-        val defaultSettings = Json.encodeToString(RouteGraphSettings())
+        val defaultSettings = Json.encodeToString(RouteGraphViewSettings())
     }
 }
 

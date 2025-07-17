@@ -101,7 +101,7 @@ fun CustomPoiListScreen() {
     var selectedSort by remember { mutableStateOf(PoiSortOption.LINEAR_DISTANCE) }
 
     LaunchedEffect(Unit) {
-        val settings = karooSystemServiceProvider.streamSettings().first()
+        val settings = karooSystemServiceProvider.streamViewSettings().first()
         selectedSort = settings.poiSortOptionForCustomPois
     }
 
@@ -193,7 +193,7 @@ fun CustomPoiListScreen() {
                                     expanded = false
 
                                     coroutineScope.launch {
-                                        karooSystemServiceProvider.saveSettings { settings ->
+                                        karooSystemServiceProvider.saveViewSettings { settings ->
                                             settings.copy(poiSortOptionForCustomPois = option)
                                         }
                                     }

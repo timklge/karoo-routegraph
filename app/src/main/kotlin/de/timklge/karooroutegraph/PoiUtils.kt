@@ -19,7 +19,7 @@ data class POI(val symbol: Symbol.POI, val type: PoiType = PoiType.POI)
 /**
  * Calculate the distances of the given POIs to the given polyline.
  */
-fun calculatePoiDistances(polyline: LineString, pois: List<POI>): Map<POI, List<NearestPoint>> {
+fun calculatePoiDistances(polyline: LineString, pois: List<POI>, maxDistanceToRoute: Double): Map<POI, List<NearestPoint>> {
     val pointList: MutableList<Point> = mutableListOf(Point.fromLngLat(0.0, 0.0), Point.fromLngLat(0.0, 0.0))
 
     return buildMap {
@@ -39,7 +39,7 @@ fun calculatePoiDistances(polyline: LineString, pois: List<POI>): Map<POI, List<
                 val nearestPointDist = nearestPoint.getNumberProperty("dist")?.toFloat()
                 val nearestPointPoint = nearestPoint.geometry() as? Point
 
-                if (nearestPointDist != null && nearestPointPoint != null && nearestPointDist < 500){
+                if (nearestPointDist != null && nearestPointPoint != null && nearestPointDist < maxDistanceToRoute){
                     val nearestPointRouteDistance = currentRouteDistance + TurfMeasurement.distance(startPoint, nearestPointPoint, TurfConstants.UNIT_METERS).toFloat()
                     nearestPointCandidates.add(NearestPoint(nearestPointPoint, nearestPointDist, nearestPointRouteDistance, poiPoint))
                 }

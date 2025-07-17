@@ -243,9 +243,9 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
             )
 
             val redrawInterval = if (karooSystem.karooSystemService.hardwareType == HardwareType.K2) {
-                4.seconds
+                5.seconds
             } else {
-                2.seconds
+                3.seconds
             }
 
             combine(applicationContext.streamSettings(karooSystem.karooSystemService), locationFlow, zoomLevelFlow, routeGraphViewModelProvider.viewModelFlow) { settings, location, mapZoom, viewModel ->
@@ -628,7 +628,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     if (routeLineString != null){
                         Log.i(TAG, "Route changed, recalculating POI distances")
 
-                        val updatedPoiDistances = calculatePoiDistances(routeLineString, pois)
+                        val updatedPoiDistances = calculatePoiDistances(routeLineString, pois, settings.poiDistanceToRouteMaxMeters)
                         poiDistances = updatedPoiDistances
 
                         val poiDistancesDebug = updatedPoiDistances.map { (key, value) ->
@@ -653,7 +653,12 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
                 val lastKnownPointAlongRoute = knownRoute?.let { knownRoute ->
                     if (distanceAlongRoute != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute) {
-                        TurfMeasurement.along(knownRoute, distanceAlongRoute.toDouble(), TurfConstants.UNIT_METERS)
+                        try {
+                            TurfMeasurement.along(knownRoute, distanceAlongRoute.toDouble().coerceIn(0.0, routeDistance), TurfConstants.UNIT_METERS)
+                        } catch(e: Exception){
+                            Log.e(TAG, "Failed to calculate last known point along route", e)
+                            null
+                        }
                     } else {
                         null
                     }

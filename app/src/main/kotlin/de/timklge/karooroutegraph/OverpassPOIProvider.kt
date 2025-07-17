@@ -1,6 +1,12 @@
 package de.timklge.karooroutegraph
 
 import android.util.Log
+import com.mapbox.geojson.Point
+import com.mapbox.turf.TurfConstants
+import com.mapbox.turf.TurfConversion
+import com.mapbox.turf.TurfMeasurement
+import com.mapbox.turf.TurfMisc
+import com.mapbox.turf.TurfTransformation
 import io.hammerhead.karooext.models.HttpResponseState
 import io.hammerhead.karooext.models.OnHttpResponse
 import kotlinx.coroutines.channels.awaitClose
@@ -44,17 +50,22 @@ data class Element(
 class OverpassPOIProvider(
     private val karooSystemServiceProvider: KarooSystemServiceProvider,
 ) {
-    suspend fun requestOverpassPOIs(requestedTags: List<String>, lat: Double, lng: Double, radius: Int = 5_000, limit: Int = 20): OverpassResponse {
+    suspend fun requestOverpassPOIs(requestedTags: List<String>, points: List<Point>, radius: Int = 1_000, limit: Int = 20): OverpassResponse {
         return callbackFlow {
+            val simplifiedPolyline = TurfTransformation.simplify(points, TurfConversion.convertLength(radius.toDouble(), TurfConstants.UNIT_METERS, TurfConstants.UNIT_DEGREES), true)
+            val polylineString = simplifiedPolyline.joinToString(separator = ",") { point ->
+                String.format(Locale.US, "%.5f,%.5f", point.latitude(), point.longitude())
+            }
+
             val url = "https://overpass-api.de/api/interpreter"
             val requestBodyDataPart = "[out:json];(" +
-                requestedTags.joinToString("") { tag -> "node[$tag](around:$radius,${String.format(Locale.US, "%.5f", lat)},${String.format(Locale.US, "%.5f", lng)});" } +
+                requestedTags.joinToString("") { tag -> "node[$tag](around:$radius,$polylineString);" } +
                 ");out center $limit;"
 
             @Suppress("BlockingMethodInNonBlockingContext")
             val requestBody = "data=${URLEncoder.encode(requestBodyDataPart, "UTF-8")}".encodeToByteArray()
 
-            Log.d(KarooRouteGraphExtension.TAG, "Http request to ${url}...")
+            Log.d(KarooRouteGraphExtension.TAG, "Http request to ${url}... with body: ${requestBodyDataPart}")
 
             val listenerId = karooSystemServiceProvider.karooSystemService.addConsumer(
                 OnHttpResponse.MakeHttpRequest(

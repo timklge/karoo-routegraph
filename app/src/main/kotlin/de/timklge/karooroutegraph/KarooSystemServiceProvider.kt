@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
+import de.timklge.karooroutegraph.screens.RouteGraphViewSettings
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.models.KarooEvent
 import io.hammerhead.karooext.models.OnStreamState
@@ -45,6 +46,7 @@ class KarooSystemServiceProvider(private val context: Context) {
     }
 
     val settingsKey = stringPreferencesKey("settings")
+    val viewSettingsKey = stringPreferencesKey("viewSettings")
 
     fun readSettings(settingsJson: String?): RouteGraphSettings {
         return if (settingsJson != null){
@@ -52,6 +54,17 @@ class KarooSystemServiceProvider(private val context: Context) {
         } else {
             val defaultSettings = jsonWithUnknownKeys.decodeFromString<RouteGraphSettings>(
                 RouteGraphSettings.defaultSettings)
+
+            defaultSettings.copy()
+        }
+    }
+
+    fun readViewSettings(settingsJson: String?): RouteGraphViewSettings {
+        return if (settingsJson != null){
+            jsonWithUnknownKeys.decodeFromString<RouteGraphViewSettings>(settingsJson)
+        } else {
+            val defaultSettings = jsonWithUnknownKeys.decodeFromString<RouteGraphViewSettings>(
+                RouteGraphViewSettings.defaultSettings)
 
             defaultSettings.copy()
         }
@@ -65,6 +78,14 @@ class KarooSystemServiceProvider(private val context: Context) {
         }
     }
 
+    suspend fun saveViewSettings(function: (settings: RouteGraphViewSettings) -> RouteGraphViewSettings) {
+        context.dataStore.edit { t ->
+            val settings = readViewSettings(t[viewSettingsKey])
+            val newSettings = function(settings)
+            t[viewSettingsKey] = jsonWithUnknownKeys.encodeToString(newSettings)
+        }
+    }
+
     fun streamSettings(): Flow<RouteGraphSettings> {
         return context.dataStore.data.map { settingsJson ->
             try {
@@ -72,6 +93,17 @@ class KarooSystemServiceProvider(private val context: Context) {
             } catch(e: Throwable){
                 Log.e(TAG, "Failed to read preferences", e)
                 jsonWithUnknownKeys.decodeFromString<RouteGraphSettings>(RouteGraphSettings.defaultSettings)
+            }
+        }.distinctUntilChanged()
+    }
+
+    fun streamViewSettings(): Flow<RouteGraphViewSettings> {
+        return context.dataStore.data.map { settingsJson ->
+            try {
+                readViewSettings(settingsJson[viewSettingsKey])
+            } catch(e: Throwable){
+                Log.e(TAG, "Failed to read preferences", e)
+                jsonWithUnknownKeys.decodeFromString<RouteGraphViewSettings>(RouteGraphViewSettings.defaultSettings)
             }
         }.distinctUntilChanged()
     }
