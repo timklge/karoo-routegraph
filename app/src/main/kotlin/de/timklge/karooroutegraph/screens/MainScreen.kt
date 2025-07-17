@@ -70,7 +70,7 @@ data class RouteGraphSettings(
     val showNavigateButtonOnGraphs: Boolean = true,
     val hereMapsApiKey: String = "",
     val gradientIndicatorFrequency: GradientIndicatorFrequency = GradientIndicatorFrequency.HIGH,
-    val poiDistanceToRouteMaxMeters: Double = 500.0
+    val poiDistanceToRouteMaxMeters: Double = 1000.0
 ){
 
     companion object {
@@ -102,6 +102,7 @@ fun MainScreen(onFinish: () -> Unit) {
     var showNavigateButtonOnGraphs by remember { mutableStateOf(true) }
     var hereMapsApiKey by remember { mutableStateOf("") }
     var enableTrafficIncidentReporting by remember { mutableStateOf(false) }
+    var poiDistanceToRouteMaxMeters by remember { mutableStateOf(1000.0) }
     var apiTestDialogVisible by remember { mutableStateOf(false) }
     var apiTestDialogPending by remember { mutableStateOf(false) }
     var apiTestErrorMessage by remember { mutableStateOf("") }
@@ -117,7 +118,8 @@ fun MainScreen(onFinish: () -> Unit) {
             hereMapsApiKey = hereMapsApiKey,
             gradientIndicatorFrequency = gradientIndicatorFrequency,
             enableTrafficIncidentReporting = enableTrafficIncidentReporting,
-            showNavigateButtonOnGraphs = showNavigateButtonOnGraphs
+            showNavigateButtonOnGraphs = showNavigateButtonOnGraphs,
+            poiDistanceToRouteMaxMeters = poiDistanceToRouteMaxMeters
         )
 
         saveSettings(ctx, newSettings)
@@ -132,6 +134,7 @@ fun MainScreen(onFinish: () -> Unit) {
             hereMapsApiKey = settings.hereMapsApiKey
             enableTrafficIncidentReporting = settings.enableTrafficIncidentReporting
             showNavigateButtonOnGraphs = settings.showNavigateButtonOnGraphs
+            poiDistanceToRouteMaxMeters = settings.poiDistanceToRouteMaxMeters
         }
     }
 
@@ -231,6 +234,34 @@ fun MainScreen(onFinish: () -> Unit) {
                             })
                             Spacer(modifier = Modifier.width(10.dp))
                             Text("Show navigate button on graphs")
+                        }
+
+                        // POI Distance Slider
+                        val poiDistanceOptions = arrayOf(200.0, 500.0, 1_000.0, 2_000.0, 5_000.0, 10_000.0)
+                        val selectedPoiDistanceIndex = poiDistanceOptions.indexOf(poiDistanceToRouteMaxMeters)
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text("POI search distance from route:")
+                            Slider(
+                                value = selectedPoiDistanceIndex.toFloat(),
+                                onValueChange = { idx ->
+                                    val newIndex = idx.roundToInt().coerceIn(poiDistanceOptions.indices)
+                                    poiDistanceToRouteMaxMeters = poiDistanceOptions[newIndex]
+                                    coroutineScope.launch { updateSettings() }
+                                },
+                                valueRange = 0f..(poiDistanceOptions.size - 1).toFloat(),
+                                steps = poiDistanceOptions.size - 2,
+                                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp),
+                            )
+                            Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                poiDistanceOptions.forEach { distance ->
+                                    val label = if (distance >= 1000.0) {
+                                        "${(distance / 1000.0).toInt()}km"
+                                    } else {
+                                        "${distance.toInt()}m"
+                                    }
+                                    Text(label, style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically) {

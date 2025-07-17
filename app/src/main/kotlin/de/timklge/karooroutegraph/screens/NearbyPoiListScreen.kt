@@ -16,10 +16,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
@@ -115,11 +118,16 @@ fun NearbyPoiListScreen() {
     val locationViewModelProvider = koinInject<LocationViewModelProvider>()
     val routeGraphViewModelProvider = koinInject<RouteGraphViewModelProvider>()
 
-    val maxDistanceFromRoute = 1_000.0
+    var maxDistanceFromRoute by remember { mutableStateOf(1_000.0) }
 
     LaunchedEffect(Unit) {
-        val settings = karooSystemServiceProvider.streamViewSettings().first()
-        selectedSort = settings.poiSortOptionForNearbyPois
+        val viewSettings = karooSystemServiceProvider.streamViewSettings().first()
+        selectedSort = viewSettings.poiSortOptionForNearbyPois
+    }
+
+    LaunchedEffect(Unit) {
+        val settings = karooSystemServiceProvider.streamSettings().first()
+        maxDistanceFromRoute = settings.poiDistanceToRouteMaxMeters
     }
 
     var pois by remember { mutableStateOf(emptyList<NearbyPoi>()) }
@@ -382,6 +390,8 @@ fun NearbyPoiListScreen() {
             }
 
             items(pois) { poi ->
+                var showContextMenu by remember { mutableStateOf(false) }
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -419,30 +429,51 @@ fun NearbyPoiListScreen() {
                         }
                     }
 
-                    if (poi.element.hasAdditionalInfo()) {
+                    Box {
                         IconButton(
-                            onClick = {
-                                openingHoursText = poi.element.tags?.map { (k, v) -> "$k=$v" }?.joinToString("\r\n") ?: "No info available" // poi.tags?.get("opening_hours") ?: "No opening hours info"
-                                showOpeningHoursDialog = true
-                            },
+                            onClick = { showContextMenu = true }
                         ) {
                             Icon(
-                                painter = painterResource(id = R.drawable.bx_info_circle),
-                                contentDescription = "Info"
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "More options"
                             )
                         }
-                    }
 
+                        DropdownMenu(
+                            expanded = showContextMenu,
+                            onDismissRequest = { showContextMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Navigate") },
+                                onClick = {
+                                    showContextMenu = false
+                                    karooSystemServiceProvider.karooSystemService.dispatch(LaunchPinDrop(poi.poi))
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.bxmap),
+                                        contentDescription = "Navigate"
+                                    )
+                                }
+                            )
 
-                    IconButton(
-                        onClick = {
-                            karooSystemServiceProvider.karooSystemService.dispatch(LaunchPinDrop(poi.poi))
-                        },
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.bxmap),
-                            contentDescription = "POI"
-                        )
+                            if (poi.element.hasAdditionalInfo()) {
+                                DropdownMenuItem(
+                                    text = { Text("Show info") },
+                                    onClick = {
+                                        showContextMenu = false
+                                        openingHoursText = poi.element.tags?.map { (k, v) -> "$k=$v" }?.joinToString("\r\n") ?: "No info available"
+                                        showOpeningHoursDialog = true
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.bx_info_circle),
+                                            contentDescription = "Show info"
+                                        )
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
             }

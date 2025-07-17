@@ -51,7 +51,7 @@ fun calculatePoiDistances(polyline: LineString, pois: List<POI>, maxDistanceToRo
             val nearestPoints = buildList<NearestPoint> {
                 nearestPointCandidates.forEach { candidate ->
                     val existingCandidate = this@buildList.find { existingPoint ->
-                        (existingPoint.distanceFromRouteStart - candidate.distanceFromRouteStart).absoluteValue < 2_000
+                        (existingPoint.distanceFromRouteStart - candidate.distanceFromRouteStart).absoluteValue < maxDistanceToRoute * 2
                     }
 
                     if (existingCandidate != null){
