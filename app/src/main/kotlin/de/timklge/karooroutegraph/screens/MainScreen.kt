@@ -1,5 +1,6 @@
 package de.timklge.karooroutegraph.screens
 
+import android.content.Intent
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -21,6 +22,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -48,6 +50,7 @@ import androidx.compose.ui.window.Dialog
 import com.mapbox.geojson.Point
 import de.timklge.karooroutegraph.GradientIndicatorFrequency
 import de.timklge.karooroutegraph.KarooRouteGraphExtension
+import de.timklge.karooroutegraph.POIActivity
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.incidents.HereMapsIncidentProvider
 import de.timklge.karooroutegraph.saveSettings
@@ -239,7 +242,7 @@ fun MainScreen(onFinish: () -> Unit) {
                         }
 
                         // POI Approach Alert Distance Slider
-                        val poiApproachAlertOptions = arrayOf(200.0, 500.0, 1_000.0, 2_000.0, 5_000.0)
+                        val poiApproachAlertOptions = arrayOf(0.0, 200.0, 500.0, 1_000.0, 2_000.0, 5_000.0)
                         val selectedApproachAlertIndex = poiApproachAlertOptions.indexOf(poiApproachAlertAtDistance)
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Text("POI approach alert distance:")
@@ -256,7 +259,9 @@ fun MainScreen(onFinish: () -> Unit) {
                             )
                             Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                                 poiApproachAlertOptions.forEach { distance ->
-                                    val label = if (distance >= 1000.0) {
+                                    val label = if (distance == 0.0){
+                                        "Off"
+                                    } else if (distance >= 1000.0) {
                                         "${(distance / 1000.0).toInt()}km"
                                     } else {
                                         "${distance.toInt()}m"
@@ -347,6 +352,25 @@ fun MainScreen(onFinish: () -> Unit) {
                                 }) {
                                 Text("Test API Key")
                             }
+                        }
+
+                        // POI Management Button
+                        FilledTonalButton(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(40.dp),
+                            onClick = {
+                                val intent = Intent(ctx, POIActivity::class.java)
+                                ctx.startActivity(intent)
+                            }
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.bxmap),
+                                contentDescription = "Manage POIs",
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Manage POIs")
                         }
 
                         Spacer(modifier = Modifier.padding(30.dp))

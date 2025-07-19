@@ -94,7 +94,11 @@ class PoiApproachAlertService(
 
             combine(karooSystemServiceProvider.streamSettings(), viewModelProvider.viewModelFlow, locationViewModelProvider.viewModelFlow, karooSystemServiceProvider.stream<UserProfile>()) { settings, viewModel, currentPosition, profile ->
                 StreamData(settings, viewModel, currentPosition, profile)
-            }.throttle(5_000L).filter { streamData -> streamData.settings.poiApproachAlertAtDistance != null }.collect { streamData ->
+            }
+            .throttle(5_000L)
+            .filter { streamData ->
+                streamData.settings.poiApproachAlertAtDistance != null && streamData.settings.poiApproachAlertAtDistance != 0.0
+            }.collect { streamData ->
                 val settings = streamData.settings
                 val viewModel = streamData.viewModel
                 val currentPosition = streamData.currentPosition
