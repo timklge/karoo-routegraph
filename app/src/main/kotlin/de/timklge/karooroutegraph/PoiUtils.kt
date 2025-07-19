@@ -30,19 +30,25 @@ sealed class DistanceToPoiResult : Comparable<DistanceToPoiResult> {
         }
     }
 
-    fun formatDistance(isImperial: Boolean): String {
+    fun formatDistance(isImperial: Boolean, flat: Boolean = false): String {
         return when (this){
             is LinearDistance -> de.timklge.karooroutegraph.screens.formatDistance(
                 distance,
                 isImperial
             )
-            is AheadOnRouteDistance -> de.timklge.karooroutegraph.screens.formatDistance(
-                distanceOnRoute,
-                isImperial
-            ) + " ahead, " + de.timklge.karooroutegraph.screens.formatDistance(
-                distanceFromPointOnRoute,
-                isImperial
-            ) + " from route"
+            is AheadOnRouteDistance -> {
+                if (flat){
+                    de.timklge.karooroutegraph.screens.formatDistance (distanceOnRoute + distanceFromPointOnRoute, isImperial)
+                } else {
+                    de.timklge.karooroutegraph.screens.formatDistance(
+                        distanceOnRoute,
+                        isImperial
+                    ) + " ahead, " + de.timklge.karooroutegraph.screens.formatDistance(
+                        distanceFromPointOnRoute,
+                        isImperial
+                    ) + " from route"
+                }
+            }
         }
     }
 }
@@ -145,7 +151,7 @@ private fun calculatePoiDistance(polyline: LineString, poi: POI, maxDistanceToRo
     return buildList {
         nearestPointCandidates.forEach { candidate ->
             val existingCandidate = this@buildList.find { existingPoint ->
-                (existingPoint.distanceFromRouteStart - candidate.distanceFromRouteStart).absoluteValue < maxDistanceToRoute * 1.5
+                (existingPoint.distanceFromRouteStart - candidate.distanceFromRouteStart).absoluteValue < maxDistanceToRoute * 2
             }
 
             if (existingCandidate != null){

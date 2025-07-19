@@ -74,6 +74,7 @@ fun MainScreen(onFinish: () -> Unit) {
     var hereMapsApiKey by remember { mutableStateOf("") }
     var enableTrafficIncidentReporting by remember { mutableStateOf(false) }
     var poiDistanceToRouteMaxMeters by remember { mutableDoubleStateOf(1000.0) }
+    var poiApproachAlertAtDistance by remember { mutableDoubleStateOf(500.0) }
     var apiTestDialogVisible by remember { mutableStateOf(false) }
     var apiTestDialogPending by remember { mutableStateOf(false) }
     var apiTestErrorMessage by remember { mutableStateOf("") }
@@ -90,7 +91,8 @@ fun MainScreen(onFinish: () -> Unit) {
             gradientIndicatorFrequency = gradientIndicatorFrequency,
             enableTrafficIncidentReporting = enableTrafficIncidentReporting,
             showNavigateButtonOnGraphs = showNavigateButtonOnGraphs,
-            poiDistanceToRouteMaxMeters = poiDistanceToRouteMaxMeters
+            poiDistanceToRouteMaxMeters = poiDistanceToRouteMaxMeters,
+            poiApproachAlertAtDistance = poiApproachAlertAtDistance
         )
 
         saveSettings(ctx, newSettings)
@@ -106,6 +108,7 @@ fun MainScreen(onFinish: () -> Unit) {
             enableTrafficIncidentReporting = settings.enableTrafficIncidentReporting
             showNavigateButtonOnGraphs = settings.showNavigateButtonOnGraphs
             poiDistanceToRouteMaxMeters = settings.poiDistanceToRouteMaxMeters
+            poiApproachAlertAtDistance = settings.poiApproachAlertAtDistance ?: 500.0
         }
     }
 
@@ -207,11 +210,11 @@ fun MainScreen(onFinish: () -> Unit) {
                             Text("Show navigate button on graphs")
                         }
 
-                        // POI Distance Slider
-                        val poiDistanceOptions = arrayOf(200.0, 500.0, 1_000.0, 2_000.0, 5_000.0, 10_000.0)
+                        // Max POI Distance from Route Slider
+                        val poiDistanceOptions = arrayOf(200.0, 500.0, 1_000.0, 2_000.0, 5_000.0)
                         val selectedPoiDistanceIndex = poiDistanceOptions.indexOf(poiDistanceToRouteMaxMeters)
                         Column(modifier = Modifier.fillMaxWidth()) {
-                            Text("POI search distance from route:")
+                            Text("Max POI distance from route:")
                             Slider(
                                 value = selectedPoiDistanceIndex.toFloat(),
                                 onValueChange = { idx ->
@@ -225,6 +228,34 @@ fun MainScreen(onFinish: () -> Unit) {
                             )
                             Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                                 poiDistanceOptions.forEach { distance ->
+                                    val label = if (distance >= 1000.0) {
+                                        "${(distance / 1000.0).toInt()}km"
+                                    } else {
+                                        "${distance.toInt()}m"
+                                    }
+                                    Text(label, style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
+
+                        // POI Approach Alert Distance Slider
+                        val poiApproachAlertOptions = arrayOf(200.0, 500.0, 1_000.0, 2_000.0, 5_000.0)
+                        val selectedApproachAlertIndex = poiApproachAlertOptions.indexOf(poiApproachAlertAtDistance)
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text("POI approach alert distance:")
+                            Slider(
+                                value = selectedApproachAlertIndex.toFloat(),
+                                onValueChange = { idx ->
+                                    val newIndex = idx.roundToInt().coerceIn(poiApproachAlertOptions.indices)
+                                    poiApproachAlertAtDistance = poiApproachAlertOptions[newIndex]
+                                    coroutineScope.launch { updateSettings() }
+                                },
+                                valueRange = 0f..(poiApproachAlertOptions.size - 1).toFloat(),
+                                steps = poiApproachAlertOptions.size - 2,
+                                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp),
+                            )
+                            Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                poiApproachAlertOptions.forEach { distance ->
                                     val label = if (distance >= 1000.0) {
                                         "${(distance / 1000.0).toInt()}km"
                                     } else {

@@ -381,6 +381,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         Log.d(TAG, "Starting graph updater")
 
         var knownRoute: LineString? = null
+        var knownPois: Set<POI> = mutableSetOf()
         var knownSettings: RouteGraphSettings? = null
         var knownRouteElevation: SampledElevationData? = null
         var knownIncidents: IncidentsResponse? = null
@@ -609,6 +610,8 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 val localPois = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.pois.orEmpty().map { symbol -> POI(symbol = symbol, type = PoiType.POI) }
                 val globalPois = globalPOIs.pois.map { poi -> POI(poi) }
                 val pois = tempPoiSymbols + globalPois + localPois + incidentPois
+                val poisChanged = knownPois != pois.toSet()
+                knownPois = pois.toSet()
 
                 val currentDistanceAlongRoute = if (routeDistance != null && locationAndRemainingRouteDistance.remainingRouteDistance != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute){
                     if (navigationStateEvent.rejoinDistance == null) {
@@ -632,7 +635,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
                 Log.d(TAG, "Received navigation state: $navigationStateEvent")
 
-                if (routeChanged){
+                if (routeChanged || poisChanged) {
                     if (routeLineString != null){
                         Log.i(TAG, "Route changed, recalculating POI distances")
 

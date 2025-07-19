@@ -15,7 +15,8 @@ data class RouteGraphSettings(
     val hereMapsApiKey: String = "",
     val gradientIndicatorFrequency: GradientIndicatorFrequency = GradientIndicatorFrequency.HIGH,
     val poiDistanceToRouteMaxMeters: Double = 1000.0,
-    val poiApproachAlertAtDistance: Double = 500.0
+    val poiApproachAlertAtDistance: Double? = 500.0,
+    val poiApproachAlertReminderIntervalSeconds: Int = 300,
 ){
 
     companion object {
