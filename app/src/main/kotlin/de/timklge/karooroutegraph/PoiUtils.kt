@@ -4,7 +4,7 @@ import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
 import com.mapbox.turf.TurfConstants
 import com.mapbox.turf.TurfMeasurement
-import com.mapbox.turf.TurfMisc
+import de.timklge.karooroutegraph.screens.PoiSortOption
 import io.hammerhead.karooext.models.Symbol
 import kotlin.math.absoluteValue
 
@@ -16,56 +16,178 @@ enum class PoiType {
 
 data class POI(val symbol: Symbol.POI, val type: PoiType = PoiType.POI)
 
+sealed class DistanceToPoiResult : Comparable<DistanceToPoiResult> {
+    data class LinearDistance(val distance: Double) : DistanceToPoiResult()
+    data class AheadOnRouteDistance(val distanceOnRoute: Double, val distanceFromPointOnRoute: Double) : DistanceToPoiResult()
+
+    override fun compareTo(other: DistanceToPoiResult): Int {
+        return when {
+            this is LinearDistance && other is LinearDistance -> this.distance.compareTo(other.distance)
+            this is AheadOnRouteDistance && other is AheadOnRouteDistance -> (this.distanceOnRoute + this.distanceFromPointOnRoute).compareTo(other.distanceOnRoute + other.distanceFromPointOnRoute)
+            this is LinearDistance && other is AheadOnRouteDistance -> 1 // Linear distance is always greater than ahead on route distance
+            this is AheadOnRouteDistance && other is LinearDistance -> -1 // Ahead on route distance is always less than linear distance
+            else -> 0 // Should not happen, but just in case
+        }
+    }
+
+    fun formatDistance(isImperial: Boolean): String {
+        return when (this){
+            is LinearDistance -> de.timklge.karooroutegraph.screens.formatDistance(
+                distance,
+                isImperial
+            )
+            is AheadOnRouteDistance -> de.timklge.karooroutegraph.screens.formatDistance(
+                distanceOnRoute,
+                isImperial
+            ) + " ahead, " + de.timklge.karooroutegraph.screens.formatDistance(
+                distanceFromPointOnRoute,
+                isImperial
+            ) + " from route"
+        }
+    }
+}
+
 /**
- * Calculate the distances of the given POIs to the given polyline.
+ * Calculate the distances of all POIs to the given polyline asynchronously.
+ *
+ * @param polyline The polyline to calculate distances against.
+ * @param pois The list of POIs to calculate distances for.
+ * @param maxDistanceToRoute The maximum distance from the route to consider a POI as relevant.
+ * @return A map of POIs to their nearest points on the route and distances.
  */
-fun calculatePoiDistances(polyline: LineString, pois: List<POI>, maxDistanceToRoute: Double): Map<POI, List<NearestPoint>> {
-    val pointList: MutableList<Point> = mutableListOf(Point.fromLngLat(0.0, 0.0), Point.fromLngLat(0.0, 0.0))
+suspend fun calculatePoiDistancesAsync(polyline: LineString, pois: List<POI>, maxDistanceToRoute: Double): Map<POI, List<NearestPoint>> {
+    /* return coroutineScope {
+        val deferredResults = pois.map { poi ->
+            async {
+                poi to calculatePoiDistance(polyline, poi, maxDistanceToRoute)
+            }
+        }
 
-    return buildMap {
-        pois.forEach { poi ->
-            val nearestPointCandidates = mutableListOf<NearestPoint>()
-            var currentRouteDistance = 0.0f
+        deferredResults.awaitAll().toMap()
+    } */
 
-            val coordinates = polyline.coordinates()
-            for (i in 1 until coordinates.size){
-                val startPoint = coordinates[i - 1]
-                val endPoint = coordinates[i]
-                pointList[0] = startPoint
-                pointList[1] = endPoint
+    return pois.associateWith { poi ->
+        val nearestPoints = calculatePoiDistance(polyline, poi, maxDistanceToRoute)
 
-                val poiPoint = Point.fromLngLat(poi.symbol.lng, poi.symbol.lat)
-                val nearestPoint = TurfMisc.nearestPointOnLine(poiPoint, pointList, TurfConstants.UNIT_METERS)
-                val nearestPointDist = nearestPoint.getNumberProperty("dist")?.toFloat()
-                val nearestPointPoint = nearestPoint.geometry() as? Point
+        nearestPoints
+    }
+}
 
-                if (nearestPointDist != null && nearestPointPoint != null && nearestPointDist < maxDistanceToRoute){
-                    val nearestPointRouteDistance = currentRouteDistance + TurfMeasurement.distance(startPoint, nearestPointPoint, TurfConstants.UNIT_METERS).toFloat()
-                    nearestPointCandidates.add(NearestPoint(nearestPointPoint, nearestPointDist, nearestPointRouteDistance, poiPoint))
-                }
+/**
+ * Get the nearest point on a line segment defined by two points (startPoint and endPoint) to a given point (poiPoint).
+ *
+ * @param poiPoint The point for which we want to find the nearest point on the line segment.
+ * @param startPoint The start point of the line segment.
+ * @param endPoint The end point of the line segment.
+ * @return The nearest point on the line segment to the given point.
+ */
+private fun getNearestPointOnLine(poiPoint: Point, startPoint: Point, endPoint: Point): Point {
+    val x1 = startPoint.longitude()
+    val y1 = startPoint.latitude()
+    val x2 = endPoint.longitude()
+    val y2 = endPoint.latitude()
+    val px = poiPoint.longitude()
+    val py = poiPoint.latitude()
 
-                currentRouteDistance += TurfMeasurement.distance(startPoint, endPoint, TurfConstants.UNIT_METERS).toFloat()
+    // Vector from start to end point
+    val dx = x2 - x1
+    val dy = y2 - y1
+
+    // If start and end points are the same, return start point
+    if (dx == 0.0 && dy == 0.0) {
+        return startPoint
+    }
+
+    // Calculate the parameter t for the projection
+    // t represents the position along the line segment (0 = start, 1 = end)
+    val t = ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)
+
+    // Clamp t to [0, 1] to ensure the point lies on the line segment
+    val clampedT = t.coerceIn(0.0, 1.0)
+
+    // Calculate the nearest point coordinates
+    val nearestX = x1 + clampedT * dx
+    val nearestY = y1 + clampedT * dy
+
+    return Point.fromLngLat(nearestX, nearestY)
+}
+
+/**
+ * Calculate the distance from a POI to the nearest point on a polyline.
+ *
+ * @param polyline The polyline to calculate distances against.
+ * @param poi The POI to calculate distances for.
+ * @param maxDistanceToRoute The maximum distance from the route to consider a POI as relevant.
+ * @return A list of nearest points on the route with their distances.
+ */
+private fun calculatePoiDistance(polyline: LineString, poi: POI, maxDistanceToRoute: Double): List<NearestPoint> {
+    val nearestPointCandidates = mutableListOf<NearestPoint>()
+    var currentRouteDistance = 0.0f
+    val poiPoint = Point.fromLngLat(poi.symbol.lng, poi.symbol.lat)
+
+    val coordinates = polyline.coordinates()
+    for (i in 1 until coordinates.size){
+        val startPoint = coordinates[i - 1]
+        val endPoint = coordinates[i]
+
+        val nearestPointOnSegment = getNearestPointOnLine(poiPoint, startPoint, endPoint)
+        val nearestPointDist = TurfMeasurement.distance(poiPoint, nearestPointOnSegment, TurfConstants.UNIT_METERS).toFloat()
+
+        if (nearestPointDist < maxDistanceToRoute){
+            val nearestPointRouteDistance = currentRouteDistance + TurfMeasurement.distance(startPoint, nearestPointOnSegment, TurfConstants.UNIT_METERS).toFloat()
+            nearestPointCandidates.add(NearestPoint(nearestPointOnSegment, nearestPointDist, nearestPointRouteDistance, poiPoint))
+        }
+
+        currentRouteDistance += TurfMeasurement.distance(startPoint, endPoint, TurfConstants.UNIT_METERS).toFloat()
+    }
+
+    // Cluster nearest point candidates together
+    return buildList {
+        nearestPointCandidates.forEach { candidate ->
+            val existingCandidate = this@buildList.find { existingPoint ->
+                (existingPoint.distanceFromRouteStart - candidate.distanceFromRouteStart).absoluteValue < maxDistanceToRoute * 1.5
             }
 
-            // Cluster nearest point candidates together
-            val nearestPoints = buildList<NearestPoint> {
-                nearestPointCandidates.forEach { candidate ->
-                    val existingCandidate = this@buildList.find { existingPoint ->
-                        (existingPoint.distanceFromRouteStart - candidate.distanceFromRouteStart).absoluteValue < maxDistanceToRoute * 2
-                    }
-
-                    if (existingCandidate != null){
-                        if (candidate.distanceFromPointOnRoute < existingCandidate.distanceFromPointOnRoute){
-                            this@buildList.remove(existingCandidate)
-                            this@buildList.add(candidate)
-                        }
-                    } else {
-                        this@buildList.add(candidate)
-                    }
+            if (existingCandidate != null){
+                if (candidate.distanceFromPointOnRoute < existingCandidate.distanceFromPointOnRoute){
+                    this@buildList.remove(existingCandidate)
+                    this@buildList.add(candidate)
                 }
+            } else {
+                this@buildList.add(candidate)
+            }
+        }
+    }
+}
+
+fun distanceToPoi(poi: Symbol.POI, nearestPointsOnRouteToFoundPois: Map<POI, List<NearestPoint>>?, currentPosition: Point?, selectedSort: PoiSortOption, distanceAlongRoute: Float?): DistanceToPoiResult? {
+    val linearDistance = currentPosition?.let {
+        TurfMeasurement.distance(
+            Point.fromLngLat(poi.lng, poi.lat),
+            it,
+            TurfConstants.UNIT_METERS
+        )
+    }
+
+    when (selectedSort) {
+        PoiSortOption.LINEAR_DISTANCE -> {
+            return linearDistance?.let { DistanceToPoiResult.LinearDistance(it) }
+        }
+        PoiSortOption.AHEAD_ON_ROUTE -> {
+            val nearestPoints = nearestPointsOnRouteToFoundPois?.entries?.find { it.key.symbol == poi }?.value
+            val nearestPointsAheadOnRoute = nearestPoints?.filter { it.distanceFromRouteStart >= (distanceAlongRoute ?: 0f) }
+            val nearestPointAheadOnRoute = nearestPointsAheadOnRoute?.minByOrNull { it.distanceFromPointOnRoute + it.distanceFromRouteStart }
+
+            val distanceAheadOnRoute = nearestPointAheadOnRoute?.let {
+                DistanceToPoiResult.AheadOnRouteDistance(
+                    it.distanceFromRouteStart.toDouble() - (distanceAlongRoute ?: 0.0f),
+                    it.distanceFromPointOnRoute.toDouble()
+                )
             }
 
-            put(poi, nearestPoints)
+            val linearDistanceResult = linearDistance?.let { DistanceToPoiResult.LinearDistance(it) }
+
+            return distanceAheadOnRoute ?: linearDistanceResult
         }
     }
 }

@@ -34,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -55,38 +56,8 @@ import io.hammerhead.karooext.KarooSystemService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import org.koin.compose.koinInject
 import kotlin.math.roundToInt
-
-@Serializable
-data class RouteGraphSettings(
-    val showGradientIndicatorsOnMap: Boolean = false,
-    val showPOILabelsOnMinimap: Boolean = true,
-    val welcomeDialogAccepted: Boolean = false,
-    val enableTrafficIncidentReporting: Boolean = false,
-    val showNavigateButtonOnGraphs: Boolean = true,
-    val hereMapsApiKey: String = "",
-    val gradientIndicatorFrequency: GradientIndicatorFrequency = GradientIndicatorFrequency.HIGH,
-    val poiDistanceToRouteMaxMeters: Double = 1000.0
-){
-
-    companion object {
-        val defaultSettings = Json.encodeToString(RouteGraphSettings())
-    }
-}
-
-@Serializable
-data class RouteGraphViewSettings(
-    val poiSortOptionForCustomPois: PoiSortOption = PoiSortOption.LINEAR_DISTANCE,
-    val poiSortOptionForNearbyPois: PoiSortOption = PoiSortOption.LINEAR_DISTANCE
-){
-    companion object {
-        val defaultSettings = Json.encodeToString(RouteGraphViewSettings())
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,7 +73,7 @@ fun MainScreen(onFinish: () -> Unit) {
     var showNavigateButtonOnGraphs by remember { mutableStateOf(true) }
     var hereMapsApiKey by remember { mutableStateOf("") }
     var enableTrafficIncidentReporting by remember { mutableStateOf(false) }
-    var poiDistanceToRouteMaxMeters by remember { mutableStateOf(1000.0) }
+    var poiDistanceToRouteMaxMeters by remember { mutableDoubleStateOf(1000.0) }
     var apiTestDialogVisible by remember { mutableStateOf(false) }
     var apiTestDialogPending by remember { mutableStateOf(false) }
     var apiTestErrorMessage by remember { mutableStateOf("") }

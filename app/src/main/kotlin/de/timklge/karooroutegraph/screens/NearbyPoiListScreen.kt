@@ -36,7 +36,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,7 +63,8 @@ import de.timklge.karooroutegraph.OverpassResponse
 import de.timklge.karooroutegraph.POI
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
-import de.timklge.karooroutegraph.calculatePoiDistances
+import de.timklge.karooroutegraph.calculatePoiDistancesAsync
+import de.timklge.karooroutegraph.distanceToPoi
 import io.hammerhead.karooext.models.LaunchPinDrop
 import io.hammerhead.karooext.models.Symbol
 import io.hammerhead.karooext.models.UserProfile
@@ -87,15 +87,23 @@ enum class NearbyPoiCategory(val label: String, val osmTag: String) {
     HOTEL("Hotel", "tourism=hotel"),
     TRAIN_STATION("Train Station", "railway=station"),
     WASTE_BASKET("Waste Basket", "amenity=waste_basket"),
+    BENCH("Bench", "amenity=bench"),
     BIKE_SHOP("Bike Shop", "shop=bicycle"),
 }
 
 data class NearbyPoi(val element: Element, val poi: Symbol.POI)
 
 fun formatDistance(distanceMeters: Double, isImperial: Boolean): String {
-    return distanceMeters.let {
-        if (isImperial){
+    return if (isImperial) {
+        val distanceFeet = distanceMeters * 3.28084
+        if (distanceFeet < 5280) { // Less than 1 mile
+            String.format(java.util.Locale.getDefault(), "%.0f ft", distanceFeet)
+        } else {
             String.format(java.util.Locale.getDefault(), "%.1f mi", distanceMeters * 0.000621371)
+        }
+    } else {
+        if (distanceMeters < 1000) { // Less than 1 km
+            String.format(java.util.Locale.getDefault(), "%.0f m", distanceMeters)
         } else {
             String.format(java.util.Locale.getDefault(), "%.1f km", distanceMeters / 1000)
         }
@@ -145,10 +153,17 @@ fun NearbyPoiListScreen() {
 
     val currentPosition by locationViewModelProvider.viewModelFlow.collectAsStateWithLifecycle(null)
     val viewModel by routeGraphViewModelProvider.viewModelFlow.collectAsStateWithLifecycle(null)
+    val temporaryPois by karooSystemServiceProvider.streamTemporaryPOIs().collectAsStateWithLifecycle(RouteGraphTemporaryPOIs())
+    var nearestPointsOnRouteToFoundPois by remember { mutableStateOf<Map<POI, List<NearestPoint>>>(mapOf()) }
 
-    val nearestPointsOnRouteToFoundPois by remember { derivedStateOf { viewModel?.knownRoute?.let { route ->
-        calculatePoiDistances(route, pois.map { POI(it.poi) }, maxDistanceFromRoute)
-    } ?: emptyMap() } }
+    LaunchedEffect(viewModel?.knownRoute, pois) {
+        val route = viewModel?.knownRoute
+
+        if (route != null) {
+            val distances = calculatePoiDistancesAsync(route, pois.map { POI(it.poi) }, maxDistanceFromRoute)
+            nearestPointsOnRouteToFoundPois = distances
+        }
+    }
 
     fun linearDistanceToPoi(poi: NearbyPoi): Double? {
         return currentPosition?.let { currentPosition ->
@@ -156,21 +171,6 @@ fun NearbyPoiListScreen() {
                 Point.fromLngLat(poi.element.lon, poi.element.lat),
                 currentPosition,
                 TurfConstants.UNIT_METERS
-            )
-        }
-    }
-
-    data class DistanceOnRouteToPoiResult(val distanceOnRoute: Double, val distanceFromPointOnRoute: Double)
-
-    fun distanceOnRouteToPoi(poi: NearbyPoi, nearestPointsOnRouteToFoundPois: Map<POI, List<NearestPoint>>, distanceAlongRoute: Float?): DistanceOnRouteToPoiResult? {
-        val nearestPoints = nearestPointsOnRouteToFoundPois.entries.find { it.key.symbol == poi.poi }?.value
-        val nearestPointsAheadOnRoute = nearestPoints?.filter { it.distanceFromRouteStart >= (distanceAlongRoute ?: 0f) }
-        val nearestPointAheadOnRoute = nearestPointsAheadOnRoute?.minByOrNull { it.distanceFromPointOnRoute + it.distanceFromRouteStart }
-
-        return nearestPointAheadOnRoute?.let {
-            DistanceOnRouteToPoiResult(
-                distanceOnRoute = it.distanceFromRouteStart.toDouble() - (distanceAlongRoute ?: 0.0f),
-                distanceFromPointOnRoute = it.distanceFromPointOnRoute.toDouble()
             )
         }
     }
@@ -261,13 +261,11 @@ fun NearbyPoiListScreen() {
                             isRefreshing = false
                         } else {
                             val newNearestPointsOnRouteToFoundPois = viewModel?.knownRoute?.let { route ->
-                                calculatePoiDistances(route, mappedPois.map { POI(it.poi) }, maxDistanceFromRoute)
+                                calculatePoiDistancesAsync(route, mappedPois.map { POI(it.poi) }, maxDistanceFromRoute)
                             } ?: emptyMap()
 
                             pois = mappedPois.sortedBy { poi ->
-                                val result = distanceOnRouteToPoi(poi, newNearestPointsOnRouteToFoundPois, viewModel?.distanceAlongRoute)
-
-                                result?.distanceOnRoute?.plus(result.distanceFromPointOnRoute) ?: Double.MAX_VALUE
+                                distanceToPoi(poi.poi, newNearestPointsOnRouteToFoundPois, currentPos, selectedSort, viewModel?.distanceAlongRoute)
                             }
                         }
                     }
@@ -367,7 +365,12 @@ fun NearbyPoiListScreen() {
                         )
                     }
 
-                    IconButton(onClick = { showSortDialog = true }) {
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    IconButton(
+                        onClick = { showSortDialog = true },
+                        modifier = Modifier.padding(0.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Settings,
                             contentDescription = "Sort Options"
@@ -412,11 +415,9 @@ fun NearbyPoiListScreen() {
 
                                 distanceMeters?.let { distance -> formatDistance(distance, isImperial) }
                             } else {
-                                val result = distanceOnRouteToPoi(poi, nearestPointsOnRouteToFoundPois, viewModel?.distanceAlongRoute)
+                                val result = distanceToPoi(poi.poi, nearestPointsOnRouteToFoundPois, currentPosition, selectedSort, viewModel?.distanceAlongRoute)
 
-                                result?.let {
-                                    "In ${formatDistance(it.distanceOnRoute, isImperial)}, ${formatDistance(it.distanceFromPointOnRoute, isImperial)} from route"
-                                }
+                                result?.formatDistance(isImperial)
                             }
                         }
 
@@ -456,6 +457,47 @@ fun NearbyPoiListScreen() {
                                     )
                                 }
                             )
+
+                            if (!temporaryPois.poisByOsmId.contains(poi.element.id)) {
+                                DropdownMenuItem(
+                                    text = { Text("Add to map") },
+                                    onClick = {
+                                        showContextMenu = false
+
+                                        coroutineScope.launch {
+                                            delay(100) // fixme delay to ensure the menu closes before saving
+
+                                            karooSystemServiceProvider.saveTemporaryPOIs {
+                                                it.copy(poisByOsmId = it.poisByOsmId + (poi.element.id to poi.poi))
+                                            }
+                                        }
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.bx_info_circle),
+                                            contentDescription = "Add to map"
+                                        )
+                                    }
+                                )
+                            } else {
+                                DropdownMenuItem(
+                                    text = { Text("Remove from map") },
+                                    onClick = {
+                                        showContextMenu = false
+                                        coroutineScope.launch {
+                                            karooSystemServiceProvider.saveTemporaryPOIs {
+                                                it.copy(poisByOsmId = it.poisByOsmId - poi.element.id)
+                                            }
+                                        }
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.bx_info_circle),
+                                            contentDescription = "Remove from map"
+                                        )
+                                    }
+                                )
+                            }
 
                             if (poi.element.hasAdditionalInfo()) {
                                 DropdownMenuItem(

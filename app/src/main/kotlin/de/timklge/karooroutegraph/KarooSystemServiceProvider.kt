@@ -6,7 +6,8 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
-import de.timklge.karooroutegraph.screens.RouteGraphViewSettings
+import de.timklge.karooroutegraph.screens.RouteGraphTemporaryPOIs
+import de.timklge.karooroutegraph.screens.RouteGraphPoiSettings
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.models.KarooEvent
 import io.hammerhead.karooext.models.OnStreamState
@@ -22,10 +23,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
-import org.koin.core.module.dsl.singleOf
-import org.koin.dsl.module
 
 class KarooSystemServiceProvider(private val context: Context) {
     val karooSystemService: KarooSystemService = KarooSystemService(context)
@@ -47,8 +45,9 @@ class KarooSystemServiceProvider(private val context: Context) {
 
     val settingsKey = stringPreferencesKey("settings")
     val viewSettingsKey = stringPreferencesKey("viewSettings")
+    val temporaryPOIsKey = stringPreferencesKey("temporaryPOIs")
 
-    fun readSettings(settingsJson: String?): RouteGraphSettings {
+    private fun readSettings(settingsJson: String?): RouteGraphSettings {
         return if (settingsJson != null){
             jsonWithUnknownKeys.decodeFromString<RouteGraphSettings>(settingsJson)
         } else {
@@ -59,12 +58,23 @@ class KarooSystemServiceProvider(private val context: Context) {
         }
     }
 
-    fun readViewSettings(settingsJson: String?): RouteGraphViewSettings {
+    private fun readViewSettings(settingsJson: String?): RouteGraphPoiSettings {
         return if (settingsJson != null){
-            jsonWithUnknownKeys.decodeFromString<RouteGraphViewSettings>(settingsJson)
+            jsonWithUnknownKeys.decodeFromString<RouteGraphPoiSettings>(settingsJson)
         } else {
-            val defaultSettings = jsonWithUnknownKeys.decodeFromString<RouteGraphViewSettings>(
-                RouteGraphViewSettings.defaultSettings)
+            val defaultSettings = jsonWithUnknownKeys.decodeFromString<RouteGraphPoiSettings>(
+                RouteGraphPoiSettings.defaultSettings)
+
+            defaultSettings.copy()
+        }
+    }
+
+    private fun readTemporaryPOIs(settingsJson: String?): RouteGraphTemporaryPOIs {
+        return if (settingsJson != null){
+            jsonWithUnknownKeys.decodeFromString<RouteGraphTemporaryPOIs>(settingsJson)
+        } else {
+            val defaultSettings = jsonWithUnknownKeys.decodeFromString<RouteGraphTemporaryPOIs>(
+                RouteGraphPoiSettings.defaultSettings)
 
             defaultSettings.copy()
         }
@@ -78,11 +88,19 @@ class KarooSystemServiceProvider(private val context: Context) {
         }
     }
 
-    suspend fun saveViewSettings(function: (settings: RouteGraphViewSettings) -> RouteGraphViewSettings) {
+    suspend fun saveViewSettings(function: (settings: RouteGraphPoiSettings) -> RouteGraphPoiSettings) {
         context.dataStore.edit { t ->
             val settings = readViewSettings(t[viewSettingsKey])
             val newSettings = function(settings)
             t[viewSettingsKey] = jsonWithUnknownKeys.encodeToString(newSettings)
+        }
+    }
+
+    suspend fun saveTemporaryPOIs(function: (settings: RouteGraphTemporaryPOIs) -> RouteGraphTemporaryPOIs) {
+        context.dataStore.edit { t ->
+            val settings = readTemporaryPOIs(t[temporaryPOIsKey])
+            val newSettings = function(settings)
+            t[temporaryPOIsKey] = jsonWithUnknownKeys.encodeToString(newSettings)
         }
     }
 
@@ -97,13 +115,24 @@ class KarooSystemServiceProvider(private val context: Context) {
         }.distinctUntilChanged()
     }
 
-    fun streamViewSettings(): Flow<RouteGraphViewSettings> {
+    fun streamViewSettings(): Flow<RouteGraphPoiSettings> {
         return context.dataStore.data.map { settingsJson ->
             try {
                 readViewSettings(settingsJson[viewSettingsKey])
             } catch(e: Throwable){
                 Log.e(TAG, "Failed to read preferences", e)
-                jsonWithUnknownKeys.decodeFromString<RouteGraphViewSettings>(RouteGraphViewSettings.defaultSettings)
+                jsonWithUnknownKeys.decodeFromString<RouteGraphPoiSettings>(RouteGraphPoiSettings.defaultSettings)
+            }
+        }.distinctUntilChanged()
+    }
+
+    fun streamTemporaryPOIs(): Flow<RouteGraphTemporaryPOIs> {
+        return context.dataStore.data.map { settingsJson ->
+            try {
+                readTemporaryPOIs(settingsJson[temporaryPOIsKey])
+            } catch(e: Throwable){
+                Log.e(TAG, "Failed to read preferences", e)
+                jsonWithUnknownKeys.decodeFromString<RouteGraphTemporaryPOIs>(RouteGraphTemporaryPOIs.defaultSettings)
             }
         }.distinctUntilChanged()
     }

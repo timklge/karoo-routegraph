@@ -1,7 +1,6 @@
 package de.timklge.karooroutegraph
 
 import android.util.Log
-import androidx.annotation.DrawableRes
 import androidx.core.content.ContextCompat
 import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
@@ -19,6 +18,7 @@ import de.timklge.karooroutegraph.incidents.HereMapsIncidentProvider
 import de.timklge.karooroutegraph.incidents.IncidentResult
 import de.timklge.karooroutegraph.incidents.IncidentsResponse
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
+import de.timklge.karooroutegraph.screens.RouteGraphTemporaryPOIs
 import identifyClimbs
 import io.hammerhead.karooext.extension.KarooExtension
 import io.hammerhead.karooext.internal.Emitter
@@ -56,28 +56,6 @@ import org.koin.android.ext.android.inject
 import kotlin.math.pow
 import kotlin.time.Duration.Companion.seconds
 
-class GradientIndicator(val id: String, val distance: Float, val gradientPercent: Float, val position: Point, @DrawableRes val drawableRes: Int){
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-
-        other as GradientIndicator
-
-        if (id != other.id) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        val result = id.hashCode()
-        return result
-    }
-
-    override fun toString(): String {
-        return "GradientIndicator(id='$id', distance=$distance, $gradientPercent)"
-    }
-}
-
 class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.VERSION_NAME) {
     companion object {
         const val TAG = "karoo-routegraph"
@@ -93,6 +71,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     private val displayViewModelProvider: RouteGraphDisplayViewModelProvider by inject()
     private val tileDownloadService: TileDownloadService by inject()
     private val locationViewModelProvider: LocationViewModelProvider by inject()
+    private val poiApproachAlertService: PoiApproachAlertService by inject()
 
     private val extensionScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -146,6 +125,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     private var lastDrawnGradientIndicators = mutableSetOf<GradientIndicator>()
     private var lastDrawnIncidentSymbols = mutableSetOf<Symbol>()
     private var lastDrawnIncidentPolylines = mutableSetOf<String>()
+    private var lastDrawnTemporaryPOIs = mutableSetOf<Symbol>()
 
     override fun startMap(emitter: Emitter<MapEffect>) {
         var currentSymbols: MutableSet<GradientIndicator>
@@ -159,6 +139,9 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         emitter.onNext(HideSymbols(lastDrawnIncidentSymbols.map { it.id }))
         lastDrawnIncidentSymbols.clear()
 
+        emitter.onNext(HideSymbols(lastDrawnTemporaryPOIs.map { it.id }))
+        lastDrawnTemporaryPOIs.clear()
+
         lastDrawnIncidentPolylines.forEach {
             emitter.onNext(HidePolyline(it))
         }
@@ -166,6 +149,17 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
         emitter.onNext(HideSymbols(lastDrawnGradientIndicators.map { "incline-${it.distance}" }))
         lastDrawnGradientIndicators = mutableSetOf()
+
+        mapScope.launch {
+            karooSystem.streamTemporaryPOIs().collect { temporaryPOIs ->
+                Log.d(TAG, "Temporary POIs: ${temporaryPOIs.poisByOsmId.size}")
+
+                emitter.onNext(HideSymbols(lastDrawnTemporaryPOIs.map { it.id }))
+                lastDrawnTemporaryPOIs.clear()
+
+                emitter.onNext(ShowSymbols(temporaryPOIs.poisByOsmId.values.toList()))
+            }
+        }
 
         mapScope.launch {
             var lastKnownIncidents: IncidentsResponse? = null
@@ -341,6 +335,8 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
         emitter.setCancellable {
             emitter.onNext(HideSymbols(lastDrawnGradientIndicators.map { "incline-${it.distance}" }))
+            emitter.onNext(HideSymbols(lastDrawnIncidentSymbols.map { it.id }))
+            emitter.onNext(HideSymbols(lastDrawnTemporaryPOIs.map { it.id }))
 
             Log.d(TAG, "Stopping map effect")
 
@@ -352,7 +348,8 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                                      val state: OnNavigationState.NavigationState,
                                      val userProfile: UserProfile,
                                      val pois: OnGlobalPOIs,
-                                     val locationAndRemainingRouteDistance: LocationAndRemainingRouteDistance)
+                                     val locationAndRemainingRouteDistance: LocationAndRemainingRouteDistance,
+                                     val temporaryPOIs: RouteGraphTemporaryPOIs)
 
     data class LocationAndRemainingRouteDistance(val lat: Double?, val lon: Double?, val bearing: Double?, val remainingRouteDistance: Double?)
 
@@ -397,16 +394,24 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 karooSystem.stream<OnNavigationState>(),
                 karooSystem.stream<UserProfile>(),
                 streamLocationAndRemainingRouteDistance(),
-                karooSystem.stream<OnGlobalPOIs>()
-            ) { settings, navigationState, userProfile, locationAndRemainingRouteDistance, pois ->
-                NavigationStreamState(settings, navigationState.state, userProfile, pois, locationAndRemainingRouteDistance)
+                karooSystem.stream<OnGlobalPOIs>(),
+                karooSystem.streamTemporaryPOIs()
+            ) { data ->
+                val settings = data[0] as RouteGraphSettings
+                val navigationState = data[1] as OnNavigationState
+                val userProfile = data[2] as UserProfile
+                val locationAndRemainingRouteDistance = data[3] as LocationAndRemainingRouteDistance
+                val pois = data[4] as OnGlobalPOIs
+                val temporaryPOIs = data[5] as RouteGraphTemporaryPOIs
+
+                NavigationStreamState(settings, navigationState.state, userProfile, pois, locationAndRemainingRouteDistance, temporaryPOIs)
             }.distinctUntilChanged().transformLatest { value ->
                 while(true){
                     emit(value)
                     delay(60.seconds)
                 }
             }
-            .collect { (settings, navigationStateEvent, userProfile, globalPOIs, locationAndRemainingRouteDistance) ->
+            .collect { (settings, navigationStateEvent, userProfile, globalPOIs, locationAndRemainingRouteDistance, temporaryPOIs: RouteGraphTemporaryPOIs) ->
                 val isImperial = userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
                 val navigatingToDestinationPolyline = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingToDestination)?.polyline?.let { LineString.fromPolyline(it, 5) }
                 val routeDistance = if (navigatingToDestinationPolyline != null) {
@@ -600,7 +605,10 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     }
                 }
 
-                val pois = (globalPOIs.pois + (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.pois.orEmpty()).map { symbol -> POI(symbol = symbol, type = PoiType.POI) } + incidentPois
+                val tempPoiSymbols = temporaryPOIs.poisByOsmId.map { (_, poi) -> POI(poi) }
+                val localPois = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.pois.orEmpty().map { symbol -> POI(symbol = symbol, type = PoiType.POI) }
+                val globalPois = globalPOIs.pois.map { poi -> POI(poi) }
+                val pois = tempPoiSymbols + globalPois + localPois + incidentPois
 
                 val currentDistanceAlongRoute = if (routeDistance != null && locationAndRemainingRouteDistance.remainingRouteDistance != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute){
                     if (navigationStateEvent.rejoinDistance == null) {
@@ -628,7 +636,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     if (routeLineString != null){
                         Log.i(TAG, "Route changed, recalculating POI distances")
 
-                        val updatedPoiDistances = calculatePoiDistances(routeLineString, pois, settings.poiDistanceToRouteMaxMeters)
+                        val updatedPoiDistances = calculatePoiDistancesAsync(routeLineString, pois, settings.poiDistanceToRouteMaxMeters)
                         poiDistances = updatedPoiDistances
 
                         val poiDistancesDebug = updatedPoiDistances.map { (key, value) ->
@@ -712,6 +720,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
         tileDownloadService.startDownloadJob()
         locationViewModelProvider.startUpdateJob()
+        poiApproachAlertService.startAlertJob()
     }
 
     private fun startMinimapUpdater() {
