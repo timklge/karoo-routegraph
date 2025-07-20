@@ -20,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -45,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.mapbox.geojson.Point
@@ -61,6 +63,18 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.koin.compose.koinInject
 import kotlin.math.roundToInt
+
+@Composable
+fun SectionHeader(title: String) {
+    Text(
+        text = title.uppercase(),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
+    )
+    Divider()
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -157,6 +171,19 @@ fun MainScreen(onFinish: () -> Unit) {
 
                     Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)){
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            Switch(checked = showNavigateButtonOnGraphs, onCheckedChange = {
+                                showNavigateButtonOnGraphs = it
+                                coroutineScope.launch {
+                                    updateSettings()
+                                }
+                            })
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Show navigate button on graphs")
+                        }
+
+                        SectionHeader("Gradient chevrons")
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Switch(checked = showGradientIndicatorsOnMap, onCheckedChange = {
                                 showGradientIndicatorsOnMap = it
                                 coroutineScope.launch {
@@ -191,6 +218,8 @@ fun MainScreen(onFinish: () -> Unit) {
                             }
                         }
 
+                        SectionHeader("Points of Interest (POI)")
+
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Switch(checked = showPOIsOnMinimap, onCheckedChange = {
                                 showPOIsOnMinimap = it
@@ -202,15 +231,23 @@ fun MainScreen(onFinish: () -> Unit) {
                             Text("Show POI labels on minimap")
                         }
 
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Switch(checked = showNavigateButtonOnGraphs, onCheckedChange = {
-                                showNavigateButtonOnGraphs = it
-                                coroutineScope.launch {
-                                    updateSettings()
-                                }
-                            })
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text("Show navigate button on graphs")
+                        // POI Management Button
+                        FilledTonalButton(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(40.dp),
+                            onClick = {
+                                val intent = Intent(ctx, POIActivity::class.java)
+                                ctx.startActivity(intent)
+                            }
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.bxmap),
+                                contentDescription = "Manage POIs",
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Manage POIs")
                         }
 
                         // Max POI Distance from Route Slider
@@ -270,6 +307,8 @@ fun MainScreen(onFinish: () -> Unit) {
                                 }
                             }
                         }
+
+                        SectionHeader("Traffic Incidents")
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Switch(checked = enableTrafficIncidentReporting, onCheckedChange = {
@@ -354,24 +393,6 @@ fun MainScreen(onFinish: () -> Unit) {
                             }
                         }
 
-                        // POI Management Button
-                        FilledTonalButton(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(40.dp),
-                            onClick = {
-                                val intent = Intent(ctx, POIActivity::class.java)
-                                ctx.startActivity(intent)
-                            }
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.bxmap),
-                                contentDescription = "Manage POIs",
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Manage POIs")
-                        }
 
                         Spacer(modifier = Modifier.padding(30.dp))
                     }
