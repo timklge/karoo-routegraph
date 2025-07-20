@@ -65,8 +65,8 @@ fun KarooSystemService.streamActiveRidePage(): Flow<ActiveRidePage> {
     }
 }
 
-fun distanceToString(distanceMeters: Float, userProfile: UserProfile, onlyMinorUnit: Boolean): String {
-    return if (userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL){
+fun distanceToString(distanceMeters: Float, isImperial: Boolean, onlyMinorUnit: Boolean): String {
+    return if (isImperial){
         val distanceMiles = distanceMeters / 1609.344f
         if (distanceMiles > 1 && !onlyMinorUnit){
             "${distanceMiles.toInt()} mi"

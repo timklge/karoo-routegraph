@@ -1,5 +1,6 @@
 package de.timklge.karooroutegraph.screens
 
+import android.content.Intent
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -19,8 +20,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -34,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -42,11 +46,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.mapbox.geojson.Point
 import de.timklge.karooroutegraph.GradientIndicatorFrequency
 import de.timklge.karooroutegraph.KarooRouteGraphExtension
+import de.timklge.karooroutegraph.POIActivity
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.incidents.HereMapsIncidentProvider
 import de.timklge.karooroutegraph.saveSettings
@@ -55,25 +61,19 @@ import io.hammerhead.karooext.KarooSystemService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import org.koin.compose.koinInject
 import kotlin.math.roundToInt
 
-@Serializable
-data class RouteGraphSettings(
-    val showGradientIndicatorsOnMap: Boolean = false,
-    val showPOILabelsOnMinimap: Boolean = true,
-    val welcomeDialogAccepted: Boolean = false,
-    val enableTrafficIncidentReporting: Boolean = false,
-    val showNavigateButtonOnGraphs: Boolean = true,
-    val hereMapsApiKey: String = "",
-    val gradientIndicatorFrequency: GradientIndicatorFrequency = GradientIndicatorFrequency.HIGH
-){
-    companion object {
-        val defaultSettings = Json.encodeToString(RouteGraphSettings())
-    }
+@Composable
+fun SectionHeader(title: String) {
+    Text(
+        text = title.uppercase(),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
+    )
+    Divider()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -90,6 +90,8 @@ fun MainScreen(onFinish: () -> Unit) {
     var showNavigateButtonOnGraphs by remember { mutableStateOf(true) }
     var hereMapsApiKey by remember { mutableStateOf("") }
     var enableTrafficIncidentReporting by remember { mutableStateOf(false) }
+    var poiDistanceToRouteMaxMeters by remember { mutableDoubleStateOf(1000.0) }
+    var poiApproachAlertAtDistance by remember { mutableDoubleStateOf(500.0) }
     var apiTestDialogVisible by remember { mutableStateOf(false) }
     var apiTestDialogPending by remember { mutableStateOf(false) }
     var apiTestErrorMessage by remember { mutableStateOf("") }
@@ -105,7 +107,9 @@ fun MainScreen(onFinish: () -> Unit) {
             hereMapsApiKey = hereMapsApiKey,
             gradientIndicatorFrequency = gradientIndicatorFrequency,
             enableTrafficIncidentReporting = enableTrafficIncidentReporting,
-            showNavigateButtonOnGraphs = showNavigateButtonOnGraphs
+            showNavigateButtonOnGraphs = showNavigateButtonOnGraphs,
+            poiDistanceToRouteMaxMeters = poiDistanceToRouteMaxMeters,
+            poiApproachAlertAtDistance = poiApproachAlertAtDistance
         )
 
         saveSettings(ctx, newSettings)
@@ -120,6 +124,8 @@ fun MainScreen(onFinish: () -> Unit) {
             hereMapsApiKey = settings.hereMapsApiKey
             enableTrafficIncidentReporting = settings.enableTrafficIncidentReporting
             showNavigateButtonOnGraphs = settings.showNavigateButtonOnGraphs
+            poiDistanceToRouteMaxMeters = settings.poiDistanceToRouteMaxMeters
+            poiApproachAlertAtDistance = settings.poiApproachAlertAtDistance ?: 500.0
         }
     }
 
@@ -165,6 +171,19 @@ fun MainScreen(onFinish: () -> Unit) {
 
                     Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)){
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            Switch(checked = showNavigateButtonOnGraphs, onCheckedChange = {
+                                showNavigateButtonOnGraphs = it
+                                coroutineScope.launch {
+                                    updateSettings()
+                                }
+                            })
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Show navigate button on graphs")
+                        }
+
+                        SectionHeader("Gradient chevrons")
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Switch(checked = showGradientIndicatorsOnMap, onCheckedChange = {
                                 showGradientIndicatorsOnMap = it
                                 coroutineScope.launch {
@@ -199,6 +218,8 @@ fun MainScreen(onFinish: () -> Unit) {
                             }
                         }
 
+                        SectionHeader("Points of Interest (POI)")
+
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Switch(checked = showPOIsOnMinimap, onCheckedChange = {
                                 showPOIsOnMinimap = it
@@ -210,16 +231,84 @@ fun MainScreen(onFinish: () -> Unit) {
                             Text("Show POI labels on minimap")
                         }
 
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Switch(checked = showNavigateButtonOnGraphs, onCheckedChange = {
-                                showNavigateButtonOnGraphs = it
-                                coroutineScope.launch {
-                                    updateSettings()
-                                }
-                            })
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text("Show navigate button on graphs")
+                        // POI Management Button
+                        FilledTonalButton(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(40.dp),
+                            onClick = {
+                                val intent = Intent(ctx, POIActivity::class.java)
+                                ctx.startActivity(intent)
+                            }
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.bxmap),
+                                contentDescription = "Manage POIs",
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Manage POIs")
                         }
+
+                        // Max POI Distance from Route Slider
+                        val poiDistanceOptions = arrayOf(200.0, 500.0, 1_000.0, 2_000.0, 5_000.0)
+                        val selectedPoiDistanceIndex = poiDistanceOptions.indexOf(poiDistanceToRouteMaxMeters)
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text("Max POI distance from route:")
+                            Slider(
+                                value = selectedPoiDistanceIndex.toFloat(),
+                                onValueChange = { idx ->
+                                    val newIndex = idx.roundToInt().coerceIn(poiDistanceOptions.indices)
+                                    poiDistanceToRouteMaxMeters = poiDistanceOptions[newIndex]
+                                    coroutineScope.launch { updateSettings() }
+                                },
+                                valueRange = 0f..(poiDistanceOptions.size - 1).toFloat(),
+                                steps = poiDistanceOptions.size - 2,
+                                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp),
+                            )
+                            Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                poiDistanceOptions.forEach { distance ->
+                                    val label = if (distance >= 1000.0) {
+                                        "${(distance / 1000.0).toInt()}km"
+                                    } else {
+                                        "${distance.toInt()}m"
+                                    }
+                                    Text(label, style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
+
+                        // POI Approach Alert Distance Slider
+                        val poiApproachAlertOptions = arrayOf(0.0, 200.0, 500.0, 1_000.0, 2_000.0, 5_000.0)
+                        val selectedApproachAlertIndex = poiApproachAlertOptions.indexOf(poiApproachAlertAtDistance)
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text("POI approach alert distance:")
+                            Slider(
+                                value = selectedApproachAlertIndex.toFloat(),
+                                onValueChange = { idx ->
+                                    val newIndex = idx.roundToInt().coerceIn(poiApproachAlertOptions.indices)
+                                    poiApproachAlertAtDistance = poiApproachAlertOptions[newIndex]
+                                    coroutineScope.launch { updateSettings() }
+                                },
+                                valueRange = 0f..(poiApproachAlertOptions.size - 1).toFloat(),
+                                steps = poiApproachAlertOptions.size - 2,
+                                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp),
+                            )
+                            Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                poiApproachAlertOptions.forEach { distance ->
+                                    val label = if (distance == 0.0){
+                                        "Off"
+                                    } else if (distance >= 1000.0) {
+                                        "${(distance / 1000.0).toInt()}km"
+                                    } else {
+                                        "${distance.toInt()}m"
+                                    }
+                                    Text(label, style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
+
+                        SectionHeader("Traffic Incidents")
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Switch(checked = enableTrafficIncidentReporting, onCheckedChange = {
@@ -303,6 +392,7 @@ fun MainScreen(onFinish: () -> Unit) {
                                 Text("Test API Key")
                             }
                         }
+
 
                         Spacer(modifier = Modifier.padding(30.dp))
                     }

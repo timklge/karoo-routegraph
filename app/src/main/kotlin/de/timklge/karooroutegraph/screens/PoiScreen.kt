@@ -81,7 +81,7 @@ fun PoiScreen(finish: () -> Unit){
                         Box(
                             modifier = Modifier
                                 .tabIndicatorOffset(tabPositions[pagerState.currentPage])
-                                .align(androidx.compose.ui.Alignment.TopStart)
+                                .align(Alignment.TopStart)
                                 .height(2.dp)
                                 .fillMaxWidth()
                                 .background(MaterialTheme.colorScheme.primary)

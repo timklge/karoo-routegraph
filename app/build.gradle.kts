@@ -70,12 +70,13 @@ tasks.register("generateManifest") {
             "latestVersionCode" to android.defaultConfig.versionCode,
             "developer" to "github.com/timklge",
             "description" to "Open-source extension that provides an elevation graph datafield depicting the complete current route, including climbs and POIs (e. g. checkpoints and refueling stops)",
-            "releaseNotes" to "* Add button to trigger navigation to route / global POIs, nearby POIs of type, POI text search\n* Flip vertical elevation profile\n* Update gradient indicator handling (add setting, update palette, add downhill chevrons)",
+            "releaseNotes" to "* Add 'ahead on route' setting and option to temporarily add POIs to POI dialog\n* Add button to trigger navigation to route / global POIs, nearby POIs of type, POI text search\n* Flip vertical elevation profile",
             "screenshotUrls" to listOf(
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/minimap.png",
-                "https://github.com/timklge/karoo-routegraph/releases/latest/download/horizontal_routegraph.png",
+                "https://github.com/timklge/karoo-routegraph/releases/latest/download/poinav.png",
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/vertical_routegraph.png",
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/chevrons.png",
+                "https://github.com/timklge/karoo-routegraph/releases/latest/download/horizontal_routegraph.png",
             ),
         )
 

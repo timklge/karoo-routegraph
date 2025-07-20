@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -22,6 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,25 +33,33 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.mapbox.geojson.Point
-import com.mapbox.turf.TurfConstants
-import com.mapbox.turf.TurfMeasurement
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.LocationViewModelProvider
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
+import de.timklge.karooroutegraph.distanceToPoi
 import io.hammerhead.karooext.models.LaunchPinDrop
 import io.hammerhead.karooext.models.OnGlobalPOIs
 import io.hammerhead.karooext.models.OnNavigationState
 import io.hammerhead.karooext.models.Symbol
 import io.hammerhead.karooext.models.UserProfile
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 enum class PoiSortOption(val displayName: String) {
     LINEAR_DISTANCE("Linear distance"),
     AHEAD_ON_ROUTE("Ahead on route");
+}
+
+sealed class DisplayedCustomPoi {
+    abstract val poi: Symbol.POI
+
+    data class Local(override val poi: Symbol.POI) : DisplayedCustomPoi()
+    data class Global(override val poi: Symbol.POI) : DisplayedCustomPoi()
+    data class Temporary(val id: Long, override val poi: Symbol.POI) : DisplayedCustomPoi()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,8 +69,11 @@ fun CustomPoiListScreen() {
     val viewModelProvider = koinInject<RouteGraphViewModelProvider>()
     val locationViewModelProvider = koinInject<LocationViewModelProvider>()
 
-    var localPois by remember { mutableStateOf<List<Symbol.POI>>(listOf()) }
-    var globalPois by remember { mutableStateOf<List<Symbol.POI>>(listOf()) }
+    var localPois by remember { mutableStateOf<List<DisplayedCustomPoi.Local>>(listOf()) }
+    var globalPois by remember { mutableStateOf<List<DisplayedCustomPoi.Global>>(listOf()) }
+    var tempPois by remember { mutableStateOf<List<DisplayedCustomPoi.Temporary>>(listOf()) }
+
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         karooSystemServiceProvider.stream<OnNavigationState>()
@@ -67,7 +82,7 @@ fun CustomPoiListScreen() {
                 newLocalPois
             }
             .collect {
-                localPois = it
+                localPois = it.map { poi -> DisplayedCustomPoi.Local(poi) }
             }
     }
 
@@ -77,7 +92,14 @@ fun CustomPoiListScreen() {
                 onGlobalPois.pois
             }
             .collect {
-                globalPois = it
+                globalPois = it.map { poi -> DisplayedCustomPoi.Global(poi) }
+            }
+    }
+
+    LaunchedEffect(Unit) {
+        karooSystemServiceProvider.streamTemporaryPOIs()
+            .collect { temporaryPOIs ->
+                tempPois = temporaryPOIs.poisByOsmId.map { (id, poi) -> DisplayedCustomPoi.Temporary(id, poi) }
             }
     }
 
@@ -96,33 +118,35 @@ fun CustomPoiListScreen() {
     var expanded by remember { mutableStateOf(false) }
     var selectedSort by remember { mutableStateOf(PoiSortOption.LINEAR_DISTANCE) }
 
-    fun distanceToPoi(poi: Symbol.POI): Double? {
-        when (selectedSort) {
-            PoiSortOption.LINEAR_DISTANCE -> {
-                return currentPosition?.let { currentPosition ->
-                    TurfMeasurement.distance(
-                        Point.fromLngLat(poi.lng, poi.lat),
-                        currentPosition,
-                        TurfConstants.UNIT_METERS
-                    )
-                }
-            }
-            PoiSortOption.AHEAD_ON_ROUTE -> {
-                val nearestPoints = routeGraphViewModel?.poiDistances?.entries?.find { it.key.symbol == poi }?.value
-                val nearestPointsAheadOnRoute = nearestPoints?.filter { it.distanceFromRouteStart >= (routeGraphViewModel?.distanceAlongRoute ?: 0f) }
-                val nearestPointAheadOnRoute = nearestPointsAheadOnRoute?.minByOrNull { it.distanceFromPointOnRoute + it.distanceFromRouteStart }
-
-                return nearestPointAheadOnRoute?.let {
-                    it.distanceFromPointOnRoute.toDouble() + it.distanceFromRouteStart.toDouble() - (routeGraphViewModel?.distanceAlongRoute ?: 0.0f)
-                }
-            }
-        }
+    LaunchedEffect(Unit) {
+        val settings = karooSystemServiceProvider.streamViewSettings().first()
+        selectedSort = settings.poiSortOptionForCustomPois
     }
 
-    val pois by remember(localPois, globalPois, currentPosition, routeGraphViewModel, selectedSort) {
+    val pois by remember(localPois, globalPois, tempPois, currentPosition, routeGraphViewModel, selectedSort) {
+        val lastKnownPositionAlongRoute = routeGraphViewModel?.lastKnownPositionOnMainRoute?.let { point ->
+            Symbol.POI(
+                lat = point.latitude(),
+                lng = point.longitude(),
+                name = "Last known position along route",
+                id = "last_known_position",
+            )
+        }
+
         val poiList = currentPosition?.let { _ ->
-            (localPois + globalPois).filter { poi -> distanceToPoi(poi) != null }.sortedBy { poi ->
-                distanceToPoi(poi)
+            val poiList = buildList {
+                addAll(localPois)
+                addAll(globalPois)
+                addAll(tempPois)
+
+                // If not on route but have a last known position along the route, add it as POI to navigate to
+                if (lastKnownPositionAlongRoute != null && routeGraphViewModel?.routeDistance == null) {
+                    add(DisplayedCustomPoi.Local(lastKnownPositionAlongRoute))
+                }
+            }
+
+            poiList.filter { displayedCustomPoi -> distanceToPoi(displayedCustomPoi.poi, routeGraphViewModel?.sampledElevationData, routeGraphViewModel?.poiDistances, currentPosition, selectedSort, routeGraphViewModel?.distanceAlongRoute) != null }.sortedBy { displayedCustomPoi ->
+                distanceToPoi(displayedCustomPoi.poi, routeGraphViewModel?.sampledElevationData, routeGraphViewModel?.poiDistances, currentPosition, selectedSort, routeGraphViewModel?.distanceAlongRoute)
             }
         } ?: run {
             localPois + globalPois
@@ -136,7 +160,7 @@ fun CustomPoiListScreen() {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
             ) {
                 ExposedDropdownMenuBox(
                     expanded = expanded,
@@ -163,6 +187,12 @@ fun CustomPoiListScreen() {
                                 onClick = {
                                     selectedSort = option
                                     expanded = false
+
+                                    coroutineScope.launch {
+                                        karooSystemServiceProvider.saveViewSettings { settings ->
+                                            settings.copy(poiSortOptionForCustomPois = option)
+                                        }
+                                    }
                                 }
                             )
                         }
@@ -171,7 +201,9 @@ fun CustomPoiListScreen() {
             }
         }
 
-        items(pois) { poi ->
+        items(pois) { displayedCustomPoi ->
+            var showContextMenu by remember { mutableStateOf(false) }
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -180,22 +212,17 @@ fun CustomPoiListScreen() {
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = poi.name ?: "Unnamed POI",
+                        text = displayedCustomPoi.poi.name ?: "Unnamed POI",
                         style = MaterialTheme.typography.bodyLarge,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
 
                     val distanceLabel = currentPosition?.let {
-                        val distanceMeters = distanceToPoi(poi)
+                        val distanceResult = distanceToPoi(displayedCustomPoi.poi, routeGraphViewModel?.sampledElevationData,
+                            routeGraphViewModel?.poiDistances, it, selectedSort, routeGraphViewModel?.distanceAlongRoute)
 
-                        distanceMeters?.let {
-                            if (isImperial){
-                                String.format(java.util.Locale.getDefault(), "%.1f mi", distanceMeters * 0.000621371)
-                            } else {
-                                String.format(java.util.Locale.getDefault(), "%.1f km", distanceMeters / 1000)
-                            }
-                        }
+                        distanceResult?.formatDistance(isImperial)
                     }
 
                     if (distanceLabel != null){
@@ -206,15 +233,55 @@ fun CustomPoiListScreen() {
                         )
                     }
                 }
-                IconButton(
-                    onClick = {
-                        karooSystemServiceProvider.karooSystemService.dispatch(LaunchPinDrop(poi))
-                    },
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.bxmap),
-                        contentDescription = "POI"
-                    )
+
+                Box {
+                    IconButton(
+                        onClick = { showContextMenu = true }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "More options"
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = showContextMenu,
+                        onDismissRequest = { showContextMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Navigate") },
+                            onClick = {
+                                showContextMenu = false
+                                karooSystemServiceProvider.karooSystemService.dispatch(LaunchPinDrop(displayedCustomPoi.poi))
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.bxmap),
+                                    contentDescription = "Navigate"
+                                )
+                            }
+                        )
+
+                        if (displayedCustomPoi is DisplayedCustomPoi.Temporary) {
+                            DropdownMenuItem(
+                                text = { Text("Remove from map") },
+                                onClick = {
+                                    showContextMenu = false
+                                    coroutineScope.launch {
+                                        karooSystemServiceProvider.saveTemporaryPOIs {
+                                            it.copy(poisByOsmId = it.poisByOsmId - displayedCustomPoi.id)
+                                        }
+                                    }
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.bx_info_circle),
+                                        contentDescription = "Remove from map"
+                                    )
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
