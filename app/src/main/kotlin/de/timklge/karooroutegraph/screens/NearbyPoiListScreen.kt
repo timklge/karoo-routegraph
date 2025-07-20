@@ -79,6 +79,8 @@ enum class NearbyPoiCategory(val label: String, val osmTag: String) {
     GAS_STATIONS("Gas Station", "amenity=fuel"),
     SUPERMARKETS("Supermarket", "shop=supermarket"),
     RESTAURANTS("Restaurant", "amenity=restaurant"),
+    CAFES("Café", "amenity=cafe"),
+    ICE_CREAM("Ice Cream", "amenity=ice_cream"),
     TOILETS("Toilets", "amenity=toilets"),
     SHOWERS("Showers", "amenity=shower"),
     ATMS("ATMs", "amenity=atm"),
