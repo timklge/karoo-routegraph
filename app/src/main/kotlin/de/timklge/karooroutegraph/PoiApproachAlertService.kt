@@ -43,14 +43,13 @@ class PoiApproachAlertService(
                     putExtra("location", "top")
                 }
 
-                delay(1_000)
                 applicationContext.sendBroadcast(intent)
 
                 karooSystemServiceProvider.karooSystemService.dispatch(
                     InRideAlert(
                         id = "poi_alert_${System.currentTimeMillis()}",
                         icon = R.drawable.bxmap,
-                        title = "POI Approach",
+                        title = applicationContext.getString(R.string.poi_approach),
                         detail = alert.message,
                         autoDismissMs = 10_000L,
                         backgroundColor = R.color.eleLightGreen,
@@ -125,8 +124,10 @@ class PoiApproachAlertService(
                     }
 
                     if (nearestPointInRange != null && (lastAlertShownForPoi == null || lastAlertShownForPoi.isBefore(checkForPoiApproachAlertsAfter))) {
-                        val text = "${poi.symbol.name} in " + distanceToPoi(poi.symbol, viewModel.sampledElevationData,
+                        val distance = distanceToPoi(poi.symbol, viewModel.sampledElevationData,
                             viewModel.poiDistances, currentPosition, PoiSortOption.AHEAD_ON_ROUTE, distanceAlongRoute)?.formatDistance(isImperial, flat = true)
+
+                        val text = applicationContext.getString(R.string.poi_in_distance, poi.symbol.name, distance ?: "")
 
                         alertChannel.send(PoiAlert(text))
 

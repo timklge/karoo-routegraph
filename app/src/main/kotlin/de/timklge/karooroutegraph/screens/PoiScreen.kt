@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import de.timklge.karooroutegraph.R
 import kotlinx.coroutines.delay
@@ -90,20 +91,20 @@ fun PoiScreen(finish: () -> Unit){
                 }
             ) {
 
-                Tab(selected = selectedTabIndex == 0, text = { Text("Custom") }, icon = { Icon(
-                    painterResource(R.drawable.bx_home), contentDescription = "Custom", modifier = Modifier
+                Tab(selected = selectedTabIndex == 0, text = { Text(stringResource(R.string.poi_tab_custom)) }, icon = { Icon(
+                    painterResource(R.drawable.bx_home), contentDescription = stringResource(R.string.poi_tab_custom), modifier = Modifier
                         .size(30.dp)
                         .padding(2.dp)
                 ) }, onClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } })
 
-                Tab(selected = selectedTabIndex == 1, text = { Text("Nearby") }, icon = { Icon(
-                    painterResource(R.drawable.bx_info_circle), contentDescription = "Nearby", modifier = Modifier
+                Tab(selected = selectedTabIndex == 1, text = { Text(stringResource(R.string.poi_tab_nearby)) }, icon = { Icon(
+                    painterResource(R.drawable.bx_info_circle), contentDescription = stringResource(R.string.poi_tab_nearby), modifier = Modifier
                         .size(30.dp)
                         .padding(2.dp)
                 ) }, onClick = { coroutineScope.launch { pagerState.animateScrollToPage(1) } })
 
-                Tab(selected = selectedTabIndex == 2, text = { Text("Search") }, icon = { Icon(
-                    painterResource(R.drawable.bx_search_alt), contentDescription = "Search", modifier = Modifier
+                Tab(selected = selectedTabIndex == 2, text = { Text(stringResource(R.string.poi_tab_search)) }, icon = { Icon(
+                    painterResource(R.drawable.bx_search_alt), contentDescription = stringResource(R.string.poi_tab_search), modifier = Modifier
                         .size(30.dp)
                         .padding(2.dp)
                 ) }, onClick = { coroutineScope.launch { pagerState.animateScrollToPage(2) } })
@@ -113,7 +114,7 @@ fun PoiScreen(finish: () -> Unit){
         if (showWarnings){
             Image(
                 painter = painterResource(id = R.drawable.back),
-                contentDescription = "Back",
+                contentDescription = stringResource(R.string.back),
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(bottom = 10.dp)

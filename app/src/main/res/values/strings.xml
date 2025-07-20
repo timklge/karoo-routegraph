@@ -13,4 +13,94 @@
     <string name="minimap_description">Secondary map display (with route and POIs)</string>
     <string name="poi_button">POI Button</string>
     <string name="poi_button_description">Button to quickly open the POI list</string>
+
+    <!-- MainScreen strings -->
+    <string name="device_status_warning">Could not read device status. Is your Karoo updated?</string>
+    <string name="show_navigate_button">Show navigate button on graphs</string>
+    <string name="gradient_chevrons">Gradient chevrons</string>
+    <string name="show_gradient_indicators">Show gradient indicators on map</string>
+    <string name="amount_of_indicators">Amount of indicators:</string>
+
+    <!-- Gradient Indicator Frequency labels -->
+    <string name="gradient_frequency_low">Low</string>
+    <string name="gradient_frequency_medium">Medium</string>
+    <string name="gradient_frequency_high">High</string>
+    <string name="gradient_frequency_max">Max</string>
+
+    <string name="points_of_interest_poi">Points of Interest (POI)</string>
+    <string name="show_poi_labels">Show POI labels on minimap</string>
+    <string name="manage_pois">Manage POIs</string>
+    <string name="manage_pois_description">Manage POIs</string>
+    <string name="max_poi_distance">Max POI distance from route:</string>
+    <string name="poi_approach_alert_distance">POI approach alert distance:</string>
+    <string name="distance_off">Off</string>
+    <string name="traffic_incidents">Traffic Incidents</string>
+    <string name="enable_traffic_incident_reporting">Enable traffic incident reporting</string>
+    <string name="requires_here_maps_api">Requires HERE Maps API Key</string>
+    <string name="here_maps_api_key">HERE Maps API Key</string>
+    <string name="test_api_key">Test API Key</string>
+    <string name="testing_api_key">Testing API key…</string>
+    <string name="api_key_valid">API key is valid. %1$d incidents reported in the center of Berlin (updated at %2$s)</string>
+    <string name="api_key_error">Error testing API key. Check if your key is valid.</string>
+    <string name="ok">OK</string>
+    <string name="back">Back</string>
+    <string name="welcome_title">Welcome to karoo-routegraph!</string>
+    <string name="welcome_message_1">You can add a vertical or horizontal route elevation profile and other fields to your data pages.</string>
+    <string name="welcome_message_2">Please note that currently, this app will download elevation profiles from a public API hosted by german FOSSGIS e. V.</string>
+
+    <!-- POI Screen strings -->
+    <string name="poi_tab_custom">Custom</string>
+    <string name="poi_tab_nearby">Nearby</string>
+    <string name="poi_tab_search">Search</string>
+
+    <!-- Common POI strings -->
+    <string name="navigate">Navigate</string>
+    <string name="add_to_map">Add to map</string>
+    <string name="remove_from_map">Remove from map</string>
+    <string name="show_info">Show info</string>
+    <string name="sort_by">Sort by</string>
+    <string name="categories">Categories</string>
+    <string name="search_query">Search query</string>
+    <string name="cancel">Cancel</string>
+    <string name="select">Select</string>
+    <string name="unnamed_poi">Unnamed POI</string>
+    <string name="last_known_position">Last known position along route</string>
+    <string name="no_info_available">No info available</string>
+
+    <!-- POI Alert strings -->
+    <string name="poi_approach">POI Approach</string>
+    <string name="poi_in_distance">%1$s in %2$s</string>
+
+    <!-- Traffic Incident Alert strings -->
+    <string name="incidents">Incidents</string>
+    <string name="traffic_incidents_found">%1$d traffic incidents along route</string>
+    <string name="failed_to_request_incidents">Failed to request incidents</string>
+
+    <!-- POI Sort Options -->
+    <string name="sort_linear_distance">Linear distance</string>
+    <string name="sort_ahead_on_route">Ahead on route</string>
+
+    <!-- POI Categories -->
+    <string name="category_water">Water</string>
+    <string name="category_gas_station">Gas Station</string>
+    <string name="category_supermarket">Supermarket</string>
+    <string name="category_restaurant">Restaurant</string>
+    <string name="category_cafe">Café</string>
+    <string name="category_ice_cream">Ice Cream</string>
+    <string name="category_toilets">Toilets</string>
+    <string name="category_showers">Showers</string>
+    <string name="category_atms">ATMs</string>
+    <string name="category_shelter">Shelter</string>
+    <string name="category_camping_site">Camping Site</string>
+    <string name="category_hotel">Hotel</string>
+    <string name="category_train_station">Train Station</string>
+    <string name="category_waste_basket">Waste Basket</string>
+    <string name="category_bench">Bench</string>
+    <string name="category_bike_shop">Bike Shop</string>
+
+    <!-- Error messages -->
+    <string name="error_no_position">Failed to fetch POIs: Current position is not available. Check GPS signal.</string>
+    <string name="error_no_route">Failed to fetch POIs: No route available. Please start a route first.</string>
+    <string name="error_no_route_ahead">Failed to fetch POIs ahead on route: No route loaded.</string>
+    <string name="error_fetch_pois">Failed to fetch POIs: %1$s</string>
 </resources>

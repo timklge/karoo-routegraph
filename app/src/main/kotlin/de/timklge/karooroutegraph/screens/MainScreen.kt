@@ -20,9 +20,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -73,7 +74,7 @@ fun SectionHeader(title: String) {
         fontWeight = FontWeight.Bold,
         modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
     )
-    Divider()
+    HorizontalDivider()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -165,7 +166,7 @@ fun MainScreen(onFinish: () -> Unit) {
                 ) {
                     if (showWarnings){
                         if (!karooConnected){
-                            Text(modifier = Modifier.padding(5.dp), text = "Could not read device status. Is your Karoo updated?")
+                            Text(modifier = Modifier.padding(5.dp), text = stringResource(R.string.device_status_warning))
                         }
                     }
 
@@ -178,10 +179,10 @@ fun MainScreen(onFinish: () -> Unit) {
                                 }
                             })
                             Spacer(modifier = Modifier.width(10.dp))
-                            Text("Show navigate button on graphs")
+                            Text(stringResource(R.string.show_navigate_button))
                         }
 
-                        SectionHeader("Gradient chevrons")
+                        SectionHeader(stringResource(R.string.gradient_chevrons))
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Switch(checked = showGradientIndicatorsOnMap, onCheckedChange = {
@@ -191,14 +192,14 @@ fun MainScreen(onFinish: () -> Unit) {
                                 }
                             })
                             Spacer(modifier = Modifier.width(10.dp))
-                            Text("Show gradient indicators on map")
+                            Text(stringResource(R.string.show_gradient_indicators))
                         }
 
                         if (showGradientIndicatorsOnMap) {
                             val frequencies = GradientIndicatorFrequency.entries.toTypedArray()
                             val selectedIndex = frequencies.indexOf(gradientIndicatorFrequency)
                             Column(modifier = Modifier.fillMaxWidth()) {
-                                Text("Amount of indicators:")
+                                Text(stringResource(R.string.amount_of_indicators))
                                 Slider(
                                     value = selectedIndex.toFloat(),
                                     onValueChange = { idx ->
@@ -212,13 +213,13 @@ fun MainScreen(onFinish: () -> Unit) {
                                 )
                                 Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                                     frequencies.forEach { freq ->
-                                        Text(freq.name, style = MaterialTheme.typography.labelSmall)
+                                        Text(stringResource(freq.labelResourceId), style = MaterialTheme.typography.labelSmall)
                                     }
                                 }
                             }
                         }
 
-                        SectionHeader("Points of Interest (POI)")
+                        SectionHeader(stringResource(R.string.points_of_interest_poi))
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Switch(checked = showPOIsOnMinimap, onCheckedChange = {
@@ -228,7 +229,7 @@ fun MainScreen(onFinish: () -> Unit) {
                                 }
                             })
                             Spacer(modifier = Modifier.width(10.dp))
-                            Text("Show POI labels on minimap")
+                            Text(stringResource(R.string.show_poi_labels))
                         }
 
                         // POI Management Button
@@ -243,18 +244,18 @@ fun MainScreen(onFinish: () -> Unit) {
                         ) {
                             Icon(
                                 painter = painterResource(id = R.drawable.bxmap),
-                                contentDescription = "Manage POIs",
+                                contentDescription = stringResource(R.string.manage_pois_description),
                                 modifier = Modifier.size(24.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Manage POIs")
+                            Text(stringResource(R.string.manage_pois))
                         }
 
                         // Max POI Distance from Route Slider
                         val poiDistanceOptions = arrayOf(200.0, 500.0, 1_000.0, 2_000.0, 5_000.0)
                         val selectedPoiDistanceIndex = poiDistanceOptions.indexOf(poiDistanceToRouteMaxMeters)
                         Column(modifier = Modifier.fillMaxWidth()) {
-                            Text("Max POI distance from route:")
+                            Text(stringResource(R.string.max_poi_distance))
                             Slider(
                                 value = selectedPoiDistanceIndex.toFloat(),
                                 onValueChange = { idx ->
@@ -282,7 +283,7 @@ fun MainScreen(onFinish: () -> Unit) {
                         val poiApproachAlertOptions = arrayOf(0.0, 200.0, 500.0, 1_000.0, 2_000.0, 5_000.0)
                         val selectedApproachAlertIndex = poiApproachAlertOptions.indexOf(poiApproachAlertAtDistance)
                         Column(modifier = Modifier.fillMaxWidth()) {
-                            Text("POI approach alert distance:")
+                            Text(stringResource(R.string.poi_approach_alert_distance))
                             Slider(
                                 value = selectedApproachAlertIndex.toFloat(),
                                 onValueChange = { idx ->
@@ -297,7 +298,7 @@ fun MainScreen(onFinish: () -> Unit) {
                             Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                                 poiApproachAlertOptions.forEach { distance ->
                                     val label = if (distance == 0.0){
-                                        "Off"
+                                        stringResource(R.string.distance_off)
                                     } else if (distance >= 1000.0) {
                                         "${(distance / 1000.0).toInt()}km"
                                     } else {
@@ -308,7 +309,7 @@ fun MainScreen(onFinish: () -> Unit) {
                             }
                         }
 
-                        SectionHeader("Traffic Incidents")
+                        SectionHeader(stringResource(R.string.traffic_incidents))
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Switch(checked = enableTrafficIncidentReporting, onCheckedChange = {
@@ -319,9 +320,9 @@ fun MainScreen(onFinish: () -> Unit) {
                             })
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
-                                Text("Enable traffic incident reporting")
+                                Text(stringResource(R.string.enable_traffic_incident_reporting))
                                 Text(
-                                    text = "Requires HERE Maps API Key",
+                                    text = stringResource(R.string.requires_here_maps_api),
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                 )
@@ -334,7 +335,7 @@ fun MainScreen(onFinish: () -> Unit) {
                                 onValueChange = {
                                     hereMapsApiKey = it
                                 },
-                                label = { Text("HERE Maps API Key") },
+                                label = { Text(stringResource(R.string.here_maps_api_key)) },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 4.dp),
@@ -360,7 +361,7 @@ fun MainScreen(onFinish: () -> Unit) {
                                                 onClick = { apiTestDialogVisible = false },
                                                 modifier = Modifier.fillMaxWidth()
                                             ) {
-                                                Text("OK")
+                                                Text(stringResource(R.string.ok))
                                             }
                                         }
                                     }
@@ -373,23 +374,23 @@ fun MainScreen(onFinish: () -> Unit) {
                                 onClick = {
                                     apiTestDialogVisible = true
                                     apiTestDialogPending = true
-                                    apiTestErrorMessage = "Testing API key..."
+                                    apiTestErrorMessage = ctx.getString(R.string.testing_api_key)
 
                                     coroutineScope.launch {
                                         try {
                                             val response = hereMapsIncidentProvider.requestIncidents(hereMapsApiKey, Point.fromLngLat(13.399, 52.5186), 2000.0)
                                             apiTestDialogPending = false
-                                            apiTestErrorMessage = "API key is valid. ${response.results?.size} incidents reported in the center of Berlin (updated at ${response.sourceUpdated})"
+                                            apiTestErrorMessage = ctx.getString(R.string.api_key_valid, response.results?.size ?: 0, response.sourceUpdated ?: "")
 
                                             Log.d(KarooRouteGraphExtension.TAG, apiTestErrorMessage)
                                         } catch (e: Exception) {
                                             Log.e(KarooRouteGraphExtension.TAG, "Error testing API key: ${e.message}")
                                             apiTestDialogPending = false
-                                            apiTestErrorMessage = "Error testing API key. Check if your key is valid."
+                                            apiTestErrorMessage = ctx.getString(R.string.api_key_error)
                                         }
                                     }
                                 }) {
-                                Text("Test API Key")
+                                Text(stringResource(R.string.test_api_key))
                             }
                         }
 
@@ -400,7 +401,7 @@ fun MainScreen(onFinish: () -> Unit) {
 
                 Image(
                     painter = painterResource(id = R.drawable.back),
-                    contentDescription = "Back",
+                    contentDescription = stringResource(R.string.back),
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .padding(bottom = 10.dp)
@@ -422,18 +423,18 @@ fun MainScreen(onFinish: () -> Unit) {
                         welcomeDialogAccepted = true
                     ))
                 }
-            }) { Text("OK") } },
+            }) { Text(stringResource(R.string.ok)) } },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    Text("Welcome to karoo-routegraph!")
+                    Text(stringResource(R.string.welcome_title))
 
                     Spacer(Modifier.padding(10.dp))
 
-                    Text("You can add a vertical or horizontal route elevation profile and other fields to your data pages.")
+                    Text(stringResource(R.string.welcome_message_1))
 
                     Spacer(Modifier.padding(10.dp))
 
-                    Text("Please note that currently, this app will download elevation profiles from a public API hosted by german FOSSGIS e. V.")
+                    Text(stringResource(R.string.welcome_message_2))
                 }
             }
         )

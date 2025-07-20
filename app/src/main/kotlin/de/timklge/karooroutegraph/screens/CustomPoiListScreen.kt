@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -49,9 +50,9 @@ import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
-enum class PoiSortOption(val displayName: String) {
-    LINEAR_DISTANCE("Linear distance"),
-    AHEAD_ON_ROUTE("Ahead on route");
+enum class PoiSortOption(val displayNameRes: Int) {
+    LINEAR_DISTANCE(R.string.sort_linear_distance),
+    AHEAD_ON_ROUTE(R.string.sort_ahead_on_route);
 }
 
 sealed class DisplayedCustomPoi {
@@ -124,15 +125,6 @@ fun CustomPoiListScreen() {
     }
 
     val pois by remember(localPois, globalPois, tempPois, currentPosition, routeGraphViewModel, selectedSort) {
-        val lastKnownPositionAlongRoute = routeGraphViewModel?.lastKnownPositionOnMainRoute?.let { point ->
-            Symbol.POI(
-                lat = point.latitude(),
-                lng = point.longitude(),
-                name = "Last known position along route",
-                id = "last_known_position",
-            )
-        }
-
         val poiList = currentPosition?.let { _ ->
             val poiList = buildList {
                 addAll(localPois)
@@ -140,7 +132,13 @@ fun CustomPoiListScreen() {
                 addAll(tempPois)
 
                 // If not on route but have a last known position along the route, add it as POI to navigate to
-                if (lastKnownPositionAlongRoute != null && routeGraphViewModel?.routeDistance == null) {
+                if (routeGraphViewModel?.lastKnownPositionOnMainRoute != null && routeGraphViewModel?.routeDistance == null) {
+                    val lastKnownPositionAlongRoute = Symbol.POI(
+                        lat = routeGraphViewModel!!.lastKnownPositionOnMainRoute!!.latitude(),
+                        lng = routeGraphViewModel!!.lastKnownPositionOnMainRoute!!.longitude(),
+                        name = "Last known position along route", // Will be translated in UI
+                        id = "last_known_position",
+                    )
                     add(DisplayedCustomPoi.Local(lastKnownPositionAlongRoute))
                 }
             }
@@ -168,10 +166,10 @@ fun CustomPoiListScreen() {
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     OutlinedTextField(
-                        value = selectedSort.displayName,
+                        value = stringResource(selectedSort.displayNameRes),
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Sort by") },
+                        label = { Text(stringResource(R.string.sort_by)) },
                         trailingIcon = {
                             ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
                         },
@@ -183,7 +181,7 @@ fun CustomPoiListScreen() {
                     ) {
                         PoiSortOption.entries.forEach { option ->
                             DropdownMenuItem(
-                                text = { Text(option.displayName, style = MaterialTheme.typography.bodyLarge) },
+                                text = { Text(stringResource(option.displayNameRes), style = MaterialTheme.typography.bodyLarge) },
                                 onClick = {
                                     selectedSort = option
                                     expanded = false
@@ -211,8 +209,14 @@ fun CustomPoiListScreen() {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
+                    val displayName = if (displayedCustomPoi.poi.id == "last_known_position") {
+                        stringResource(R.string.last_known_position)
+                    } else {
+                        displayedCustomPoi.poi.name ?: stringResource(R.string.unnamed_poi)
+                    }
+
                     Text(
-                        text = displayedCustomPoi.poi.name ?: "Unnamed POI",
+                        text = displayName,
                         style = MaterialTheme.typography.bodyLarge,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -249,7 +253,7 @@ fun CustomPoiListScreen() {
                         onDismissRequest = { showContextMenu = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Navigate") },
+                            text = { Text(stringResource(R.string.navigate)) },
                             onClick = {
                                 showContextMenu = false
                                 karooSystemServiceProvider.karooSystemService.dispatch(LaunchPinDrop(displayedCustomPoi.poi))
@@ -257,14 +261,14 @@ fun CustomPoiListScreen() {
                             leadingIcon = {
                                 Icon(
                                     painter = painterResource(id = R.drawable.bxmap),
-                                    contentDescription = "Navigate"
+                                    contentDescription = stringResource(R.string.navigate)
                                 )
                             }
                         )
 
                         if (displayedCustomPoi is DisplayedCustomPoi.Temporary) {
                             DropdownMenuItem(
-                                text = { Text("Remove from map") },
+                                text = { Text(stringResource(R.string.remove_from_map)) },
                                 onClick = {
                                     showContextMenu = false
                                     coroutineScope.launch {
@@ -276,7 +280,7 @@ fun CustomPoiListScreen() {
                                 leadingIcon = {
                                     Icon(
                                         painter = painterResource(id = R.drawable.bx_info_circle),
-                                        contentDescription = "Remove from map"
+                                        contentDescription = stringResource(R.string.remove_from_map)
                                     )
                                 }
                             )
