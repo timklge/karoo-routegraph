@@ -139,6 +139,7 @@ fun NearbyPoiListScreen() {
     }
 
     var pois by remember { mutableStateOf(emptyList<NearbyPoi>()) }
+    var mappedPois by remember { mutableStateOf(emptyList<NearbyPoi>()) }
 
     var showOpeningHoursDialog by remember { mutableStateOf(false) }
     var openingHoursText by remember { mutableStateOf("") }
@@ -173,6 +174,33 @@ fun NearbyPoiListScreen() {
                 TurfConstants.UNIT_METERS
             )
         }
+    }
+
+    suspend fun sortPois() {
+        when (selectedSort) {
+            PoiSortOption.LINEAR_DISTANCE -> {
+                pois = mappedPois.sortedBy { linearDistanceToPoi(it) ?: Double.MAX_VALUE }
+            }
+            PoiSortOption.AHEAD_ON_ROUTE -> {
+                if (viewModel?.knownRoute == null) {
+                    lastErrorMessage = "Failed to fetch POIs: No route available. Please start a route first."
+                    delay(1_000)
+                    isRefreshing = false
+                } else {
+                    val newNearestPointsOnRouteToFoundPois = viewModel?.knownRoute?.let { route ->
+                        calculatePoiDistancesAsync(route, mappedPois.map { POI(it.poi) }, maxDistanceFromRoute)
+                    } ?: emptyMap()
+
+                    pois = mappedPois.sortedBy { poi ->
+                        distanceToPoi(poi.poi, viewModel?.sampledElevationData, newNearestPointsOnRouteToFoundPois, currentPosition, selectedSort, viewModel?.distanceAlongRoute)
+                    }
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(selectedSort, mappedPois) {
+        sortPois()
     }
 
     fun onRefresh() {
@@ -238,7 +266,7 @@ fun NearbyPoiListScreen() {
                     )
                 }
 
-                val mappedPois = overpassResponse?.elements?.map { element ->
+                mappedPois = overpassResponse?.elements?.map { element ->
                     NearbyPoi(
                         element = element,
                         poi = Symbol.POI(
@@ -249,27 +277,6 @@ fun NearbyPoiListScreen() {
                         )
                     )
                 } ?: emptyList()
-
-                when (selectedSort) {
-                    PoiSortOption.LINEAR_DISTANCE -> {
-                        pois = mappedPois.sortedBy { linearDistanceToPoi(it) ?: Double.MAX_VALUE }
-                    }
-                    PoiSortOption.AHEAD_ON_ROUTE -> {
-                        if (viewModel?.knownRoute == null) {
-                            lastErrorMessage = "Failed to fetch POIs: No route available. Please start a route first."
-                            delay(1_000)
-                            isRefreshing = false
-                        } else {
-                            val newNearestPointsOnRouteToFoundPois = viewModel?.knownRoute?.let { route ->
-                                calculatePoiDistancesAsync(route, mappedPois.map { POI(it.poi) }, maxDistanceFromRoute)
-                            } ?: emptyMap()
-
-                            pois = mappedPois.sortedBy { poi ->
-                                distanceToPoi(poi.poi, viewModel?.sampledElevationData, newNearestPointsOnRouteToFoundPois, currentPos, selectedSort, viewModel?.distanceAlongRoute)
-                            }
-                        }
-                    }
-                }
             } catch(e: Exception){
                 lastErrorMessage = "Failed to fetch POIs: ${e.message}"
                 delay(1_000)
