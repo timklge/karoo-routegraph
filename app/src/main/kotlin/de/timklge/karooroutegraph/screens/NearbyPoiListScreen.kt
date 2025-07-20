@@ -265,7 +265,7 @@ fun NearbyPoiListScreen() {
                             } ?: emptyMap()
 
                             pois = mappedPois.sortedBy { poi ->
-                                distanceToPoi(poi.poi, newNearestPointsOnRouteToFoundPois, currentPos, selectedSort, viewModel?.distanceAlongRoute)
+                                distanceToPoi(poi.poi, viewModel?.sampledElevationData, newNearestPointsOnRouteToFoundPois, currentPos, selectedSort, viewModel?.distanceAlongRoute)
                             }
                         }
                     }
@@ -415,7 +415,8 @@ fun NearbyPoiListScreen() {
 
                                 distanceMeters?.let { distance -> formatDistance(distance, isImperial) }
                             } else {
-                                val result = distanceToPoi(poi.poi, nearestPointsOnRouteToFoundPois, currentPosition, selectedSort, viewModel?.distanceAlongRoute)
+                                val result = distanceToPoi(poi.poi, viewModel?.sampledElevationData,
+                                    nearestPointsOnRouteToFoundPois, currentPosition, selectedSort, viewModel?.distanceAlongRoute)
 
                                 result?.formatDistance(isImperial)
                             }

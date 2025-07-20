@@ -365,12 +365,14 @@ class VerticalRouteGraphDataType(
                                 }
                             }
 
-                            val climbGain = distanceToString(climb.totalGain(viewModel.sampledElevationData).toFloat(), userProfile, true)
-                            val climbLength = distanceToString(climb.length, userProfile, false)
+                            val isImperial = userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
+
+                            val climbGain = distanceToString(climb.totalGain(viewModel.sampledElevationData).toFloat(), isImperial, true)
+                            val climbLength = distanceToString(climb.length, isImperial, false)
 
                             val climbAverageIncline = (climb.getAverageIncline(viewModel.sampledElevationData) * 100).roundToInt()   // String.format(Locale.getDefault(), "%.1f", climb.getAverageIncline(viewModel.sampledElevationData) * 100)
                             val climbMaxIncline = climb.getMaxIncline(viewModel.sampledElevationData)
-                            val climbMaxInclineLength = distanceToString(climbMaxIncline.end - climbMaxIncline.start, userProfile, false)
+                            val climbMaxInclineLength = distanceToString(climbMaxIncline.end - climbMaxIncline.start, isImperial, false)
 
                             if (climb.category.number <= 3){
                                 textDrawCommands.add(TextDrawCommand(graphBounds.right + 100f, climbStartProgressPixels + 15f, "⛰ $climbGain, $climbLength", textPaint, climb.category.importance, "⛰", Paint(textPaint).apply {
@@ -447,13 +449,15 @@ class VerticalRouteGraphDataType(
 
                         textDrawCommands.add(TextDrawCommand(graphBounds.right + 100f + 40f, progressPixels + 15f, text, textPaintBold, labelPriority, leadingIcon = mapPoiToIcon(poi.symbol.type)))
 
+                        val isImperial = userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
+
                         if (viewModel.distanceAlongRoute != null && nearestPoint.distanceFromRouteStart > viewModel.distanceAlongRoute){
                             val distanceMeters = nearestPoint.distanceFromRouteStart - viewModel.distanceAlongRoute
-                            var distanceStr = "In ${distanceToString(distanceMeters, userProfile, false)}"
+                            var distanceStr = "In ${distanceToString(distanceMeters, isImperial, false)}"
 
                             val elevationMetersRemaining = viewModel.sampledElevationData?.getTotalClimb(viewModel.distanceAlongRoute, nearestPoint.distanceFromRouteStart)
                             if (elevationMetersRemaining != null && !distanceIsZero(elevationMetersRemaining.toFloat(), userProfile)) {
-                                distanceStr += " ↗ ${distanceToString(elevationMetersRemaining.toFloat(), userProfile, true)}"
+                                distanceStr += " ↗ ${distanceToString(elevationMetersRemaining.toFloat(), isImperial, true)}"
                             }
 
                             textDrawCommands.add(TextDrawCommand(graphBounds.right + 100f, progressPixels + 15f, distanceStr, textPaint, labelPriority))

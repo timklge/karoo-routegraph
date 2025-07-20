@@ -125,7 +125,8 @@ class PoiApproachAlertService(
                     }
 
                     if (nearestPointInRange != null && (lastAlertShownForPoi == null || lastAlertShownForPoi.isBefore(checkForPoiApproachAlertsAfter))) {
-                        val text = "${poi.symbol.name} in " + distanceToPoi(poi.symbol, viewModel.poiDistances, currentPosition, PoiSortOption.AHEAD_ON_ROUTE, distanceAlongRoute)?.formatDistance(isImperial, flat = true)
+                        val text = "${poi.symbol.name} in " + distanceToPoi(poi.symbol, viewModel.sampledElevationData,
+                            viewModel.poiDistances, currentPosition, PoiSortOption.AHEAD_ON_ROUTE, distanceAlongRoute)?.formatDistance(isImperial, flat = true)
 
                         alertChannel.send(PoiAlert(text))
 

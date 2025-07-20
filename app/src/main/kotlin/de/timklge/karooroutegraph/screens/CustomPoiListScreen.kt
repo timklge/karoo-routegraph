@@ -145,8 +145,8 @@ fun CustomPoiListScreen() {
                 }
             }
 
-            poiList.filter { displayedCustomPoi -> distanceToPoi(displayedCustomPoi.poi, routeGraphViewModel?.poiDistances, currentPosition, selectedSort, routeGraphViewModel?.distanceAlongRoute) != null }.sortedBy { displayedCustomPoi ->
-                distanceToPoi(displayedCustomPoi.poi, routeGraphViewModel?.poiDistances, currentPosition, selectedSort, routeGraphViewModel?.distanceAlongRoute)
+            poiList.filter { displayedCustomPoi -> distanceToPoi(displayedCustomPoi.poi, routeGraphViewModel?.sampledElevationData, routeGraphViewModel?.poiDistances, currentPosition, selectedSort, routeGraphViewModel?.distanceAlongRoute) != null }.sortedBy { displayedCustomPoi ->
+                distanceToPoi(displayedCustomPoi.poi, routeGraphViewModel?.sampledElevationData, routeGraphViewModel?.poiDistances, currentPosition, selectedSort, routeGraphViewModel?.distanceAlongRoute)
             }
         } ?: run {
             localPois + globalPois
@@ -219,7 +219,8 @@ fun CustomPoiListScreen() {
                     )
 
                     val distanceLabel = currentPosition?.let {
-                        val distanceResult = distanceToPoi(displayedCustomPoi.poi, routeGraphViewModel?.poiDistances, it, selectedSort, routeGraphViewModel?.distanceAlongRoute)
+                        val distanceResult = distanceToPoi(displayedCustomPoi.poi, routeGraphViewModel?.sampledElevationData,
+                            routeGraphViewModel?.poiDistances, it, selectedSort, routeGraphViewModel?.distanceAlongRoute)
 
                         distanceResult?.formatDistance(isImperial)
                     }

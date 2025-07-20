@@ -18,7 +18,7 @@ data class POI(val symbol: Symbol.POI, val type: PoiType = PoiType.POI)
 
 sealed class DistanceToPoiResult : Comparable<DistanceToPoiResult> {
     data class LinearDistance(val distance: Double) : DistanceToPoiResult()
-    data class AheadOnRouteDistance(val distanceOnRoute: Double, val distanceFromPointOnRoute: Double) : DistanceToPoiResult()
+    data class AheadOnRouteDistance(val distanceOnRoute: Double, val distanceFromPointOnRoute: Double, val elevationMetersRemaining: Double?) : DistanceToPoiResult()
 
     override fun compareTo(other: DistanceToPoiResult): Int {
         return when {
@@ -40,13 +40,15 @@ sealed class DistanceToPoiResult : Comparable<DistanceToPoiResult> {
                 if (flat){
                     de.timklge.karooroutegraph.screens.formatDistance (distanceOnRoute + distanceFromPointOnRoute, isImperial)
                 } else {
-                    de.timklge.karooroutegraph.screens.formatDistance(
-                        distanceOnRoute,
-                        isImperial
-                    ) + " ahead, " + de.timklge.karooroutegraph.screens.formatDistance(
-                        distanceFromPointOnRoute,
-                        isImperial
-                    ) + " from route"
+                    buildString {
+                        append(de.timklge.karooroutegraph.screens.formatDistance(distanceOnRoute, isImperial))
+                        append(" ahead, ")
+                        append(de.timklge.karooroutegraph.screens.formatDistance(distanceFromPointOnRoute, isImperial))
+                        append(" from route")
+                        if (elevationMetersRemaining != null) {
+                            append(" ↗ ${distanceToString(elevationMetersRemaining.toFloat(), isImperial, true)}")
+                        }
+                    }
                 }
             }
         }
@@ -166,7 +168,7 @@ private fun calculatePoiDistance(polyline: LineString, poi: POI, maxDistanceToRo
     }
 }
 
-fun distanceToPoi(poi: Symbol.POI, nearestPointsOnRouteToFoundPois: Map<POI, List<NearestPoint>>?, currentPosition: Point?, selectedSort: PoiSortOption, distanceAlongRoute: Float?): DistanceToPoiResult? {
+fun distanceToPoi(poi: Symbol.POI, sampledElevationData: SampledElevationData?, nearestPointsOnRouteToFoundPois: Map<POI, List<NearestPoint>>?, currentPosition: Point?, selectedSort: PoiSortOption, distanceAlongRoute: Float?): DistanceToPoiResult? {
     val linearDistance = currentPosition?.let {
         TurfMeasurement.distance(
             Point.fromLngLat(poi.lng, poi.lat),
@@ -185,9 +187,14 @@ fun distanceToPoi(poi: Symbol.POI, nearestPointsOnRouteToFoundPois: Map<POI, Lis
             val nearestPointAheadOnRoute = nearestPointsAheadOnRoute?.minByOrNull { it.distanceFromPointOnRoute + it.distanceFromRouteStart }
 
             val distanceAheadOnRoute = nearestPointAheadOnRoute?.let {
+                val elevationMetersRemaining = if (distanceAlongRoute != null) {
+                    sampledElevationData?.getTotalClimb(distanceAlongRoute, nearestPointAheadOnRoute.distanceFromRouteStart)
+                } else null
+
                 DistanceToPoiResult.AheadOnRouteDistance(
                     it.distanceFromRouteStart.toDouble() - (distanceAlongRoute ?: 0.0f),
-                    it.distanceFromPointOnRoute.toDouble()
+                    it.distanceFromPointOnRoute.toDouble(),
+                    elevationMetersRemaining
                 )
             }
 

@@ -195,7 +195,8 @@ fun PoiSearchScreen() {
 
                             pois = foundPlaces.sortedBy { poi ->
                                 val symbol = Symbol.POI("poi-${poi.osmId ?: poi.placeId}", poi.lat.toDouble(), poi.lon.toDouble(), name = poi.displayName ?: poi.name ?: "Unnamed POI")
-                                distanceToPoi(symbol, newNearestPointsOnRouteToFoundPois, currentPos, selectedSort, viewModel?.distanceAlongRoute)
+                                distanceToPoi(symbol, viewModel?.sampledElevationData,
+                                    newNearestPointsOnRouteToFoundPois, currentPos, selectedSort, viewModel?.distanceAlongRoute)
                             }
                         }
                     }
@@ -336,7 +337,7 @@ fun PoiSearchScreen() {
                                     formatDistance(distance, isImperial)
                                 }
                             } else {
-                                val result = distanceToPoi(symbol, nearestPointsOnRouteToFoundPois, currentPosition, selectedSort, viewModel?.distanceAlongRoute)
+                                val result = distanceToPoi(symbol, viewModel?.sampledElevationData, nearestPointsOnRouteToFoundPois, currentPosition, selectedSort, viewModel?.distanceAlongRoute)
                                 result?.formatDistance(isImperial)
                             }
                         }

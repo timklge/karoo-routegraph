@@ -73,9 +73,10 @@ tasks.register("generateManifest") {
             "releaseNotes" to "* Add 'ahead on route' setting and option to temporarily add POIs to POI dialog\n* Add button to trigger navigation to route / global POIs, nearby POIs of type, POI text search\n* Flip vertical elevation profile",
             "screenshotUrls" to listOf(
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/minimap.png",
-                "https://github.com/timklge/karoo-routegraph/releases/latest/download/horizontal_routegraph.png",
+                "https://github.com/timklge/karoo-routegraph/releases/latest/download/poinav.png",
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/vertical_routegraph.png",
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/chevrons.png",
+                "https://github.com/timklge/karoo-routegraph/releases/latest/download/horizontal_routegraph.png",
             ),
         )
 
