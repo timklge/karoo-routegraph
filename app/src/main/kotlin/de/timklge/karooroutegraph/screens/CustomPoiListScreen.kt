@@ -29,6 +29,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -226,7 +227,7 @@ fun CustomPoiListScreen() {
                         val distanceResult = distanceToPoi(displayedCustomPoi.poi, routeGraphViewModel?.sampledElevationData,
                             routeGraphViewModel?.poiDistances, it, selectedSort, routeGraphViewModel?.distanceAlongRoute)
 
-                        distanceResult?.formatDistance(isImperial)
+                        distanceResult?.formatDistance(LocalContext.current, isImperial)
                     }
 
                     if (distanceLabel != null){

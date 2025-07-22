@@ -98,6 +98,10 @@
     <string name="category_bench">Bench</string>
     <string name="category_bike_shop">Bike Shop</string>
 
+    <!-- Distance formatting strings -->
+    <string name="distance_ahead">ahead</string>
+    <string name="distance_from_route">from route</string>
+
     <!-- Error messages -->
     <string name="error_no_position">Failed to fetch POIs: Current position is not available. Check GPS signal.</string>
     <string name="error_no_route">Failed to fetch POIs: No route available. Please start a route first.</string>

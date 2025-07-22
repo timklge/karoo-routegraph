@@ -1,5 +1,6 @@
 package de.timklge.karooroutegraph
 
+import android.content.Context
 import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
 import com.mapbox.turf.TurfConstants
@@ -30,7 +31,7 @@ sealed class DistanceToPoiResult : Comparable<DistanceToPoiResult> {
         }
     }
 
-    fun formatDistance(isImperial: Boolean, flat: Boolean = false): String {
+    fun formatDistance(context: Context, isImperial: Boolean, flat: Boolean = false): String {
         return when (this){
             is LinearDistance -> de.timklge.karooroutegraph.screens.formatDistance(
                 distance,
@@ -42,9 +43,9 @@ sealed class DistanceToPoiResult : Comparable<DistanceToPoiResult> {
                 } else {
                     buildString {
                         append(de.timklge.karooroutegraph.screens.formatDistance(distanceOnRoute, isImperial))
-                        append(" ahead, ")
+                        append(" ${context.getString(R.string.distance_ahead)}, ")
                         append(de.timklge.karooroutegraph.screens.formatDistance(distanceFromPointOnRoute, isImperial))
-                        append(" from route")
+                        append(" ${context.getString(R.string.distance_from_route)}")
                         if (elevationMetersRemaining != null) {
                             append(" ↗ ${distanceToString(elevationMetersRemaining.toFloat(), isImperial, true)}")
                         }

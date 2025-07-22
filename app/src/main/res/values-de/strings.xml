@@ -99,9 +99,13 @@
     <string name="category_bench">Bank</string>
     <string name="category_bike_shop">Fahrradladen</string>
 
+    <!-- Distance formatting strings -->
+    <string name="distance_ahead">voraus</string>
+    <string name="distance_from_route">von Route</string>
+
     <!-- Error messages -->
-    <string name="error_no_position">POIs konnten nicht geladen werden: Aktuelle Position ist nicht verfügbar. GPS-Signal prüfen.</string>
-    <string name="error_no_route">POIs konnten nicht geladen werden: Keine Route verfügbar. Bitte starten Sie zuerst eine Route.</string>
-    <string name="error_no_route_ahead">POIs voraus auf Route konnten nicht geladen werden: Keine Route geladen.</string>
-    <string name="error_fetch_pois">POIs konnten nicht geladen werden: %1$s</string>
+    <string name="error_no_position">POIs konnten nicht abgerufen werden: Aktuelle Position ist nicht verfügbar. GPS-Signal prüfen.</string>
+    <string name="error_no_route">POIs konnten nicht abgerufen werden: Keine Route verfügbar. Bitte zuerst eine Route starten.</string>
+    <string name="error_no_route_ahead">POIs voraus auf Route konnten nicht abgerufen werden: Keine Route geladen.</string>
+    <string name="error_fetch_pois">POIs konnten nicht abgerufen werden: %1$s</string>
 </resources>
