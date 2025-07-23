@@ -4,8 +4,6 @@ import android.util.Log
 import com.mapbox.geojson.Point
 import com.mapbox.turf.TurfConstants
 import com.mapbox.turf.TurfConversion
-import com.mapbox.turf.TurfMeasurement
-import com.mapbox.turf.TurfMisc
 import com.mapbox.turf.TurfTransformation
 import io.hammerhead.karooext.models.HttpResponseState
 import io.hammerhead.karooext.models.OnHttpResponse

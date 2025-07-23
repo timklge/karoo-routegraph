@@ -1,5 +1,6 @@
 package de.timklge.karooroutegraph
 
+import android.content.Intent
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.mapbox.geojson.LineString
@@ -485,12 +486,19 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                                 karooSystem.karooSystemService.dispatch(InRideAlert(
                                     "incident-update-${System.currentTimeMillis()}",
                                     R.drawable.bx_info_circle,
-                                    "Incidents",
-                                    "${incidents.results.size} traffic incidents along route",
+                                    applicationContext.getString(R.string.incidents),
+                                    applicationContext.getString(R.string.traffic_incidents_found, incidents.results.size),
                                     10_000L,
                                     R.color.eleLightRed,
                                     R.color.black
                                 ))
+
+                                val intent = Intent("de.timklge.HIDE_POWERBAR").apply {
+                                    putExtra("duration", 11_000L)
+                                    putExtra("location", "top")
+                                }
+
+                                applicationContext.sendBroadcast(intent)
 
                                 karooSystem.karooSystemService.dispatch(PlayBeepPattern(
                                     listOf(PlayBeepPattern.Tone(3000, 300), PlayBeepPattern.Tone(3000, 300), PlayBeepPattern.Tone(3000, 300))
@@ -504,11 +512,18 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                             extensionScope.launch {
                                 delay(10_000L) // Wait for 10 seconds before showing the alert
 
+                                val intent = Intent("de.timklge.HIDE_POWERBAR").apply {
+                                    putExtra("duration", 11_000L)
+                                    putExtra("location", "top")
+                                }
+
+                                applicationContext.sendBroadcast(intent)
+
                                 karooSystem.karooSystemService.dispatch(InRideAlert(
                                     "incident-update-${System.currentTimeMillis()}",
                                     R.drawable.bx_info_circle,
-                                    "Incidents",
-                                    "Failed to request incidents",
+                                    applicationContext.getString(R.string.incidents),
+                                    applicationContext.getString(R.string.failed_to_request_incidents),
                                     10_000L,
                                     R.color.eleLightRed,
                                     R.color.black

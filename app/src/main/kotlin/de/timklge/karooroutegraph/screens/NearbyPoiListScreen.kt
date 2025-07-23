@@ -43,7 +43,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -74,23 +76,23 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
-enum class NearbyPoiCategory(val label: String, val osmTag: String) {
-    DRINKING_WATER("Water", "amenity=drinking_water"),
-    GAS_STATIONS("Gas Station", "amenity=fuel"),
-    SUPERMARKETS("Supermarket", "shop=supermarket"),
-    RESTAURANTS("Restaurant", "amenity=restaurant"),
-    CAFES("Café", "amenity=cafe"),
-    ICE_CREAM("Ice Cream", "amenity=ice_cream"),
-    TOILETS("Toilets", "amenity=toilets"),
-    SHOWERS("Showers", "amenity=shower"),
-    ATMS("ATMs", "amenity=atm"),
-    SHELTER("Shelter", "amenity=shelter"),
-    CAMPING_SITE("Camping Site", "tourism=camp_site"),
-    HOTEL("Hotel", "tourism=hotel"),
-    TRAIN_STATION("Train Station", "railway=station"),
-    WASTE_BASKET("Waste Basket", "amenity=waste_basket"),
-    BENCH("Bench", "amenity=bench"),
-    BIKE_SHOP("Bike Shop", "shop=bicycle"),
+enum class NearbyPoiCategory(val labelRes: Int, val osmTag: String) {
+    DRINKING_WATER(R.string.category_water, "amenity=drinking_water"),
+    GAS_STATIONS(R.string.category_gas_station, "amenity=fuel"),
+    SUPERMARKETS(R.string.category_supermarket, "shop=supermarket"),
+    RESTAURANTS(R.string.category_restaurant, "amenity=restaurant"),
+    CAFES(R.string.category_cafe, "amenity=cafe"),
+    ICE_CREAM(R.string.category_ice_cream, "amenity=ice_cream"),
+    TOILETS(R.string.category_toilets, "amenity=toilets"),
+    SHOWERS(R.string.category_showers, "amenity=shower"),
+    ATMS(R.string.category_atms, "amenity=atm"),
+    SHELTER(R.string.category_shelter, "amenity=shelter"),
+    CAMPING_SITE(R.string.category_camping_site, "tourism=camp_site"),
+    HOTEL(R.string.category_hotel, "tourism=hotel"),
+    TRAIN_STATION(R.string.category_train_station, "railway=station"),
+    WASTE_BASKET(R.string.category_waste_basket, "amenity=waste_basket"),
+    BENCH(R.string.category_bench, "amenity=bench"),
+    BIKE_SHOP(R.string.category_bike_shop, "shop=bicycle"),
 }
 
 data class NearbyPoi(val element: Element, val poi: Symbol.POI)
@@ -129,6 +131,12 @@ fun NearbyPoiListScreen() {
     val routeGraphViewModelProvider = koinInject<RouteGraphViewModelProvider>()
 
     var maxDistanceFromRoute by remember { mutableStateOf(1_000.0) }
+
+    // Add these for accessing string resources
+    val errorNoRoute = stringResource(R.string.error_no_route)
+    val errorNoPosition = stringResource(R.string.error_no_position)
+    val errorFetchPois = stringResource(R.string.error_fetch_pois)
+    val unnamedPoi = stringResource(R.string.unnamed_poi)
 
     LaunchedEffect(Unit) {
         val viewSettings = karooSystemServiceProvider.streamViewSettings().first()
@@ -185,7 +193,7 @@ fun NearbyPoiListScreen() {
             }
             PoiSortOption.AHEAD_ON_ROUTE -> {
                 if (viewModel?.knownRoute == null) {
-                    lastErrorMessage = "Failed to fetch POIs: No route available. Please start a route first."
+                    lastErrorMessage = errorNoRoute
                     delay(1_000)
                     isRefreshing = false
                 } else {
@@ -215,7 +223,7 @@ fun NearbyPoiListScreen() {
             try {
                 val currentPos = currentPosition
                 if (currentPos == null) {
-                    lastErrorMessage = "Failed to fetch POIs: Current position is not available. Check GPS signal."
+                    lastErrorMessage = errorNoPosition
                     delay(1_000)
                     isRefreshing = false
                     return@launch
@@ -244,7 +252,7 @@ fun NearbyPoiListScreen() {
                     val route = viewModel?.knownRoute
 
                     if (route == null) {
-                        lastErrorMessage = "Failed to fetch POIs ahead on route: No route loaded."
+                        lastErrorMessage = errorNoRoute
                         delay(1_000)
                         isRefreshing = false
                         return@launch
@@ -275,12 +283,12 @@ fun NearbyPoiListScreen() {
                             id = "nearby-${element.id}",
                             lat = element.lat,
                             lng = element.lon,
-                            name = element.tags?.get("name") ?: "Unnamed POI"
+                            name = element.tags?.get("name") ?: unnamedPoi
                         )
                     )
                 } ?: emptyList()
             } catch(e: Exception){
-                lastErrorMessage = "Failed to fetch POIs: ${e.message}"
+                lastErrorMessage = String.format(errorFetchPois, e.message ?: "")
                 delay(1_000)
                 isRefreshing = false
                 return@launch
@@ -332,7 +340,7 @@ fun NearbyPoiListScreen() {
                                 }
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(option.displayName)
+                            Text(stringResource(option.displayNameRes))
                         }
                     }
                 }
@@ -352,14 +360,21 @@ fun NearbyPoiListScreen() {
                         .padding(horizontal = 8.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    val selectText = stringResource(R.string.select)
+                    val categoriesText = if (selectedCategories.isEmpty()) {
+                        selectText
+                    } else {
+                        selectedCategories.map { stringResource(it.labelRes) }.joinToString()
+                    }
+
                     Box(modifier = Modifier
                         .weight(1f)
                         .clickable { showDialog = true }) {
                         OutlinedTextField(
-                            value = if (selectedCategories.isEmpty()) "Select" else selectedCategories.joinToString { it.label },
+                            value = categoriesText,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Categories") },
+                            label = { Text(stringResource(R.string.categories)) },
                             trailingIcon = {
                                 ExposedDropdownMenuDefaults.TrailingIcon(expanded = false)
                             },
@@ -412,7 +427,7 @@ fun NearbyPoiListScreen() {
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = poi.element.tags?.get("name") ?: "Unnamed POI",
+                            text = poi.element.tags?.get("name") ?: stringResource(R.string.unnamed_poi),
                             style = MaterialTheme.typography.bodyLarge,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
@@ -427,7 +442,7 @@ fun NearbyPoiListScreen() {
                                 val result = distanceToPoi(poi.poi, viewModel?.sampledElevationData,
                                     nearestPointsOnRouteToFoundPois, currentPosition, selectedSort, viewModel?.distanceAlongRoute)
 
-                                result?.formatDistance(isImperial)
+                                result?.formatDistance(LocalContext.current, isImperial)
                             }
                         }
 
@@ -455,7 +470,7 @@ fun NearbyPoiListScreen() {
                             onDismissRequest = { showContextMenu = false }
                         ) {
                             DropdownMenuItem(
-                                text = { Text("Navigate") },
+                                text = { Text(stringResource(R.string.navigate)) },
                                 onClick = {
                                     showContextMenu = false
                                     karooSystemServiceProvider.karooSystemService.dispatch(LaunchPinDrop(poi.poi))
@@ -463,14 +478,14 @@ fun NearbyPoiListScreen() {
                                 leadingIcon = {
                                     Icon(
                                         painter = painterResource(id = R.drawable.bxmap),
-                                        contentDescription = "Navigate"
+                                        contentDescription = stringResource(R.string.navigate)
                                     )
                                 }
                             )
 
                             if (!temporaryPois.poisByOsmId.contains(poi.element.id)) {
                                 DropdownMenuItem(
-                                    text = { Text("Add to map") },
+                                    text = { Text(stringResource(R.string.add_to_map)) },
                                     onClick = {
                                         showContextMenu = false
 
@@ -485,13 +500,13 @@ fun NearbyPoiListScreen() {
                                     leadingIcon = {
                                         Icon(
                                             painter = painterResource(id = R.drawable.bx_info_circle),
-                                            contentDescription = "Add to map"
+                                            contentDescription = stringResource(R.string.add_to_map)
                                         )
                                     }
                                 )
                             } else {
                                 DropdownMenuItem(
-                                    text = { Text("Remove from map") },
+                                    text = { Text(stringResource(R.string.remove_from_map)) },
                                     onClick = {
                                         showContextMenu = false
                                         coroutineScope.launch {
@@ -503,24 +518,25 @@ fun NearbyPoiListScreen() {
                                     leadingIcon = {
                                         Icon(
                                             painter = painterResource(id = R.drawable.bx_info_circle),
-                                            contentDescription = "Remove from map"
+                                            contentDescription = stringResource(R.string.remove_from_map)
                                         )
                                     }
                                 )
                             }
 
                             if (poi.element.hasAdditionalInfo()) {
+                                val noInfoText = stringResource(R.string.no_info_available)
                                 DropdownMenuItem(
-                                    text = { Text("Show info") },
+                                    text = { Text(stringResource(R.string.show_info)) },
                                     onClick = {
                                         showContextMenu = false
-                                        openingHoursText = poi.element.tags?.map { (k, v) -> "$k=$v" }?.joinToString("\r\n") ?: "No info available"
+                                        openingHoursText = poi.element.tags?.map { (k, v) -> "$k=$v" }?.joinToString("\r\n") ?: noInfoText
                                         showOpeningHoursDialog = true
                                     },
                                     leadingIcon = {
                                         Icon(
                                             painter = painterResource(id = R.drawable.bx_info_circle),
-                                            contentDescription = "Show info"
+                                            contentDescription = stringResource(R.string.show_info)
                                         )
                                     }
                                 )
@@ -567,7 +583,7 @@ fun NearbyPoiListScreen() {
                                     }
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(category.label)
+                                Text(stringResource(category.labelRes))
                             }
                         }
                     }
@@ -576,7 +592,7 @@ fun NearbyPoiListScreen() {
                         horizontalArrangement = Arrangement.End
                     ) {
                         TextButton(onClick = { showDialog = false }) {
-                            Text("Cancel")
+                            Text(stringResource(R.string.cancel))
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(onClick = {
@@ -584,7 +600,7 @@ fun NearbyPoiListScreen() {
                             showDialog = false
                             onRefresh()
                         }) {
-                            Text("OK")
+                            Text(stringResource(R.string.ok))
                         }
                     }
                 }
@@ -602,7 +618,7 @@ fun NearbyPoiListScreen() {
                     Text(text = openingHoursText, style = MaterialTheme.typography.bodyMedium)
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(onClick = { showOpeningHoursDialog = false }) {
-                        Text("OK")
+                        Text(stringResource(R.string.ok))
                     }
                 }
             }

@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">RouteGraph</string>
+    <string name="extension_name">RouteGraph</string>
+    <string name="routegraph">Routenprofil</string>
+    <string name="routegraph_description">Vollständiges Höhenprofil mit POIs</string>
+    <string name="verticalroutegraph">Vertikales Routenprofil</string>
+    <string name="verticalroutegraph_description">Vollständiges Höhenprofil mit POIs</string>
+    <string name="distance_to_poi">Entfernung zum POI</string>
+    <string name="distance_to_poi_description">Entfernung zum nächsten POI</string>
+    <string name="elevation_to_poi">Höhe zum POI</string>
+    <string name="elevation_to_poi_description">Höhe zum nächsten POI</string>
+    <string name="minimap">Minikarte</string>
+    <string name="minimap_description">Sekundäre Kartenanzeige (mit Route und POIs)</string>
+    <string name="poi_button">POI-Knopf</string>
+    <string name="poi_button_description">Knopf zum schnellen Öffnen der POI-Liste</string>
+
+    <!-- MainScreen strings -->
+    <string name="device_status_warning">Gerätestatus konnte nicht gelesen werden. Bitte Karoo-Software aktualisieren.</string>
+    <string name="show_navigate_button">Navigations-Knopf in Graphen anzeigen</string>
+    <string name="gradient_chevrons">Steigungsindikatoren</string>
+    <string name="show_gradient_indicators">Steigungsindikatoren auf Karte anzeigen</string>
+    <string name="amount_of_indicators">Anzahl der Indikatoren:</string>
+
+    <!-- Gradient Indicator Frequency labels -->
+    <string name="gradient_frequency_low">Niedrig</string>
+    <string name="gradient_frequency_medium">Mittel</string>
+    <string name="gradient_frequency_high">Hoch</string>
+    <string name="gradient_frequency_max">Maximum</string>
+
+    <string name="points_of_interest_poi">Sehenswürdigkeiten (POI)</string>
+    <string name="show_poi_labels">POI-Beschriftungen auf Minikarte anzeigen</string>
+    <string name="manage_pois">POIs verwalten</string>
+    <string name="manage_pois_description">POIs verwalten</string>
+    <string name="max_poi_distance">Max. POI-Entfernung von Route:</string>
+    <string name="poi_approach_alert_distance">POI-Annäherungsalarm-Entfernung:</string>
+    <string name="distance_off">Aus</string>
+    <string name="traffic_incidents">Verkehrsereignisse</string>
+    <string name="enable_traffic_incident_reporting">Verkehrsereignis-Meldungen aktivieren</string>
+    <string name="requires_here_maps_api">Benötigt HERE Maps API-Schlüssel</string>
+    <string name="here_maps_api_key">HERE Maps API-Schlüssel</string>
+    <string name="test_api_key">API-Schlüssel testen</string>
+    <string name="testing_api_key">Teste API-Schlüssel…</string>
+    <string name="api_key_valid">API-Schlüssel ist gültig. %1$d Verkehrsereignisse im Zentrum von Berlin gemeldet (aktualisiert am %2$s)</string>
+    <string name="api_key_error">Fehler beim Testen des API-Schlüssels. Prüfen Sie, ob Ihr Schlüssel gültig ist.</string>
+    <string name="ok">OK</string>
+    <string name="back">Zurück</string>
+    <string name="welcome_title">Willkommen bei karoo-routegraph!</string>
+    <string name="welcome_message_1">Sie können ein vertikales oder horizontales Routenhöhenprofil und andere Felder zu Ihren Datenseiten hinzufügen.</string>
+    <string name="welcome_message_2">Bitte beachten Sie, dass diese App derzeit Höhenprofile von einer öffentlichen API herunterlädt, die vom deutschen FOSSGIS e. V. gehostet wird.</string>
+
+    <!-- POI Screen strings -->
+    <string name="poi_tab_custom">Eigene</string>
+    <string name="poi_tab_nearby">Nähe</string>
+    <string name="poi_tab_search">Suchen</string>
+
+    <!-- Common POI strings -->
+    <string name="navigate">Navigieren</string>
+    <string name="add_to_map">Zur Karte hinzufügen</string>
+    <string name="remove_from_map">Von Karte entfernen</string>
+    <string name="show_info">Info anzeigen</string>
+    <string name="sort_by">Sortieren nach</string>
+    <string name="categories">Kategorien</string>
+    <string name="search_query">Suchanfrage</string>
+    <string name="cancel">Abbrechen</string>
+    <string name="select">Auswählen</string>
+    <string name="unnamed_poi">Unbenannter POI</string>
+    <string name="last_known_position">Letzte bekannte Position entlang der Route</string>
+    <string name="no_info_available">Keine Informationen verfügbar</string>
+
+    <!-- POI Alert strings -->
+    <string name="poi_approach">POI-Annäherung</string>
+    <string name="poi_in_distance">%1$s in %2$s</string>
+
+    <!-- Traffic Incident Alert strings -->
+    <string name="incidents">Störungen</string>
+    <string name="traffic_incidents_found">%1$d Verkehrsstörungen entlang der Route</string>
+    <string name="failed_to_request_incidents">Störungen konnten nicht angefordert werden</string>
+
+    <!-- POI Sort Options -->
+    <string name="sort_linear_distance">Luftlinie</string>
+    <string name="sort_ahead_on_route">Distanz auf Route</string>
+
+    <!-- POI Categories -->
+    <string name="category_water">Trinkwasser</string>
+    <string name="category_gas_station">Tankstelle</string>
+    <string name="category_supermarket">Supermarkt</string>
+    <string name="category_restaurant">Restaurant</string>
+    <string name="category_cafe">Café</string>
+    <string name="category_ice_cream">Eisdiele</string>
+    <string name="category_toilets">Toiletten</string>
+    <string name="category_showers">Duschen</string>
+    <string name="category_atms">Geldautomaten</string>
+    <string name="category_shelter">Unterstand</string>
+    <string name="category_camping_site">Campingplatz</string>
+    <string name="category_hotel">Hotel</string>
+    <string name="category_train_station">Bahnhof</string>
+    <string name="category_waste_basket">Mülleimer</string>
+    <string name="category_bench">Bank</string>
+    <string name="category_bike_shop">Fahrradladen</string>
+
+    <!-- Distance formatting strings -->
+    <string name="distance_ahead">voraus</string>
+    <string name="distance_from_route">von Route</string>
+
+    <!-- Error messages -->
+    <string name="error_no_position">POIs konnten nicht abgerufen werden: Aktuelle Position ist nicht verfügbar. GPS-Signal prüfen.</string>
+    <string name="error_no_route">POIs konnten nicht abgerufen werden: Keine Route verfügbar. Bitte zuerst eine Route starten.</string>
+    <string name="error_no_route_ahead">POIs voraus auf Route konnten nicht abgerufen werden: Keine Route geladen.</string>
+    <string name="error_fetch_pois">POIs konnten nicht abgerufen werden: %1$s</string>
+</resources>

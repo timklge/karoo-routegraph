@@ -11,7 +11,6 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import java.net.URLEncoder
-import java.util.Locale
 import java.util.zip.GZIPInputStream
 
 @Serializable

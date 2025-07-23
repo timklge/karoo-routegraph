@@ -5,9 +5,9 @@ import android.util.Log
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
+import de.timklge.karooroutegraph.screens.RouteGraphPoiSettings
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.screens.RouteGraphTemporaryPOIs
-import de.timklge.karooroutegraph.screens.RouteGraphPoiSettings
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.models.KarooEvent
 import io.hammerhead.karooext.models.OnStreamState

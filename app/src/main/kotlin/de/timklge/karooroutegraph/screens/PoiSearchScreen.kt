@@ -32,14 +32,17 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -78,12 +81,17 @@ fun PoiSearchScreen() {
     var selectedSort by remember { mutableStateOf(PoiSortOption.LINEAR_DISTANCE) }
     val focusManager = LocalFocusManager.current
 
+    // Get localized error messages
+    val errorNoPosition = stringResource(R.string.error_no_position)
+    val errorNoRoute = stringResource(R.string.error_no_route)
+    val errorFetchPois = stringResource(R.string.error_fetch_pois)
+
     val karooSystemServiceProvider = koinInject<KarooSystemServiceProvider>()
     val nominatimProvider = koinInject<NominatimProvider>()
     val locationViewModelProvider = koinInject<LocationViewModelProvider>()
     val routeGraphViewModelProvider = koinInject<RouteGraphViewModelProvider>()
 
-    var maxDistanceFromRoute by remember { mutableStateOf(1_000.0) }
+    var maxDistanceFromRoute by remember { mutableDoubleStateOf(1_000.0) }
 
     LaunchedEffect(Unit) {
         val viewSettings = karooSystemServiceProvider.streamViewSettings().first()
@@ -134,9 +142,6 @@ fun PoiSearchScreen() {
 
     fun onRefresh() {
         if (isRefreshing) return // Prevent multiple refreshes
-        if (searchQuery.isEmpty()) {
-            return
-        }
 
         focusManager.clearFocus()
         isRefreshing = true
@@ -146,7 +151,7 @@ fun PoiSearchScreen() {
             try {
                 val currentPos = currentPosition
                 if (currentPos == null) {
-                    lastErrorMessage = "Failed to fetch POIs: Current position is not available. Check GPS signal."
+                    lastErrorMessage = errorNoPosition
                     delay(1_000)
                     isRefreshing = false
                     return@launch
@@ -174,7 +179,7 @@ fun PoiSearchScreen() {
                     }
                     PoiSortOption.AHEAD_ON_ROUTE -> {
                         if (viewModel?.knownRoute == null) {
-                            lastErrorMessage = "Failed to fetch POIs: No route available. Please start a route first."
+                            lastErrorMessage = errorNoRoute
                             delay(1_000)
                             isRefreshing = false
                         } else {
@@ -186,13 +191,6 @@ fun PoiSearchScreen() {
                                 calculatePoiDistancesAsync(route, poisForCalculation, maxDistanceFromRoute)
                             } ?: emptyMap()
 
-                            /* pois = foundPlaces.sortedWith(
-                                compareBy<OsmPlace> { it.placeRank }.thenBy { poi ->
-                                    val symbol = Symbol.POI("poi-${poi.osmId ?: poi.placeId}", poi.lat.toDouble(), poi.lon.toDouble(), name = poi.displayName ?: poi.name ?: "Unnamed POI")
-                                    distanceToPoi(symbol, newNearestPointsOnRouteToFoundPois, currentPos, selectedSort, viewModel?.distanceAlongRoute)
-                                }
-                            ) */
-
                             pois = foundPlaces.sortedBy { poi ->
                                 val symbol = Symbol.POI("poi-${poi.osmId ?: poi.placeId}", poi.lat.toDouble(), poi.lon.toDouble(), name = poi.displayName ?: poi.name ?: "Unnamed POI")
                                 distanceToPoi(symbol, viewModel?.sampledElevationData,
@@ -202,7 +200,7 @@ fun PoiSearchScreen() {
                     }
                 }
             } catch(e: Exception){
-                lastErrorMessage = "Failed to fetch POIs: ${e.message}"
+                lastErrorMessage = errorFetchPois.format(e.message ?: "Unknown error")
                 delay(1_000)
                 isRefreshing = false
                 return@launch
@@ -254,7 +252,7 @@ fun PoiSearchScreen() {
                                 }
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(option.displayName)
+                            Text(stringResource(option.displayNameRes))
                         }
                     }
                 }
@@ -277,7 +275,7 @@ fun PoiSearchScreen() {
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        label = { Text("Search query") },
+                        label = { Text(stringResource(R.string.search_query)) },
                         maxLines = 1,
                         singleLine = true,
                         modifier = Modifier.weight(1.0f),
@@ -324,7 +322,7 @@ fun PoiSearchScreen() {
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = poi.displayName ?: poi.name ?: "Unnamed POI",
+                            text = poi.displayName ?: poi.name ?: stringResource(R.string.unnamed_poi),
                             style = MaterialTheme.typography.bodyLarge,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -338,7 +336,7 @@ fun PoiSearchScreen() {
                                 }
                             } else {
                                 val result = distanceToPoi(symbol, viewModel?.sampledElevationData, nearestPointsOnRouteToFoundPois, currentPosition, selectedSort, viewModel?.distanceAlongRoute)
-                                result?.formatDistance(isImperial)
+                                result?.formatDistance(LocalContext.current, isImperial)
                             }
                         }
 
@@ -366,7 +364,7 @@ fun PoiSearchScreen() {
                             onDismissRequest = { showContextMenu = false }
                         ) {
                             DropdownMenuItem(
-                                text = { Text("Navigate") },
+                                text = { Text(stringResource(R.string.navigate)) },
                                 onClick = {
                                     showContextMenu = false
                                     karooSystemServiceProvider.karooSystemService.dispatch(LaunchPinDrop(symbol))
@@ -374,7 +372,7 @@ fun PoiSearchScreen() {
                                 leadingIcon = {
                                     Icon(
                                         painter = painterResource(id = R.drawable.bxmap),
-                                        contentDescription = "Navigate"
+                                        contentDescription = stringResource(R.string.navigate)
                                     )
                                 }
                             )
@@ -384,7 +382,7 @@ fun PoiSearchScreen() {
 
                                 if (!temporaryPois.poisByOsmId.contains(id)) {
                                     DropdownMenuItem(
-                                        text = { Text("Add to map") },
+                                        text = { Text(stringResource(R.string.add_to_map)) },
                                         onClick = {
                                             showContextMenu = false
                                             coroutineScope.launch {
@@ -396,13 +394,13 @@ fun PoiSearchScreen() {
                                         leadingIcon = {
                                             Icon(
                                                 painter = painterResource(id = R.drawable.bx_info_circle),
-                                                contentDescription = "Add to map"
+                                                contentDescription = stringResource(R.string.add_to_map)
                                             )
                                         }
                                     )
                                 } else {
                                     DropdownMenuItem(
-                                        text = { Text("Remove from map") },
+                                        text = { Text(stringResource(R.string.remove_from_map)) },
                                         onClick = {
                                             showContextMenu = false
                                             coroutineScope.launch {
@@ -414,7 +412,7 @@ fun PoiSearchScreen() {
                                         leadingIcon = {
                                             Icon(
                                                 painter = painterResource(id = R.drawable.bx_info_circle),
-                                                contentDescription = "Remove from map"
+                                                contentDescription = stringResource(R.string.remove_from_map)
                                             )
                                         }
                                     )
