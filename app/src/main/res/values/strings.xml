@@ -87,6 +87,7 @@
     <string name="category_restaurant">Restaurant</string>
     <string name="category_cafe">Café</string>
     <string name="category_ice_cream">Ice Cream</string>
+    <string name="category_bakery">Bakery</string>
     <string name="category_toilets">Toilets</string>
     <string name="category_showers">Showers</string>
     <string name="category_atms">ATMs</string>

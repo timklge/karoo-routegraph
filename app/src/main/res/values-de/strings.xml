@@ -88,6 +88,7 @@
     <string name="category_restaurant">Restaurant</string>
     <string name="category_cafe">Café</string>
     <string name="category_ice_cream">Eisdiele</string>
+    <string name="category_bakery">Bäckerei</string>
     <string name="category_toilets">Toiletten</string>
     <string name="category_showers">Duschen</string>
     <string name="category_atms">Geldautomaten</string>
