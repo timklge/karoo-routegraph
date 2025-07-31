@@ -5,7 +5,10 @@
 [![GitHub License](https://img.shields.io/github/license/timklge/karoo-routegraph)](https://github.com/timklge/karoo-routegraph/blob/master/LICENSE)
 
 This extension for Karoo devices adds a graphical data field showing the elevation profile of the current route,
-including route-specific POIs that you have set up, global POIs and climbs.
+including route-specific POIs that you have set up, global POIs and climbs. It also provides a minimap datafield and
+a button to navigate to POIs along the route (e. g. upcoming gas stations for refueling). It's meant to be used
+as a companion app on long rides where you want to have a quick overview of the route that includes upcoming checkpoints,
+climbs and refueling opportunities so that you can pace yourself accordingly.
 
 Please note that currently, this app requires an active internet connection to fetch elevation data, which
 is downloaded from [valhalla1.openstreetmap.de](https://valhalla1.openstreetmap.de). This is a public API
