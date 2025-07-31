@@ -108,4 +108,6 @@
     <string name="error_no_route">Failed to fetch POIs: No route available. Please start a route first.</string>
     <string name="error_no_route_ahead">Failed to fetch POIs ahead on route: No route loaded.</string>
     <string name="error_fetch_pois">Failed to fetch POIs: %1$s</string>
+    <string name="start_of_route">Start</string>
+    <string name="end_of_route">End</string>
 </resources>
