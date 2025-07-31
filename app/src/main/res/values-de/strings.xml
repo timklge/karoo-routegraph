@@ -102,7 +102,7 @@
 
     <!-- Distance formatting strings -->
     <string name="distance_ahead">%1$s voraus, %2$s von Route</string>
-    <string name="distance_behind">Vorbei vor %2$s, %3$s von Route</string>
+    <string name="distance_behind">Vor %1$s, %2$s von Route</string>
 
     <!-- Error messages -->
     <string name="error_no_position">POIs konnten nicht abgerufen werden: Aktuelle Position ist nicht verfügbar. GPS-Signal prüfen.</string>

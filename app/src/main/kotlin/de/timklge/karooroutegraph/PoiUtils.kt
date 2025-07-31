@@ -65,10 +65,10 @@ sealed class DistanceToPoiResult : Comparable<DistanceToPoiResult> {
                 } else {
                     buildString {
                         append(context.getString(if (distanceOnRoute >= 0.0) R.string.distance_ahead else R.string.distance_behind,
-                            de.timklge.karooroutegraph.screens.formatDistance(distanceOnRoute, isImperial),
-                            de.timklge.karooroutegraph.screens.formatDistance(distanceFromPointOnRoute, isImperial)))
+                            de.timklge.karooroutegraph.screens.formatDistance(distanceOnRoute.absoluteValue, isImperial),
+                            de.timklge.karooroutegraph.screens.formatDistance(distanceFromPointOnRoute.absoluteValue, isImperial)))
 
-                        if (elevationMetersRemaining != null) {
+                        if (elevationMetersRemaining != null && elevationMetersRemaining > 0) {
                             append(" ↗ ${distanceToString(elevationMetersRemaining.toFloat(), isImperial, true)}")
                         }
                     }
