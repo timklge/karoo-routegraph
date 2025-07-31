@@ -215,7 +215,7 @@ fun getStartAndEndPoiIfNone(routeLineString: LineString?, pois: List<Symbol.POI>
         val endPoint = routeLineString?.coordinates()?.lastOrNull()
 
         // Add start and end of route POIs if no POIs are present there yet
-        if (startPoint != null){
+        if (startPoint != null) {
             val hasPoiAtStartPoint = pois.any { poi ->
                 val poiPoint = Point.fromLngLat(poi.lng, poi.lat)
 
@@ -235,7 +235,7 @@ fun getStartAndEndPoiIfNone(routeLineString: LineString?, pois: List<Symbol.POI>
             }
         }
 
-        if (endPoint != null){
+        if (endPoint != null) {
             val hasPoiAtEndPoint = pois.any { poi ->
                 val poiPoint = Point.fromLngLat(poi.lng, poi.lat)
 
@@ -259,7 +259,7 @@ fun getStartAndEndPoiIfNone(routeLineString: LineString?, pois: List<Symbol.POI>
 
 fun processPoiName(name: String?): String? {
     return when (name) {
-        "Startseite" -> return "Zu Hause"
+        "Startseite" -> "Zu Hause"
         else -> name
     }
 }

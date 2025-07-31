@@ -1,6 +1,5 @@
 package de.timklge.karooroutegraph.screens
 
-import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -37,7 +36,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import de.timklge.karooroutegraph.KarooRouteGraphExtension
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.LocationViewModelProvider
 import de.timklge.karooroutegraph.R
@@ -132,17 +130,7 @@ fun CustomPoiListScreen() {
             val route = routeGraphViewModel?.knownRoute
             val allPois = (localPois + globalPois + tempPois).map { it.poi }
 
-            // Debug logging
-            Log.d(KarooRouteGraphExtension.TAG, "DEBUG: additionalPois calculation")
-            Log.d(KarooRouteGraphExtension.TAG, "DEBUG: route is null: ${route == null}")
-            Log.d(KarooRouteGraphExtension.TAG, "DEBUG: route coordinates count: ${route?.coordinates()?.size ?: 0}")
-            Log.d(KarooRouteGraphExtension.TAG, "DEBUG: existing POIs count: ${allPois.size}")
-            Log.d(KarooRouteGraphExtension.TAG, "DEBUG: settings is null: ${settings == null}")
-
-            val result = getStartAndEndPoiIfNone(route, allPois, settings, context)
-            Log.d(KarooRouteGraphExtension.TAG, "DEBUG: additionalPois result count: ${result.size}")
-
-            result
+            getStartAndEndPoiIfNone(route, allPois, settings, context)
         }
     }
 
