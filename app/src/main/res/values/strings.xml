@@ -100,8 +100,8 @@
     <string name="category_bike_shop">Bike Shop</string>
 
     <!-- Distance formatting strings -->
-    <string name="distance_ahead">ahead</string>
-    <string name="distance_from_route">from route</string>
+    <string name="distance_ahead">%1$s ahead, %2$s from route</string>
+    <string name="distance_behind">Passed %1$s ago, %2$s from route</string>
 
     <!-- Error messages -->
     <string name="error_no_position">Failed to fetch POIs: Current position is not available. Check GPS signal.</string>

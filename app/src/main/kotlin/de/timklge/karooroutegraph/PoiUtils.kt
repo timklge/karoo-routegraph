@@ -26,7 +26,26 @@ sealed class DistanceToPoiResult : Comparable<DistanceToPoiResult> {
         return when {
             this is LinearDistance && other is LinearDistance -> this.distance.compareTo(other.distance)
             this is AheadOnRouteDistance && other is AheadOnRouteDistance -> {
-                (this.distanceOnRoute + this.distanceFromPointOnRoute).compareTo(other.distanceOnRoute + other.distanceFromPointOnRoute)
+                // Sort by distanceOnRoute: positive values ascending, negative values below positive and in descending order
+                when {
+                    this.distanceOnRoute >= 0 && other.distanceOnRoute >= 0 -> {
+                        // Both positive: sort by distanceOnRoute ascending
+                        this.distanceOnRoute.compareTo(other.distanceOnRoute)
+                    }
+                    this.distanceOnRoute < 0 && other.distanceOnRoute < 0 -> {
+                        // Both negative: sort by distanceOnRoute descending (reverse comparison)
+                        other.distanceOnRoute.compareTo(this.distanceOnRoute)
+                    }
+                    this.distanceOnRoute >= 0 && other.distanceOnRoute < 0 -> {
+                        // This is positive, other is negative: this comes first
+                        -1
+                    }
+                    this.distanceOnRoute < 0 && other.distanceOnRoute >= 0 -> {
+                        // This is negative, other is positive: other comes first
+                        1
+                    }
+                    else -> 0
+                }
             }
             this is LinearDistance && other is AheadOnRouteDistance -> 1 // Linear distance is always greater than ahead on route distance
             this is AheadOnRouteDistance && other is LinearDistance -> -1 // Ahead on route distance is always less than linear distance
@@ -45,11 +64,11 @@ sealed class DistanceToPoiResult : Comparable<DistanceToPoiResult> {
                     de.timklge.karooroutegraph.screens.formatDistance (distanceOnRoute + distanceFromPointOnRoute, isImperial)
                 } else {
                     buildString {
-                        append(de.timklge.karooroutegraph.screens.formatDistance(distanceOnRoute, isImperial))
-                        append(" ${context.getString(R.string.distance_ahead)}, ")
-                        append(de.timklge.karooroutegraph.screens.formatDistance(distanceFromPointOnRoute, isImperial))
-                        append(" ${context.getString(R.string.distance_from_route)}")
-                        if (elevationMetersRemaining != null) {
+                        append(context.getString(if (distanceOnRoute >= 0.0) R.string.distance_ahead else R.string.distance_behind,
+                            de.timklge.karooroutegraph.screens.formatDistance(distanceOnRoute.absoluteValue, isImperial),
+                            de.timklge.karooroutegraph.screens.formatDistance(distanceFromPointOnRoute.absoluteValue, isImperial)))
+
+                        if (elevationMetersRemaining != null && elevationMetersRemaining > 0) {
                             append(" ↗ ${distanceToString(elevationMetersRemaining.toFloat(), isImperial, true)}")
                         }
                     }
@@ -67,17 +86,7 @@ sealed class DistanceToPoiResult : Comparable<DistanceToPoiResult> {
  * @param maxDistanceToRoute The maximum distance from the route to consider a POI as relevant.
  * @return A map of POIs to their nearest points on the route and distances.
  */
-suspend fun calculatePoiDistancesAsync(polyline: LineString, pois: List<POI>, maxDistanceToRoute: Double): Map<POI, List<NearestPoint>> {
-    /* return coroutineScope {
-        val deferredResults = pois.map { poi ->
-            async {
-                poi to calculatePoiDistance(polyline, poi, maxDistanceToRoute)
-            }
-        }
-
-        deferredResults.awaitAll().toMap()
-    } */
-
+fun calculatePoiDistances(polyline: LineString, pois: List<POI>, maxDistanceToRoute: Double): Map<POI, List<NearestPoint>> {
     return pois.associateWith { poi ->
         val nearestPoints = calculatePoiDistance(polyline, poi, maxDistanceToRoute)
 
@@ -187,12 +196,11 @@ fun distanceToPoi(poi: Symbol.POI, sampledElevationData: SampledElevationData?, 
         }
         PoiSortOption.AHEAD_ON_ROUTE -> {
             val nearestPoints = nearestPointsOnRouteToFoundPois?.entries?.find { it.key.symbol == poi }?.value
-            val nearestPointsAheadOnRoute = nearestPoints?.filter { it.distanceFromRouteStart >= (distanceAlongRoute ?: 0f) }
-            val nearestPointAheadOnRoute = nearestPointsAheadOnRoute?.minByOrNull { it.distanceFromPointOnRoute + it.distanceFromRouteStart }
+            val nearestPointOnRoute = nearestPoints?.minByOrNull { it.distanceFromPointOnRoute + it.distanceFromRouteStart }
 
-            val distanceAheadOnRoute = nearestPointAheadOnRoute?.let {
+            val distanceAheadOnRoute = nearestPointOnRoute?.let {
                 val elevationMetersRemaining = if (distanceAlongRoute != null) {
-                    sampledElevationData?.getTotalClimb(distanceAlongRoute, nearestPointAheadOnRoute.distanceFromRouteStart)
+                    sampledElevationData?.getTotalClimb(distanceAlongRoute, nearestPointOnRoute.distanceFromRouteStart)
                 } else null
 
                 DistanceToPoiResult.AheadOnRouteDistance(

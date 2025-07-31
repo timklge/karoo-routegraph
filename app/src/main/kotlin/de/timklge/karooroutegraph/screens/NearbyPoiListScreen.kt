@@ -65,7 +65,7 @@ import de.timklge.karooroutegraph.OverpassResponse
 import de.timklge.karooroutegraph.POI
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
-import de.timklge.karooroutegraph.calculatePoiDistancesAsync
+import de.timklge.karooroutegraph.calculatePoiDistances
 import de.timklge.karooroutegraph.distanceToPoi
 import io.hammerhead.karooext.models.LaunchPinDrop
 import io.hammerhead.karooext.models.Symbol
@@ -172,7 +172,7 @@ fun NearbyPoiListScreen() {
         val route = viewModel?.knownRoute
 
         if (route != null) {
-            val distances = calculatePoiDistancesAsync(route, pois.map { POI(it.poi) }, maxDistanceFromRoute)
+            val distances = calculatePoiDistances(route, pois.map { POI(it.poi) }, maxDistanceFromRoute)
             nearestPointsOnRouteToFoundPois = distances
         }
     }
@@ -199,7 +199,7 @@ fun NearbyPoiListScreen() {
                     isRefreshing = false
                 } else {
                     val newNearestPointsOnRouteToFoundPois = viewModel?.knownRoute?.let { route ->
-                        calculatePoiDistancesAsync(route, mappedPois.map { POI(it.poi) }, maxDistanceFromRoute)
+                        calculatePoiDistances(route, mappedPois.map { POI(it.poi) }, maxDistanceFromRoute)
                     } ?: emptyMap()
 
                     pois = mappedPois.sortedBy { poi ->
@@ -261,7 +261,7 @@ fun NearbyPoiListScreen() {
 
                     val routeAhead = try {
                         val routeLength = viewModel?.routeDistance?.toDouble() ?: TurfMeasurement.length(route, TurfConstants.UNIT_METERS)
-                        val startDistance = viewModel?.distanceAlongRoute?.toDouble() ?: 0.0
+                        val startDistance = ((viewModel?.distanceAlongRoute?.toDouble() ?: 0.0) - 5_000).coerceAtLeast(0.0) // 5 km behind
                         val endDistance = (startDistance + 50_000).coerceAtMost(routeLength) // 50 km ahead
                         TurfMisc.lineSliceAlong(route, startDistance, endDistance, TurfConstants.UNIT_METERS)
                     } catch(e: Exception) {

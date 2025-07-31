@@ -59,7 +59,7 @@ import de.timklge.karooroutegraph.OsmPlace
 import de.timklge.karooroutegraph.POI
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
-import de.timklge.karooroutegraph.calculatePoiDistancesAsync
+import de.timklge.karooroutegraph.calculatePoiDistances
 import de.timklge.karooroutegraph.distanceToPoi
 import io.hammerhead.karooext.models.LaunchPinDrop
 import io.hammerhead.karooext.models.Symbol
@@ -125,7 +125,7 @@ fun PoiSearchScreen() {
             val poisForCalculation = pois.map { poi ->
                 POI(Symbol.POI("poi-${poi.osmId ?: poi.placeId}", poi.lat.toDouble(), poi.lon.toDouble(), name = poi.displayName ?: poi.name ?: "Unnamed POI"))
             }
-            val distances = calculatePoiDistancesAsync(route, poisForCalculation, maxDistanceFromRoute)
+            val distances = calculatePoiDistances(route, poisForCalculation, maxDistanceFromRoute)
             nearestPointsOnRouteToFoundPois = distances
         }
     }
@@ -188,7 +188,7 @@ fun PoiSearchScreen() {
                             }
 
                             val newNearestPointsOnRouteToFoundPois = viewModel?.knownRoute?.let { route ->
-                                calculatePoiDistancesAsync(route, poisForCalculation, maxDistanceFromRoute)
+                                calculatePoiDistances(route, poisForCalculation, maxDistanceFromRoute)
                             } ?: emptyMap()
 
                             pois = foundPlaces.sortedBy { poi ->
