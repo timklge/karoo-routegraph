@@ -416,6 +416,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
             .collect { (settings, navigationStateEvent, userProfile, globalPOIs, locationAndRemainingRouteDistance, temporaryPOIs: RouteGraphTemporaryPOIs) ->
                 val isImperial = userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
                 val navigatingToDestinationPolyline = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingToDestination)?.polyline?.let { LineString.fromPolyline(it, 5) }
+
                 val routeDistance = if (navigatingToDestinationPolyline != null) {
                     try {
                         TurfMeasurement.length(navigatingToDestinationPolyline, TurfConstants.UNIT_METERS)
@@ -430,10 +431,14 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 val routeLineString = when (navigationStateEvent) {
                     is OnNavigationState.NavigationState.NavigatingRoute -> {
                         val polyline = navigationStateEvent.routePolyline
+                        val lineString = LineString.fromPolyline(polyline, 5)
 
-                        // Log.d(TAG, "Route polyline: ${Base64.encodeToString(polyline.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)}")
-
-                        LineString.fromPolyline(polyline, 5)
+                        if (navigationStateEvent.reversed) {
+                            // Reverse the polyline if we are navigating in reverse
+                            LineString.fromLngLats(lineString.coordinates().reversed())
+                        } else {
+                            lineString
+                        }
                     }
 
                     is OnNavigationState.NavigationState.NavigatingToDestination -> {
@@ -642,11 +647,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
                 val currentDistanceAlongRoute = if (routeDistance != null && locationAndRemainingRouteDistance.remainingRouteDistance != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute){
                     if (navigationStateEvent.rejoinDistance == null) {
-                        if (navigationStateEvent.reversed){
-                            routeDistance
-                        } else {
-                            routeDistance - locationAndRemainingRouteDistance.remainingRouteDistance
-                        }
+                        routeDistance - locationAndRemainingRouteDistance.remainingRouteDistance
                     } else {
                         null
                     }
