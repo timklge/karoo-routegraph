@@ -99,6 +99,8 @@
     <string name="category_waste_basket">Mülleimer</string>
     <string name="category_bench">Bank</string>
     <string name="category_bike_shop">Fahrradladen</string>
+    <string name="category_attraction">Sehenswürdigkeit</string>
+    <string name="category_viewpoint">Aussichtspunkt</string>
 
     <!-- Distance formatting strings -->
     <string name="distance_ahead">%1$s voraus, %2$s von Route</string>
