@@ -94,6 +94,8 @@ enum class NearbyPoiCategory(val labelRes: Int, val osmTag: String) {
     WASTE_BASKET(R.string.category_waste_basket, "amenity=waste_basket"),
     BENCH(R.string.category_bench, "amenity=bench"),
     BIKE_SHOP(R.string.category_bike_shop, "shop=bicycle"),
+    TOURISM_ATTRACTION(R.string.category_attraction, "tourism=attraction"),
+    VIEWPOINT(R.string.category_viewpoint, "tourism=viewpoint"),
 }
 
 data class NearbyPoi(val element: Element, val poi: Symbol.POI)
