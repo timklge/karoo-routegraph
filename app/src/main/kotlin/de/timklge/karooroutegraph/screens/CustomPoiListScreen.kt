@@ -22,6 +22,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +41,8 @@ import de.timklge.karooroutegraph.LocationViewModelProvider
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.distanceToPoi
+import de.timklge.karooroutegraph.getStartAndEndPoiIfNone
+import de.timklge.karooroutegraph.processPoiName
 import io.hammerhead.karooext.models.LaunchPinDrop
 import io.hammerhead.karooext.models.OnGlobalPOIs
 import io.hammerhead.karooext.models.OnNavigationState
@@ -62,6 +65,7 @@ sealed class DisplayedCustomPoi {
     data class Local(override val poi: Symbol.POI) : DisplayedCustomPoi()
     data class Global(override val poi: Symbol.POI) : DisplayedCustomPoi()
     data class Temporary(val id: Long, override val poi: Symbol.POI) : DisplayedCustomPoi()
+    data class Additional(val id: Long, override val poi: Symbol.POI) : DisplayedCustomPoi()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,7 +95,9 @@ fun CustomPoiListScreen() {
     LaunchedEffect(Unit) {
         karooSystemServiceProvider.stream<OnGlobalPOIs>()
             .map { onGlobalPois ->
-                onGlobalPois.pois
+                onGlobalPois.pois.map { poi ->
+                    poi.copy(name = processPoiName(poi.name))
+                }
             }
             .collect {
                 globalPois = it.map { poi -> DisplayedCustomPoi.Global(poi) }
@@ -115,6 +121,18 @@ fun CustomPoiListScreen() {
 
     val routeGraphViewModel by viewModelProvider.viewModelFlow.collectAsStateWithLifecycle(null)
     val currentPosition by locationViewModelProvider.viewModelFlow.collectAsStateWithLifecycle(null)
+    val settings by karooSystemServiceProvider.streamSettings().collectAsStateWithLifecycle(null)
+
+    val context = LocalContext.current
+
+    val additionalPois by remember {
+        derivedStateOf {
+            val route = routeGraphViewModel?.knownRoute
+            val allPois = (localPois + globalPois + tempPois).map { it.poi }
+
+            getStartAndEndPoiIfNone(route, allPois, settings, context)
+        }
+    }
 
     // State for dropdown
     var expanded by remember { mutableStateOf(false) }
@@ -125,33 +143,35 @@ fun CustomPoiListScreen() {
         selectedSort = settings.poiSortOptionForCustomPois
     }
 
-    val pois by remember(localPois, globalPois, tempPois, currentPosition, routeGraphViewModel, selectedSort) {
-        val poiList = currentPosition?.let { _ ->
-            val poiList = buildList {
-                addAll(localPois)
-                addAll(globalPois)
-                addAll(tempPois)
+    val pois by remember {
+        derivedStateOf {
+            currentPosition?.let { _ ->
+                val poiList = buildList {
+                    addAll(localPois)
+                    addAll(globalPois)
+                    addAll(tempPois)
+                    addAll(additionalPois.mapIndexed { index, poi -> DisplayedCustomPoi.Additional(index.toLong(), poi.symbol) })
 
-                // If not on route but have a last known position along the route, add it as POI to navigate to
-                if (routeGraphViewModel?.lastKnownPositionOnMainRoute != null && routeGraphViewModel?.routeDistance == null) {
-                    val lastKnownPositionAlongRoute = Symbol.POI(
-                        lat = routeGraphViewModel!!.lastKnownPositionOnMainRoute!!.latitude(),
-                        lng = routeGraphViewModel!!.lastKnownPositionOnMainRoute!!.longitude(),
-                        name = "Last known position along route", // Will be translated in UI
-                        id = "last_known_position",
-                    )
-                    add(DisplayedCustomPoi.Local(lastKnownPositionAlongRoute))
+                    // If not on route but have a last known position along the route, add it as POI to navigate to
+                    if (routeGraphViewModel?.lastKnownPositionOnMainRoute != null && routeGraphViewModel?.routeDistance == null) {
+                        val lastKnownPositionAlongRoute = Symbol.POI(
+                            lat = routeGraphViewModel!!.lastKnownPositionOnMainRoute!!.latitude(),
+                            lng = routeGraphViewModel!!.lastKnownPositionOnMainRoute!!.longitude(),
+                            name = "Last known position along route", // Will be translated in UI
+                            id = "last_known_position",
+                        )
+                        add(DisplayedCustomPoi.Local(lastKnownPositionAlongRoute))
+                    }
                 }
-            }
 
-            poiList.filter { displayedCustomPoi -> distanceToPoi(displayedCustomPoi.poi, routeGraphViewModel?.sampledElevationData, routeGraphViewModel?.poiDistances, currentPosition, selectedSort, routeGraphViewModel?.distanceAlongRoute) != null }.sortedBy { displayedCustomPoi ->
-                distanceToPoi(displayedCustomPoi.poi, routeGraphViewModel?.sampledElevationData, routeGraphViewModel?.poiDistances, currentPosition, selectedSort, routeGraphViewModel?.distanceAlongRoute)
+                poiList.filter { displayedCustomPoi -> distanceToPoi(displayedCustomPoi.poi, routeGraphViewModel?.sampledElevationData, routeGraphViewModel?.poiDistances, currentPosition, selectedSort, routeGraphViewModel?.distanceAlongRoute) != null }.sortedBy { displayedCustomPoi ->
+                    distanceToPoi(displayedCustomPoi.poi, routeGraphViewModel?.sampledElevationData, routeGraphViewModel?.poiDistances, currentPosition, selectedSort, routeGraphViewModel?.distanceAlongRoute)
+                }
+            } ?: run {
+                // Include additionalPois even when currentPosition is null
+                localPois + globalPois + additionalPois.mapIndexed { index, poi -> DisplayedCustomPoi.Additional(index.toLong(), poi.symbol) }
             }
-        } ?: run {
-            localPois + globalPois
         }
-
-        mutableStateOf(poiList)
     }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
