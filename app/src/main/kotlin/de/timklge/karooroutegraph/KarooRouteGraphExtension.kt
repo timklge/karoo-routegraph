@@ -623,8 +623,20 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
                 val tempPoiSymbols = temporaryPOIs.poisByOsmId.map { (_, poi) -> POI(poi) }
                 val localPois = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.pois.orEmpty().map { symbol -> POI(symbol = symbol, type = PoiType.POI) }
-                val globalPois = globalPOIs.pois.map { poi -> POI(poi) }
-                val pois = tempPoiSymbols + globalPois + localPois + incidentPois
+                val globalPois = globalPOIs.pois.map { poi -> 
+                    POI(poi.copy(name = processPoiName(poi.name)))
+                }
+
+                val pois = buildList {
+                    addAll(tempPoiSymbols)
+                    addAll(globalPois)
+                    addAll(localPois)
+
+                    addAll(getStartAndEndPoiIfNone(routeLineString, map { it.symbol }, settings, applicationContext))
+
+                    addAll(incidentPois)
+                }
+
                 val poisChanged = knownPois != pois.toSet()
                 knownPois = pois.toSet()
 

@@ -6,6 +6,7 @@ import com.mapbox.geojson.Point
 import com.mapbox.turf.TurfConstants
 import com.mapbox.turf.TurfMeasurement
 import de.timklge.karooroutegraph.screens.PoiSortOption
+import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import io.hammerhead.karooext.models.Symbol
 import kotlin.math.absoluteValue
 
@@ -213,5 +214,60 @@ fun distanceToPoi(poi: Symbol.POI, sampledElevationData: SampledElevationData?, 
 
             return distanceAheadOnRoute ?: linearDistanceResult
         }
+    }
+}
+
+fun getStartAndEndPoiIfNone(routeLineString: LineString?, pois: List<Symbol.POI>, settings: RouteGraphSettings?, applicationContext: Context): List<POI> {
+    return buildList {
+        val startPoint = routeLineString?.coordinates()?.firstOrNull()
+        val endPoint = routeLineString?.coordinates()?.lastOrNull()
+
+        // Add start and end of route POIs if no POIs are present there yet
+        if (startPoint != null) {
+            val hasPoiAtStartPoint = pois.any { poi ->
+                val poiPoint = Point.fromLngLat(poi.lng, poi.lat)
+
+                TurfMeasurement.distance(poiPoint, startPoint, TurfConstants.UNIT_METERS) < (settings?.poiDistanceToRouteMaxMeters ?: 500.0)
+            }
+            if (!hasPoiAtStartPoint) {
+                add(POI(
+                    Symbol.POI(
+                        "start-of-route",
+                        startPoint.latitude(),
+                        startPoint.longitude(),
+                        type = Symbol.POI.Types.GENERIC,
+                        name = applicationContext.getString(R.string.start_of_route)
+                    ),
+                    PoiType.POI
+                ))
+            }
+        }
+
+        if (endPoint != null) {
+            val hasPoiAtEndPoint = pois.any { poi ->
+                val poiPoint = Point.fromLngLat(poi.lng, poi.lat)
+
+                TurfMeasurement.distance(poiPoint, endPoint, TurfConstants.UNIT_METERS) < (settings?.poiDistanceToRouteMaxMeters ?: 500.0)
+            }
+            if (!hasPoiAtEndPoint) {
+                add(POI(
+                    Symbol.POI(
+                        "end-of-route",
+                        endPoint.latitude(),
+                        endPoint.longitude(),
+                        type = Symbol.POI.Types.GENERIC,
+                        name = applicationContext.getString(R.string.end_of_route)
+                    ),
+                    PoiType.POI
+                ))
+            }
+        }
+    }
+}
+
+fun processPoiName(name: String?): String? {
+    return when (name) {
+        "Startseite" -> "Zu Hause"
+        else -> name
     }
 }

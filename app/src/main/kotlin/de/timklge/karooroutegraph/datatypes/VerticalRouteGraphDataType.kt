@@ -127,7 +127,7 @@ class VerticalRouteGraphDataType(
                 val canvas = Canvas(bitmap)
                 val nightMode = isNightMode()
 
-                val graphBounds = RectF(15f, 5f, 90f, config.viewSize.second.toFloat() - 25f)
+                val graphBounds = RectF(15f, 15f, 90f, config.viewSize.second.toFloat() - 25f)
 
                 val poiLinePaint = Paint().apply {
                     color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
