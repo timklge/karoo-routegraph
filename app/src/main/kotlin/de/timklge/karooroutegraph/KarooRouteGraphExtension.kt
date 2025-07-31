@@ -654,7 +654,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     if (routeLineString != null){
                         Log.i(TAG, "Route changed, recalculating POI distances")
 
-                        val updatedPoiDistances = calculatePoiDistancesAsync(routeLineString, pois, settings.poiDistanceToRouteMaxMeters)
+                        val updatedPoiDistances = calculatePoiDistances(routeLineString, pois, settings.poiDistanceToRouteMaxMeters)
                         poiDistances = updatedPoiDistances
 
                         val poiDistancesDebug = updatedPoiDistances.map { (key, value) ->
