@@ -47,7 +47,7 @@
     <string name="back">Zurück</string>
     <string name="welcome_title">Willkommen bei karoo-routegraph!</string>
     <string name="welcome_message_1">Sie können ein vertikales oder horizontales Routenhöhenprofil und andere Felder zu Ihren Datenseiten hinzufügen.</string>
-    <string name="welcome_message_2">Bitte beachten Sie, dass diese App derzeit Höhenprofile von einer öffentlichen API herunterlädt, die vom deutschen FOSSGIS e. V. gehostet wird.</string>
+    <string name="welcome_message_2">Bitte beachten Sie, dass für das Nachschlagen von POIs während der Fahrt (z. B. Supermärkte) eine aktive Internetverbindung benötigt wird.</string>
 
     <!-- POI Screen strings -->
     <string name="poi_tab_custom">Eigene</string>

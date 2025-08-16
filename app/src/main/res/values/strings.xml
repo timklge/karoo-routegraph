@@ -46,7 +46,7 @@
     <string name="back">Back</string>
     <string name="welcome_title">Welcome to karoo-routegraph!</string>
     <string name="welcome_message_1">You can add a vertical or horizontal route elevation profile and other fields to your data pages.</string>
-    <string name="welcome_message_2">Please note that currently, this app will download elevation profiles from a public API hosted by german FOSSGIS e. V.</string>
+    <string name="welcome_message_2">Please note that an active internet connection is required to look up nearby POIs while riding.</string>
 
     <!-- POI Screen strings -->
     <string name="poi_tab_custom">Custom</string>

@@ -10,9 +10,7 @@ a button to navigate to POIs along the route (e. g. upcoming gas stations for re
 as a companion app on long rides where you want to have a quick overview of the route that includes upcoming checkpoints,
 climbs and refueling opportunities so that you can pace yourself accordingly.
 
-Please note that currently, this app requires an active internet connection to fetch elevation data, which
-is downloaded from [valhalla1.openstreetmap.de](https://valhalla1.openstreetmap.de). This is a public API
-hosted by FOSSGIS e. V. (Credits see below).
+Please note that an active internet connection is required to search for nearby POIs while riding.
 
 Compatible with Karoo 2 and Karoo 3 devices.
 
@@ -72,7 +70,6 @@ try to identify climbs using an alternate algorithm, so they will not perfectly 
 ## Credits
 
 - OpenStreetMap Data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors (<a href="https://opendatacommons.org/licenses/odbl/index.html">ODbL</a>), <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, <a href="https://openstreetmap.org/fixthemap">participate/fix mistakes</a>
-  - Uses valhalla1.openstreetmap.de for elevation data (hosted by [FOSSGIS e.V.](https://www.fossgis.de/news/2021-11-12_funding_valhalla/))
   - OpenStreetMap raster tiles for the minimap served by https://tile.openstreetmap.org
   - Nearby POI search uses https://overpass-api.de
   - POI search box uses nominatim API for geocoding: https://nominatim.openstreetmap.org/

@@ -1,24 +1,22 @@
+package de.timklge.karooroutegraph
+
 import androidx.annotation.ColorRes
-import de.timklge.karooroutegraph.R
-import de.timklge.karooroutegraph.SampledElevationData
 import kotlin.math.roundToInt
 
 enum class ClimbCategory(
-    val minGradient: Float,
-    val minLength: Float,
+    val minGradient: Float?,
     val number: Int,
     val importance: Int,
     @ColorRes val colorRes: Int,
 ) {
-    CAT1(0.08f, 1000f, 1, 9, R.color.eleRed),
-    CAT2(0.06f, 750f, 2, 5, R.color.eleDarkOrange),
-    CAT3(0.04f, 500f, 3, 2, R.color.eleYellow),
-    CAT4(0.02f, 250f, 4, 1, R.color.eleDarkGreen);
+    LARGE_CLIMB(0.075f, 1, 9, R.color.eleRed),
+    MEDIUM_CLIMB(0.046f, 2, 2, R.color.eleYellow),
+    SMALL_CLIMB(null, 3, 1, R.color.eleDarkGreen);
 
     companion object {
         fun categorize(gradient: Float, length: Float): ClimbCategory? {
             return entries.firstOrNull { category ->
-                gradient >= category.minGradient && length >= category.minLength
+                gradient >= (category.minGradient ?: 0f)
             }
         }
     }
@@ -105,101 +103,4 @@ data class Climb(
 
         return MaxIncline(start, end, avgMaxIncline)
     }
-}
-
-fun SampledElevationData.identifyClimbs(
-    minClimbLength: Float = 250f,    // Minimum climb length in meters
-    minGradient: Float = 0.02f,      // Minimum gradient (2%) to consider as a climb
-    maxMergeGap: Float = 250f        // Maximum gap between climbs to merge them
-): List<Climb> {
-    val initialClimbs = findInitialClimbs(minClimbLength, minGradient)
-    return mergeCloseClimbs(initialClimbs, maxMergeGap)
-}
-
-private fun SampledElevationData.findInitialClimbs(
-    minClimbLength: Float,
-    minGradient: Float
-): List<Climb> {
-    val climbs = mutableListOf<Climb>()
-    var climbStart = -1
-    var currentClimb = false
-
-    // Calculate gradients between consecutive points
-    for (i in 0 until elevations.size - 1) {
-        val elevationDiff = elevations[i + 1] - elevations[i]
-        val gradient = elevationDiff / interval
-
-        if (gradient >= minGradient && !currentClimb) {
-            climbStart = i
-            currentClimb = true
-        } else if ((gradient < minGradient || i == elevations.size - 2) && currentClimb) {
-            val climbLength = (i - climbStart) * interval
-            if (climbLength >= minClimbLength) {
-                val avgGradient = (elevations[i] - elevations[climbStart]) / climbLength
-                val category = ClimbCategory.categorize(avgGradient, climbLength)
-                if (category != null) {
-                    climbs.add(
-                        Climb(
-                            category = category,
-                            startDistance = climbStart * interval,
-                            endDistance = i * interval
-                        )
-                    )
-                }
-            }
-            currentClimb = false
-        }
-    }
-
-    return climbs
-}
-
-private fun SampledElevationData.mergeCloseClimbs(
-    climbs: List<Climb>,
-    maxMergeGap: Float
-): List<Climb> {
-    if (climbs.isEmpty()) return emptyList()
-
-    val sortedClimbs = climbs.sortedBy { it.startDistance }
-    val mergedClimbs = mutableListOf<Climb>()
-
-    var currentClimb = sortedClimbs.first()
-
-    for (i in 1 until sortedClimbs.size) {
-        val nextClimb = sortedClimbs[i]
-
-        if (currentClimb.overlapsWith(nextClimb, maxMergeGap)) {
-            // Merge the climbs
-            currentClimb = currentClimb.merge(nextClimb)
-
-            // Recategorize the merged climb based on its new characteristics
-            val avgGradient = getClimbGradient(currentClimb)
-            val newCategory = ClimbCategory.categorize(avgGradient, currentClimb.length)
-            if (newCategory != null) {
-                currentClimb = currentClimb.copy(category = newCategory)
-            }
-        } else {
-            mergedClimbs.add(currentClimb)
-            currentClimb = nextClimb
-        }
-    }
-
-    // Don't forget to add the last climb
-    mergedClimbs.add(currentClimb)
-
-    return mergedClimbs
-}
-
-fun SampledElevationData.getClimbGradient(climb: Climb): Float {
-    val startIndex = (climb.startDistance / interval).toInt()
-    val endIndex = (climb.endDistance / interval).toInt()
-
-    if (startIndex >= elevations.size || endIndex >= elevations.size || startIndex >= endIndex) {
-        return 0f
-    }
-
-    val elevationGain = elevations[endIndex] - elevations[startIndex]
-    val horizontalDistance = climb.length
-
-    return elevationGain / horizontalDistance
 }

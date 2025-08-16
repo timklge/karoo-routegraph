@@ -13,7 +13,6 @@ val appModule = module {
     singleOf(::KarooSystemServiceProvider)
     singleOf(::RouteGraphViewModelProvider)
     singleOf(::RouteGraphDisplayViewModelProvider)
-    singleOf(::ValhallaAPIElevationProvider)
     singleOf(::OverpassPOIProvider)
     singleOf(::NominatimProvider)
     singleOf(::MinimapViewModelProvider)

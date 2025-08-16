@@ -245,8 +245,10 @@ class MinimapDataType(
                 val centerPosition = if (displayViewModel.minimapZoomLevel == MinimapZoomLevel.COMPLETE_ROUTE){
                     if (viewModel.rejoin != null) {
                         viewModel.rejoin.getCenterPoint()
-                    } else if (viewModel.knownRoute != null) {
+                    } else if (viewModel.knownRoute != null && viewModel.isOnRoute == true) {
                         viewModel.knownRoute.getCenterPoint()
+                    } else if (minimapViewModel.currentLng != null && minimapViewModel.currentLat != null) {
+                        Point.fromLngLat(minimapViewModel.currentLng, minimapViewModel.currentLat)
                     } else {
                         defaultMapCenter
                     }
