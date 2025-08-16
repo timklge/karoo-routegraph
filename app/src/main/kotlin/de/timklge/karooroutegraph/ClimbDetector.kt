@@ -8,10 +8,11 @@ enum class ClimbCategory(
     val number: Int,
     val importance: Int,
     @ColorRes val colorRes: Int,
+    @ColorRes val minimapColorRes: Int,
 ) {
-    LARGE_CLIMB(0.075f, 1, 9, R.color.eleRed),
-    MEDIUM_CLIMB(0.046f, 2, 2, R.color.eleYellow),
-    SMALL_CLIMB(null, 3, 1, R.color.eleDarkGreen);
+    LARGE_CLIMB(0.075f, 1, 9, R.color.eleRed, R.color.eleRed),
+    MEDIUM_CLIMB(0.046f, 2, 2, R.color.eleYellow, R.color.eleDarkOrange),
+    SMALL_CLIMB(null, 3, 1, R.color.eleDarkGreen, R.color.eleDarkGreen);
 
     companion object {
         fun categorize(gradient: Float, length: Float): ClimbCategory? {

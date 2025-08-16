@@ -447,7 +447,7 @@ class MinimapDataType(
                                 this@MinimapDataType.drawPolyline(
                                     polyline,
                                     canvas,
-                                    this@MinimapDataType.applicationContext.getColor(climb.category.colorRes),
+                                    this@MinimapDataType.applicationContext.getColor(climb.category.minimapColorRes),
                                     centerPosition,
                                     zoomLevel
                                 )
