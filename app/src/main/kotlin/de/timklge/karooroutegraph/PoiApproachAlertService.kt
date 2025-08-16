@@ -3,6 +3,8 @@ package de.timklge.karooroutegraph
 import android.content.Context
 import android.content.Intent
 import com.mapbox.geojson.Point
+import com.mapbox.turf.TurfConstants
+import com.mapbox.turf.TurfMeasurement
 import de.timklge.karooroutegraph.screens.PoiSortOption
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import io.hammerhead.karooext.models.HardwareType
@@ -106,34 +108,37 @@ class PoiApproachAlertService(
                 val currentTime = Instant.now()
                 val checkForPoiApproachAlertsAfter = currentTime.minus(settings.poiApproachAlertReminderIntervalSeconds.toLong(), ChronoUnit.SECONDS)
 
-                val distanceAlongRoute = viewModel.distanceAlongRoute ?:  return@collect // No route distance available, skip alerting
+                val distanceAlongRoute = viewModel.distanceAlongRoute
 
-                viewModel.poiDistances?.forEach { (poi, points) ->
-                    val lastAlertShownForPoi = lastAlertTriggeredAt[poi.symbol]
-                    val pointsAhead = points.filter { it.distanceFromRouteStart >= distanceAlongRoute }
-                    val nearestPointInRange = pointsAhead.find {
-                        val alongRoute = it.distanceFromRouteStart - distanceAlongRoute
+                if (distanceAlongRoute != null && viewModel.isOnRoute == true) {
+                    viewModel.poiDistances?.forEach { (poi, points) ->
+                        val lastAlertShownForPoi = lastAlertTriggeredAt[poi.symbol]
+                        val pointsAhead = points.filter { it.distanceFromRouteStart >= distanceAlongRoute }
+                        val nearestPointInRange = pointsAhead.find {
+                            val alongRoute = it.distanceFromRouteStart - distanceAlongRoute
 
-                        alongRoute <= (settings.poiApproachAlertAtDistance ?: 500.0) && alongRoute >= 20.0
-                    }
+                            alongRoute <= (settings.poiApproachAlertAtDistance ?: 500.0) && alongRoute >= 20.0
+                        }
 
-                    if (nearestPointInRange == null && lastAlertShownForPoi != null) {
-                        // Reset alert if no point is in range
-                        lastAlertTriggeredAt.remove(poi.symbol)
-                        return@forEach
-                    }
+                        if (nearestPointInRange == null && lastAlertShownForPoi != null) {
+                            // Reset alert if no point is in range
+                            lastAlertTriggeredAt.remove(poi.symbol)
+                            return@forEach
+                        }
 
-                    if (nearestPointInRange != null && (lastAlertShownForPoi == null || lastAlertShownForPoi.isBefore(checkForPoiApproachAlertsAfter))) {
-                        val distance = distanceToPoi(poi.symbol, viewModel.sampledElevationData,
-                            viewModel.poiDistances, currentPosition, PoiSortOption.AHEAD_ON_ROUTE, distanceAlongRoute)?.formatDistance(applicationContext, isImperial, flat = true)
+                        if (nearestPointInRange != null && (lastAlertShownForPoi == null || lastAlertShownForPoi.isBefore(checkForPoiApproachAlertsAfter))) {
+                            val distance = distanceToPoi(poi.symbol, viewModel.sampledElevationData,
+                                viewModel.poiDistances, currentPosition, PoiSortOption.AHEAD_ON_ROUTE, distanceAlongRoute)?.formatDistance(applicationContext, isImperial, flat = true)
 
-                        val text = applicationContext.getString(R.string.poi_in_distance, poi.symbol.name, distance ?: "")
+                            val text = applicationContext.getString(R.string.poi_in_distance, poi.symbol.name, distance ?: "")
 
-                        alertChannel.send(PoiAlert(text))
+                            alertChannel.send(PoiAlert(text))
 
-                        lastAlertTriggeredAt[poi.symbol] = currentTime
+                            lastAlertTriggeredAt[poi.symbol] = currentTime
+                        }
                     }
                 }
+
             }
         }
     }

@@ -20,7 +20,6 @@ import de.timklge.karooroutegraph.incidents.IncidentResult
 import de.timklge.karooroutegraph.incidents.IncidentsResponse
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.screens.RouteGraphTemporaryPOIs
-import identifyClimbs
 import io.hammerhead.karooext.extension.KarooExtension
 import io.hammerhead.karooext.internal.Emitter
 import io.hammerhead.karooext.models.DataType
@@ -67,7 +66,6 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     private val karooSystem: KarooSystemServiceProvider by inject()
     private val routeGraphViewModelProvider: RouteGraphViewModelProvider by inject()
     private val minimapViewModelProvider: MinimapViewModelProvider by inject()
-    private val valhallaAPIElevationProvider: ValhallaAPIElevationProvider by inject()
     private val incidentProvider: HereMapsIncidentProvider by inject()
     private val displayViewModelProvider: RouteGraphDisplayViewModelProvider by inject()
     private val tileDownloadService: TileDownloadService by inject()
@@ -384,7 +382,6 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         var knownRoute: LineString? = null
         var knownPois: Set<POI> = mutableSetOf()
         var knownSettings: RouteGraphSettings? = null
-        var knownRouteElevation: SampledElevationData? = null
         var knownIncidents: IncidentsResponse? = null
         var knownIncidentWarningShown: Boolean = false
         var poiDistances: Map<POI, List<NearestPoint>>? = null
@@ -413,9 +410,46 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     delay(60.seconds)
                 }
             }
-            .collect { (settings, navigationStateEvent, userProfile, globalPOIs, locationAndRemainingRouteDistance, temporaryPOIs: RouteGraphTemporaryPOIs) ->
+            .collect { (settings, navigationStateEvent: OnNavigationState.NavigationState, userProfile, globalPOIs, locationAndRemainingRouteDistance, temporaryPOIs: RouteGraphTemporaryPOIs) ->
                 val isImperial = userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
                 val navigatingToDestinationPolyline = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingToDestination)?.polyline?.let { LineString.fromPolyline(it, 5) }
+                val elevationPolyline: LineString? = when (navigationStateEvent) {
+                    is OnNavigationState.NavigationState.NavigatingRoute -> {
+                        navigationStateEvent.routeElevationPolyline?.let { LineString.fromPolyline(it, 1) }
+                    }
+                    is OnNavigationState.NavigationState.NavigatingToDestination -> {
+                        navigationStateEvent.elevationPolyline?.let { LineString.fromPolyline(it, 1) }
+                    }
+                    else -> null
+                }
+                val karooClimbs = when (navigationStateEvent) {
+                    is OnNavigationState.NavigationState.NavigatingRoute -> {
+                        navigationStateEvent.climbs
+                    }
+                    is OnNavigationState.NavigationState.NavigatingToDestination -> {
+                        navigationStateEvent.climbs
+                    }
+                    else -> null
+                }
+                val sampledElevationData = elevationPolyline?.let {
+                    SampledElevationData.fromSparseElevationData(it)
+                }
+                val climbs = karooClimbs?.let {
+                    karooClimbs.mapNotNull { karooClimb ->
+                        val category = ClimbCategory.categorize(
+                            karooClimb.grade.toFloat() / 100.0f,
+                            karooClimb.length.toFloat()
+                        )
+
+                        category?.let {
+                            Climb(
+                                category,
+                                karooClimb.startDistance.toFloat(),
+                                karooClimb.startDistance.toFloat() + karooClimb.length.toFloat()
+                            )
+                        }
+                    }
+                }
 
                 val routeDistance = if (navigatingToDestinationPolyline != null) {
                     try {
@@ -452,7 +486,6 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
                 val routeChanged =  if (knownRoute == null || routeLineString != knownRoute || knownSettings != settings){
                     knownRoute = routeLineString
-                    knownRouteElevation = null
                     knownIncidents = null
                     knownIncidentWarningShown = false
                     lastKnownPositionAlongRoute = null
@@ -646,7 +679,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 knownPois = pois.toSet()
 
                 val currentDistanceAlongRoute = if (routeDistance != null && locationAndRemainingRouteDistance.remainingRouteDistance != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute){
-                    if (navigationStateEvent.rejoinDistance == null) {
+                    if (navigationStateEvent.rejoinDistance == null && navigationStateEvent.rejoinPolyline == null) {
                         routeDistance - locationAndRemainingRouteDistance.remainingRouteDistance
                     } else {
                         null
@@ -707,37 +740,17 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     it.copy(
                         routeDistance = routeDistance?.toFloat(),
                         distanceAlongRoute = distanceAlongRoute?.toFloat(),
+                        isOnRoute = currentDistanceAlongRoute != null,
                         knownRoute = knownRoute,
                         poiDistances = poiDistances,
-                        sampledElevationData = knownRouteElevation,
+                        sampledElevationData = sampledElevationData,
+                        climbs = climbs,
                         isImperial = isImperial,
                         navigatingToDestination = navigationStateEvent is OnNavigationState.NavigationState.NavigatingToDestination,
                         rejoin = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.rejoinPolyline?.let { LineString.fromPolyline(it, 5) },
                         locationAndRemainingRouteDistance = locationAndRemainingRouteDistance,
                         lastKnownPositionOnMainRoute = lastKnownPointAlongRoute ?: it.lastKnownPositionOnMainRoute
                     )
-                }
-
-                // Request elevation data
-                if (knownRouteElevation == null && routeLineString != null && routeDistance != null){
-                    Log.i(TAG, "Route changed, recalculating elevation data")
-
-                    try {
-                        val samplingInterval = if (routeDistance > 250_000f) 100.0f else 60.0f
-                        val elevations = valhallaAPIElevationProvider.requestValhallaElevations(routeLineString, samplingInterval)
-
-                        Log.i(TAG, "Elevation data: $elevations")
-                        knownRouteElevation = elevations
-
-                        val climbs = elevations.identifyClimbs()
-                        Log.i(TAG, "Identified climbs: $climbs")
-
-                        routeGraphViewModelProvider.update {
-                            it.copy(sampledElevationData = elevations, climbs = climbs)
-                        }
-                    } catch(e: Exception){
-                        Log.e(TAG, "Failed to sample route elevation", e)
-                    }
                 }
             }
         }

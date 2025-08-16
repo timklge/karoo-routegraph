@@ -111,4 +111,80 @@ class SampledElevationData(val interval: Float, val elevations: FloatArray) {
             currentIndicatorPosition += stepInMeters
         }
     }
+
+    companion object {
+        fun fromSparseElevationData(lineString: LineString, interval: Float = 60f): SampledElevationData {
+            // lineString contains elevation data with latitude representing the distance along the route in meters, longitude representing the elevation in meters
+            val coordinates = lineString.coordinates()
+
+            if (coordinates.isEmpty()) {
+                return SampledElevationData(interval, floatArrayOf())
+            }
+
+            if (coordinates.size == 1) {
+                // Single point - create array with just that elevation
+                val elevation = coordinates[0].longitude().toFloat()
+                return SampledElevationData(interval, floatArrayOf(elevation))
+            }
+
+            // Extract distance-elevation pairs from coordinates
+            val sparseData = coordinates.map { coord ->
+                val distance = coord.latitude().toFloat()  // Distance along route
+                val elevation = coord.longitude().toFloat() // Elevation
+                Pair(distance, elevation)
+            }.sortedBy { it.first } // Ensure sorted by distance
+
+            val totalDistance = sparseData.last().first - sparseData.first().first
+            val numSamples = ((totalDistance / interval).toInt() + 1).coerceAtLeast(1)
+            val elevations = FloatArray(numSamples)
+
+            // Generate regularly spaced samples using linear interpolation
+            for (i in 0 until numSamples) {
+                val targetDistance = sparseData.first().first + i * interval
+
+                // Find the two sparse points that bracket the target distance
+                var leftIndex = 0
+                var rightIndex = sparseData.size - 1
+
+                // Binary search to find the bracketing points efficiently
+                for (j in sparseData.indices) {
+                    if (sparseData[j].first <= targetDistance) {
+                        leftIndex = j
+                    } else {
+                        rightIndex = j
+                        break
+                    }
+                }
+
+                // Handle edge cases
+                when {
+                    leftIndex >= sparseData.size - 1 -> {
+                        // Target is at or beyond the last point
+                        elevations[i] = sparseData.last().second
+                    }
+                    rightIndex <= 0 -> {
+                        // Target is at or before the first point
+                        elevations[i] = sparseData.first().second
+                    }
+                    leftIndex == rightIndex -> {
+                        // Exact match with a sparse point
+                        elevations[i] = sparseData[leftIndex].second
+                    }
+                    else -> {
+                        // Linear interpolation between two points
+                        val leftPoint = sparseData[leftIndex]
+                        val rightPoint = sparseData[rightIndex]
+
+                        val distanceRange = rightPoint.first - leftPoint.first
+                        val elevationRange = rightPoint.second - leftPoint.second
+
+                        val ratio = (targetDistance - leftPoint.first) / distanceRange
+                        elevations[i] = leftPoint.second + ratio * elevationRange
+                    }
+                }
+            }
+
+            return SampledElevationData(interval, elevations)
+        }
+    }
 }

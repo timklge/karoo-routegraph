@@ -24,7 +24,7 @@ koin-androidx-compose = { module = "io.insert-koin:koin-androidx-compose", versi
 
 mapbox-sdk-turf = { module = "com.mapbox.mapboxsdk:mapbox-sdk-turf", version = "7.3.1" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferences" }
-hammerhead-karoo-ext = { group = "io.hammerhead", name = "karoo-ext", version = "1.1.5" }
+hammerhead-karoo-ext = { group = "io.hammerhead", name = "karoo-ext", version = "1.1.6" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
 
 # compose
