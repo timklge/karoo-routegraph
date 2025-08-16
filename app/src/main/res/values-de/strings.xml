@@ -73,9 +73,9 @@
     <string name="poi_in_distance">%1$s in %2$s</string>
 
     <!-- Traffic Incident Alert strings -->
-    <string name="incidents">Störungen</string>
-    <string name="traffic_incidents_found">%1$d Verkehrsstörungen entlang der Route</string>
-    <string name="failed_to_request_incidents">Störungen konnten nicht angefordert werden</string>
+    <string name="incidents">Meldungen</string>
+    <string name="traffic_incidents_found">%1$d Meldungen entlang der Route</string>
+    <string name="failed_to_request_incidents">Meldungen konnten nicht geladen werden</string>
 
     <!-- POI Sort Options -->
     <string name="sort_linear_distance">Luftlinie</string>
@@ -91,16 +91,16 @@
     <string name="category_bakery">Bäckerei</string>
     <string name="category_toilets">Toiletten</string>
     <string name="category_showers">Duschen</string>
-    <string name="category_atms">Geldautomaten</string>
+    <string name="category_atms">Geldautomat</string>
     <string name="category_shelter">Unterstand</string>
-    <string name="category_camping_site">Campingplatz</string>
+    <string name="category_camping_site">Camping</string>
     <string name="category_hotel">Hotel</string>
     <string name="category_train_station">Bahnhof</string>
     <string name="category_waste_basket">Mülleimer</string>
     <string name="category_bench">Bank</string>
-    <string name="category_bike_shop">Fahrradladen</string>
-    <string name="category_attraction">Sehenswürdigkeit</string>
-    <string name="category_viewpoint">Aussichtspunkt</string>
+    <string name="category_bike_shop">Radladen</string>
+    <string name="category_attraction">Attraktion</string>
+    <string name="category_viewpoint">Aussicht</string>
 
     <!-- Distance formatting strings -->
     <string name="distance_ahead">%1$s voraus, %2$s von Route</string>
