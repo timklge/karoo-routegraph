@@ -236,9 +236,9 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
             )
 
             val redrawInterval = if (karooSystem.karooSystemService.hardwareType == HardwareType.K2) {
-                5.seconds
+                15.seconds
             } else {
-                3.seconds
+                10.seconds
             }
 
             combine(applicationContext.streamSettings(karooSystem.karooSystemService), locationFlow, zoomLevelFlow, routeGraphViewModelProvider.viewModelFlow) { settings, location, mapZoom, viewModel ->
@@ -318,7 +318,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                             lat = position.latitude(),
                             lng = position.longitude(),
                             iconRes = gradientIndicator.drawableRes,
-                            orientation = bearing.toFloat() - (location.orientation ?: 0.0).toFloat(),
+                            orientation = bearing.toFloat(),
                         )
                     }
                     emitter.onNext(ShowSymbols(icons))
