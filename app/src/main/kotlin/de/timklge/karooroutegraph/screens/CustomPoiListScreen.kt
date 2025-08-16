@@ -130,7 +130,7 @@ fun CustomPoiListScreen() {
             val route = routeGraphViewModel?.knownRoute
             val allPois = (localPois + globalPois + tempPois).map { it.poi }
 
-            getStartAndEndPoiIfNone(route, allPois, settings, context)
+            getStartAndEndPoiIfNone(route, allPois, settings, context, routeGraphViewModel?.navigatingToDestination == true)
         }
     }
 

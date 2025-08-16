@@ -217,7 +217,7 @@ fun distanceToPoi(poi: Symbol.POI, sampledElevationData: SampledElevationData?, 
     }
 }
 
-fun getStartAndEndPoiIfNone(routeLineString: LineString?, pois: List<Symbol.POI>, settings: RouteGraphSettings?, applicationContext: Context): List<POI> {
+fun getStartAndEndPoiIfNone(routeLineString: LineString?, pois: List<Symbol.POI>, settings: RouteGraphSettings?, applicationContext: Context, isNavigationToDestination: Boolean): List<POI> {
     return buildList {
         val startPoint = routeLineString?.coordinates()?.firstOrNull()
         val endPoint = routeLineString?.coordinates()?.lastOrNull()
@@ -229,7 +229,7 @@ fun getStartAndEndPoiIfNone(routeLineString: LineString?, pois: List<Symbol.POI>
 
                 TurfMeasurement.distance(poiPoint, startPoint, TurfConstants.UNIT_METERS) < (settings?.poiDistanceToRouteMaxMeters ?: 500.0)
             }
-            if (!hasPoiAtStartPoint) {
+            if (!hasPoiAtStartPoint && !isNavigationToDestination) {
                 add(POI(
                     Symbol.POI(
                         "start-of-route",

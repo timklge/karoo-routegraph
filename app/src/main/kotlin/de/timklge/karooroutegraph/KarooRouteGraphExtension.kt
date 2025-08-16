@@ -450,6 +450,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                         }
                     }
                 }
+                val isNavigatingToDestination = navigatingToDestinationPolyline != null
 
                 val routeDistance = if (navigatingToDestinationPolyline != null) {
                     try {
@@ -670,7 +671,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     addAll(globalPois)
                     addAll(localPois)
 
-                    addAll(getStartAndEndPoiIfNone(routeLineString, map { it.symbol }, settings, applicationContext))
+                    addAll(getStartAndEndPoiIfNone(routeLineString, map { it.symbol }, settings, applicationContext, isNavigatingToDestination))
 
                     addAll(incidentPois)
                 }
