@@ -51,6 +51,7 @@ import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.streamDatatypeIsVisible
 import de.timklge.karooroutegraph.streamSettings
 import de.timklge.karooroutegraph.streamUserProfile
+import de.timklge.karooroutegraph.throttle
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.DataTypeImpl
 import io.hammerhead.karooext.internal.ViewEmitter
@@ -223,7 +224,7 @@ class MinimapDataType(
                 displayViewModel.copy(minimapWidth = width, minimapHeight = height)
             }
 
-            flow.filter { it.dataPageIsVisible }.collect { (viewModel, minimapViewModel, userProfile, displayViewModel, settings) ->
+            flow.throttle(1_000L).filter { it.dataPageIsVisible }.collect { (viewModel, minimapViewModel, userProfile, displayViewModel, settings) ->
                 Log.d(TAG, "Redrawing minimap view")
 
                 val width = config.viewSize.first
