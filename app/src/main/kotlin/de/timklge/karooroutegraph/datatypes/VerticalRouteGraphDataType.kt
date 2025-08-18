@@ -289,7 +289,7 @@ class VerticalRouteGraphDataType(
                 var previousDrawnProgressPixels = 0.0f
                 var firstElevationPixels: Float? = null
 
-                val displayedViewRange = displayViewModel.zoomLevel.getDistanceInMeters(viewModel, settings)
+                val displayedViewRange = displayViewModel.verticalZoomLevel.getDistanceInMeters(viewModel, settings)
                 val isZoomedIn = displayedViewRange != null && displayedViewRange <= 3_000
 
                 data class TextDrawCommand(val x: Float, val y: Float, val text: String, val paint: Paint, val importance: Int = 10,
