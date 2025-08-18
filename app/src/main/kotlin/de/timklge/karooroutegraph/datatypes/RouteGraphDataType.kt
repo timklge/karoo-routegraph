@@ -239,19 +239,19 @@ class RouteGraphDataType(
 
                 val zoomLevel = displayViewModel.zoomLevel
 
-                val viewDistanceStart = if (zoomLevel == ZoomLevel.COMPLETE_ROUTE){
+                val viewDistanceStart = if (zoomLevel == ZoomLevel.CompleteRoute){
                     0.0f
                 } else {
                     val distanceAlongRoute = viewModel.distanceAlongRoute ?: 0.0f
-                    val displayedMeters = zoomLevel.getDistanceInMeters(viewModel.isImperial) ?: 0.0f
+                    val displayedMeters = zoomLevel.getDistanceInMeters(viewModel, settings) ?: 0.0f
 
                     (distanceAlongRoute - displayedMeters * 0.1f).coerceAtLeast(0.0f)
                 }
-                val viewDistanceEnd = if (zoomLevel == ZoomLevel.COMPLETE_ROUTE){
+                val viewDistanceEnd = if (zoomLevel == ZoomLevel.CompleteRoute){
                     viewModel.routeDistance ?: 0.0f
                 } else {
                     val distanceAlongRoute = viewModel.distanceAlongRoute ?: 0.0f
-                    val displayedMeters = zoomLevel.getDistanceInMeters(viewModel.isImperial) ?: 0.0f
+                    val displayedMeters = zoomLevel.getDistanceInMeters(viewModel, settings) ?: 0.0f
 
                     (distanceAlongRoute + displayedMeters * 0.9f).coerceAtMost(viewModel.routeDistance ?: 0.0f)
                 }
@@ -281,6 +281,9 @@ class RouteGraphDataType(
                 var firstPixelFromLeft = 0.0f
                 var previousDrawnPixelsFromLeft = 0.0f
                 var firstPixelsFromTop: Float? = null
+
+                val displayedViewRange = displayViewModel.zoomLevel.getDistanceInMeters(viewModel, settings)
+                val isZoomedIn = displayedViewRange != null && displayedViewRange <= 3_000
 
                 if (viewModel.sampledElevationData != null){
                     val elevationProfilePath = Path().apply {
@@ -321,7 +324,7 @@ class RouteGraphDataType(
                     filledPath.lineTo(firstPixelFromLeft, graphBounds.bottom)
                     filledPath.close()
 
-                    if (displayViewModel.zoomLevel != ZoomLevel.TWO_UNITS){
+                    if (isZoomedIn){
                         if (viewModel.climbs != null){
                             // Sort climbs so that harder climbs will be drawn on top if they overlap
                             val climbsSortedByCategory = viewModel.climbs.sortedByDescending { it.category.number }
@@ -490,7 +493,7 @@ class RouteGraphDataType(
 
                         val progress = ((viewDistanceStart + tickInterval * i) / unitFactor)
 
-                        val text = if (zoomLevel == ZoomLevel.TWO_UNITS){
+                        val text = if (isZoomedIn){
                             String.format(Locale.US, "%.1f", progress)
                         } else "${progress.toInt()}"
 

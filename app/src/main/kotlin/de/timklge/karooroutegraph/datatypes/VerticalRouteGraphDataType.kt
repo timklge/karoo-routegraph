@@ -244,19 +244,19 @@ class VerticalRouteGraphDataType(
                 }
 
                 val zoomLevel = displayViewModel.verticalZoomLevel
-                val viewDistanceStart = if (zoomLevel == ZoomLevel.COMPLETE_ROUTE){
+                val viewDistanceStart = if (zoomLevel == ZoomLevel.CompleteRoute){
                     0.0f
                 } else {
                     val distanceAlongRoute = viewModel.distanceAlongRoute ?: 0.0f
-                    val displayedMeters = zoomLevel.getDistanceInMeters(viewModel.isImperial) ?: 0.0f
+                    val displayedMeters = zoomLevel.getDistanceInMeters(viewModel, settings) ?: 0.0f
 
                     (distanceAlongRoute - displayedMeters * 0.1f).coerceAtLeast(0.0f)
                 }
-                val viewDistanceEnd = if (zoomLevel == ZoomLevel.COMPLETE_ROUTE){
+                val viewDistanceEnd = if (zoomLevel == ZoomLevel.CompleteRoute){
                     viewModel.routeDistance ?: 0.0f
                 } else {
                     val distanceAlongRoute = viewModel.distanceAlongRoute ?: 0.0f
-                    val displayedMeters = zoomLevel.getDistanceInMeters(viewModel.isImperial) ?: 0.0f
+                    val displayedMeters = zoomLevel.getDistanceInMeters(viewModel, settings) ?: 0.0f
 
                     (distanceAlongRoute + displayedMeters * 0.9f).coerceAtMost(viewModel.routeDistance ?: 0.0f)
                 }
@@ -287,6 +287,9 @@ class VerticalRouteGraphDataType(
                 var firstProgressPixels = 0.0f
                 var previousDrawnProgressPixels = 0.0f
                 var firstElevationPixels: Float? = null
+
+                val displayedViewRange = displayViewModel.zoomLevel.getDistanceInMeters(viewModel, settings)
+                val isZoomedIn = displayedViewRange != null && displayedViewRange <= 3_000
 
                 data class TextDrawCommand(val x: Float, val y: Float, val text: String, val paint: Paint, val importance: Int = 10,
                                            /** If set, draws this text over the original text */
@@ -355,7 +358,7 @@ class VerticalRouteGraphDataType(
 
                             val clipRect = RectF(graphBounds.left, clampedClimbEndProgressPixels, graphBounds.right, clampedClimbStartProgressPixels)
 
-                            if (displayViewModel.verticalZoomLevel != ZoomLevel.TWO_UNITS) {
+                            if (isZoomedIn) {
                                 canvas.withClip(clipRect) {
                                     canvas.withClip(filledPath) {
                                         categoryPaints[climb.category]?.let { paint ->
@@ -385,7 +388,7 @@ class VerticalRouteGraphDataType(
                         }
                     }
 
-                    if (displayViewModel.verticalZoomLevel == ZoomLevel.TWO_UNITS) {
+                    if (isZoomedIn) {
                         for (i in 0 until viewModel.sampledElevationData.elevations.size-1){
                             val distance = i * viewModel.sampledElevationData.interval
                             if (distance !in viewRange) continue
@@ -542,7 +545,7 @@ class VerticalRouteGraphDataType(
                     )
 
                     val progress = ((viewDistanceStart + tickInterval * i) / unitFactor)
-                    val text = if (zoomLevel == ZoomLevel.TWO_UNITS){
+                    val text = if (isZoomedIn){
                         String.format(Locale.US, "%.1f", progress)
                     } else "${progress.toInt()}"
 

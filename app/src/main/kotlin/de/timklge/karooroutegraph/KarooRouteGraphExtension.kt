@@ -761,37 +761,10 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         super.onCreate()
 
         startGraphUpdater()
-        startMinimapUpdater()
 
         tileDownloadService.startDownloadJob()
         locationViewModelProvider.startUpdateJob()
         poiApproachAlertService.startAlertJob()
-    }
-
-    private fun startMinimapUpdater() {
-        extensionScope.launch {
-            data class StreamData(
-                val location: OnLocationChanged,
-                val rideState: RideState
-            )
-
-            val flow = combine(karooSystem.stream<OnLocationChanged>(), karooSystem.stream<RideState>()) { location, rideState ->
-                StreamData(location, rideState)
-            }
-
-            flow.throttle(30_000L).collect { (locationEvent, rideState) ->
-                /* TODO store ridden path */
-
-                minimapViewModelProvider.update {
-                    it.copy(
-                        // pastPoints = newPointList,
-                        currentLat = locationEvent.lat,
-                        currentLng = locationEvent.lng,
-                        currentBearing = locationEvent.orientation
-                    )
-                }
-            }
-        }
     }
 
     override fun onDestroy() {

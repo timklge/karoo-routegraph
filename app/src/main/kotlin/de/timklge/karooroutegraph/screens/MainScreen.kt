@@ -18,6 +18,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -96,6 +99,10 @@ fun MainScreen(onFinish: () -> Unit) {
     var apiTestDialogVisible by remember { mutableStateOf(false) }
     var apiTestDialogPending by remember { mutableStateOf(false) }
     var apiTestErrorMessage by remember { mutableStateOf("") }
+    var elevationProfileZoomLevels by remember { mutableStateOf(listOf(2, 20, 50, 100)) }
+    var showAddZoomLevelDialog by remember { mutableStateOf(false) }
+    var newZoomLevelText by remember { mutableStateOf("") }
+    var zoomLevelError by remember { mutableStateOf("") }
     val hereMapsIncidentProvider = koinInject<HereMapsIncidentProvider>()
 
     suspend fun updateSettings(){
@@ -110,7 +117,8 @@ fun MainScreen(onFinish: () -> Unit) {
             enableTrafficIncidentReporting = enableTrafficIncidentReporting,
             showNavigateButtonOnGraphs = showNavigateButtonOnGraphs,
             poiDistanceToRouteMaxMeters = poiDistanceToRouteMaxMeters,
-            poiApproachAlertAtDistance = poiApproachAlertAtDistance
+            poiApproachAlertAtDistance = poiApproachAlertAtDistance,
+            elevationProfileZoomLevels = elevationProfileZoomLevels
         )
 
         saveSettings(ctx, newSettings)
@@ -127,6 +135,7 @@ fun MainScreen(onFinish: () -> Unit) {
             showNavigateButtonOnGraphs = settings.showNavigateButtonOnGraphs
             poiDistanceToRouteMaxMeters = settings.poiDistanceToRouteMaxMeters
             poiApproachAlertAtDistance = settings.poiApproachAlertAtDistance ?: 500.0
+            elevationProfileZoomLevels = settings.elevationProfileZoomLevels
         }
     }
 
@@ -171,6 +180,8 @@ fun MainScreen(onFinish: () -> Unit) {
                     }
 
                     Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)){
+                        SectionHeader(stringResource(R.string.elevation_profile))
+
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Switch(checked = showNavigateButtonOnGraphs, onCheckedChange = {
                                 showNavigateButtonOnGraphs = it
@@ -180,6 +191,61 @@ fun MainScreen(onFinish: () -> Unit) {
                             })
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(stringResource(R.string.show_navigate_button))
+                        }
+
+                        // Elevation Profile Zoom Levels
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.elevation_profile_zoom_levels))
+
+                            // Sort zoom levels in ascending order
+                            val sortedZoomLevels = elevationProfileZoomLevels.sorted()
+
+                            sortedZoomLevels.forEach { zoomLevel ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = zoomLevel.toString(),
+                                    )
+
+                                    Icon(
+                                        imageVector = Icons.Filled.Delete,
+                                        contentDescription = stringResource(R.string.delete_zoom_level),
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clickable {
+                                                elevationProfileZoomLevels = elevationProfileZoomLevels.filter { it != zoomLevel }
+                                                coroutineScope.launch {
+                                                    updateSettings()
+                                                }
+                                            },
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        }
+
+                        FilledTonalButton(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(40.dp),
+                            onClick = {
+                                showAddZoomLevelDialog = true
+                                newZoomLevelText = ""
+                                zoomLevelError = ""
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Add,
+                                contentDescription = stringResource(R.string.add_zoom_level),
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.add_zoom_level))
                         }
 
                         SectionHeader(stringResource(R.string.gradient_chevrons))
@@ -394,6 +460,95 @@ fun MainScreen(onFinish: () -> Unit) {
                             }
                         }
 
+                        // New Zoom Level Dialog
+                        if (showAddZoomLevelDialog) {
+                            Dialog(onDismissRequest = {
+                                showAddZoomLevelDialog = false
+                                newZoomLevelText = ""
+                                zoomLevelError = ""
+                            }) {
+                                Surface(
+                                    shape = MaterialTheme.shapes.medium,
+                                    color = MaterialTheme.colorScheme.surface,
+                                    modifier = Modifier.padding(16.dp)
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(20.dp),
+                                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.new_zoom_level),
+                                            style = MaterialTheme.typography.headlineSmall
+                                        )
+
+                                        OutlinedTextField(
+                                            value = newZoomLevelText,
+                                            onValueChange = {
+                                                newZoomLevelText = it
+                                                zoomLevelError = ""
+                                            },
+                                            label = { Text(stringResource(R.string.enter_zoom_level)) },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            isError = zoomLevelError.isNotEmpty(),
+                                            singleLine = true
+                                        )
+
+                                        if (zoomLevelError.isNotEmpty()) {
+                                            Text(
+                                                text = zoomLevelError,
+                                                color = MaterialTheme.colorScheme.error,
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                        }
+
+                                        Column(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            FilledTonalButton(
+                                                onClick = {
+                                                    val zoomLevel = newZoomLevelText.toIntOrNull()
+                                                    when {
+                                                        zoomLevel == null -> {
+                                                            zoomLevelError = ctx.getString(R.string.invalid_zoom_level)
+                                                        }
+                                                        zoomLevel < 1 || zoomLevel > 999 -> {
+                                                            zoomLevelError = ctx.getString(R.string.invalid_zoom_level)
+                                                        }
+                                                        elevationProfileZoomLevels.contains(zoomLevel) -> {
+                                                            zoomLevelError = ctx.getString(R.string.zoom_level_exists)
+                                                        }
+                                                        else -> {
+                                                            elevationProfileZoomLevels = (elevationProfileZoomLevels + zoomLevel).sorted()
+                                                            newZoomLevelText = ""
+                                                            zoomLevelError = ""
+                                                            showAddZoomLevelDialog = false
+                                                            coroutineScope.launch {
+                                                                updateSettings()
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Text(stringResource(R.string.add))
+                                            }
+
+                                            FilledTonalButton(
+                                                onClick = {
+                                                    showAddZoomLevelDialog = false
+                                                    newZoomLevelText = ""
+                                                    zoomLevelError = ""
+                                                },
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Text(stringResource(R.string.cancel))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
 
                         Spacer(modifier = Modifier.padding(30.dp))
                     }

@@ -17,6 +17,18 @@
 
     <!-- MainScreen strings -->
     <string name="device_status_warning">Gerätestatus konnte nicht gelesen werden. Bitte Karoo-Software aktualisieren.</string>
+    <string name="elevation_profile">Höhenprofil</string>
+    <string name="zoom_levels">Zoomstufen:</string>
+    <string name="elevation_profile_zoom_levels">Zoomstufen:</string>
+    <string name="zoom_level">Zoomstufe</string>
+    <string name="add_zoom_level">Zoomstufe hinzufügen</string>
+    <string name="remove_zoom_level">Zoomstufe entfernen</string>
+    <string name="new_zoom_level">Neue Zoomstufe</string>
+    <string name="enter_zoom_level">Zoomstufe eingeben (1-999)</string>
+    <string name="delete_zoom_level">Zoomstufe löschen</string>
+    <string name="zoom_level_exists">Diese Zoomstufe ist bereits vorhanden</string>
+    <string name="invalid_zoom_level">Bitte geben Sie eine gültige Zoomstufe zwischen 1 und 999 ein</string>
+    <string name="add">Hinzufügen</string>
     <string name="show_navigate_button">Navigations-Knopf in Graphen anzeigen</string>
     <string name="gradient_chevrons">Steigungsindikatoren</string>
     <string name="show_gradient_indicators">Steigungsindikatoren auf Karte anzeigen</string>
