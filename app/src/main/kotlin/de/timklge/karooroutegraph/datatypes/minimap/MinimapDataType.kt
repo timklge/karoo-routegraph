@@ -86,31 +86,31 @@ enum class MinimapZoomLevel(val level: Float?) {
     COMPLETE_ROUTE(null);
 
     fun next(maxZoomLevel: Float?): MinimapZoomLevel {
-        if (this == COMPLETE_ROUTE) {
-            return CLOSEST
-        }
-
-        val nextLevel = when (this) {
-            CLOSEST -> CLOSE
-            CLOSE -> FAR
-            FAR -> FURTHER
-            FURTHER -> FURTHEST
-            FURTHEST -> COMPLETE_ROUTE
-            else -> null
-        }
-
-        if (nextLevel == COMPLETE_ROUTE && maxZoomLevel == null) {
-            return CLOSEST
-        }
-
-        if (nextLevel?.level == null) {
+        if (this == CLOSEST) {
             return COMPLETE_ROUTE
         }
 
-        return if (maxZoomLevel != null && nextLevel.level < maxZoomLevel) {
-            COMPLETE_ROUTE
+        val previousLevel = when (this) {
+            COMPLETE_ROUTE -> FURTHEST
+            FURTHEST -> FURTHER
+            FURTHER -> FAR
+            FAR -> CLOSE
+            CLOSE -> CLOSEST
+            else -> null
+        }
+
+        if (previousLevel == CLOSEST && maxZoomLevel == null) {
+            return COMPLETE_ROUTE
+        }
+
+        if (previousLevel?.level == null) {
+            return CLOSEST
+        }
+
+        return if (maxZoomLevel != null && previousLevel.level < maxZoomLevel) {
+            CLOSEST
         } else {
-            nextLevel
+            previousLevel
         }
     }
 }

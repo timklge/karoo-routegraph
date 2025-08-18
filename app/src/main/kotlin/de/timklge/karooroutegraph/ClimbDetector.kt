@@ -30,20 +30,6 @@ data class Climb(
 ) {
     val length: Float get() = endDistance - startDistance
 
-    fun overlapsWith(other: Climb, maxGap: Float): Boolean {
-        return (startDistance <= other.endDistance + maxGap &&
-                endDistance + maxGap >= other.startDistance)
-    }
-
-    fun merge(other: Climb): Climb {
-        return Climb(
-            // Take the more difficult category (they are ordered from hardest to easiest in the enum)
-            category = minOf(category, other.category),
-            startDistance = minOf(startDistance, other.startDistance),
-            endDistance = maxOf(endDistance, other.endDistance)
-        )
-    }
-
     fun totalGain(sampledElevationData: SampledElevationData): Double {
         return sampledElevationData.getTotalClimb(startDistance, endDistance)
     }
