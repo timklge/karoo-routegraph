@@ -359,7 +359,7 @@ class VerticalRouteGraphDataType(
 
                             val clipRect = RectF(graphBounds.left, clampedClimbEndProgressPixels, graphBounds.right, clampedClimbStartProgressPixels)
 
-                            if (isZoomedIn) {
+                            if (!isZoomedIn) {
                                 canvas.withClip(clipRect) {
                                     canvas.withClip(filledPath) {
                                         categoryPaints[climb.category]?.let { paint ->
