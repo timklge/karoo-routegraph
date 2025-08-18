@@ -281,7 +281,7 @@ class RouteGraphDataType(
                 var previousDrawnPixelsFromLeft = 0.0f
                 var firstPixelsFromTop: Float? = null
 
-                val displayedViewRange = displayViewModel.verticalZoomLevel.getDistanceInMeters(viewModel, settings)
+                val displayedViewRange = displayViewModel.zoomLevel.getDistanceInMeters(viewModel, settings)
                 val onlyHighlightClimbsAtZoomLeveLMeters = if (viewModel.isImperial) {
                     settings.onlyHighlightClimbsAtZoomLevel?.let { it * 1609.344f }
                 } else {
@@ -497,7 +497,7 @@ class RouteGraphDataType(
 
                         val progress = ((viewDistanceStart + tickInterval * i) / unitFactor)
 
-                        val text = if (isZoomedIn){
+                        val text = if (displayedViewRange == null || displayedViewRange <= 2000.0f) {
                             String.format(Locale.US, "%.1f", progress)
                         } else "${progress.toInt()}"
 
