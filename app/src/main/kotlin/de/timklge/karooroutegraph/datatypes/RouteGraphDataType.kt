@@ -42,6 +42,7 @@ import de.timklge.karooroutegraph.getInclineIndicatorColor
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.streamDatatypeIsVisible
 import de.timklge.karooroutegraph.streamSettings
+import de.timklge.karooroutegraph.throttle
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.DataTypeImpl
 import io.hammerhead.karooext.internal.ViewEmitter
@@ -120,7 +121,7 @@ class RouteGraphDataType(
         }
 
         val viewJob = CoroutineScope(Dispatchers.Default).launch {
-            flow.filter { it.isVisible }.collect { (viewModel, displayViewModel, settings) ->
+            flow.throttle(1_000L).filter { it.isVisible }.collect { (viewModel, displayViewModel, settings) ->
                 val bitmap = createBitmap(config.viewSize.first, config.viewSize.second)
 
                 val canvas = Canvas(bitmap)
@@ -322,7 +323,7 @@ class RouteGraphDataType(
                     filledPath.lineTo(firstPixelFromLeft, graphBounds.bottom)
                     filledPath.close()
 
-                    if (isZoomedIn){
+                    if (!isZoomedIn){
                         if (viewModel.climbs != null){
                             // Sort climbs so that harder climbs will be drawn on top if they overlap
                             val climbsSortedByCategory = viewModel.climbs.sortedByDescending { it.category.number }

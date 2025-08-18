@@ -54,6 +54,7 @@ import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.streamDatatypeIsVisible
 import de.timklge.karooroutegraph.streamSettings
 import de.timklge.karooroutegraph.streamUserProfile
+import de.timklge.karooroutegraph.throttle
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.DataTypeImpl
 import io.hammerhead.karooext.internal.ViewEmitter
@@ -121,7 +122,7 @@ class VerticalRouteGraphDataType(
         }
 
         val viewJob = CoroutineScope(Dispatchers.Default).launch {
-            flow.filter { it.isVisible }.collect { (viewModel, displayViewModel, userProfile, settings) ->
+            flow.throttle(1_000L).filter { it.isVisible }.collect { (viewModel, displayViewModel, userProfile, settings) ->
                 val bitmap = createBitmap(config.viewSize.first, config.viewSize.second)
 
                 val canvas = Canvas(bitmap)
