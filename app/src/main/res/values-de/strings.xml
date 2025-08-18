@@ -30,6 +30,8 @@
     <string name="invalid_zoom_level">Bitte geben Sie eine gültige Zoomstufe zwischen 1 und 999 ein</string>
     <string name="add">Hinzufügen</string>
     <string name="show_navigate_button">Navigations-Knopf in Graphen anzeigen</string>
+    <string name="only_highlight_climbs_at_zoom_level">Nur Anstiege hervorheben ab Zoomstufe:</string>
+    <string name="never">Nie</string>
     <string name="gradient_chevrons">Steigungsindikatoren</string>
     <string name="show_gradient_indicators">Steigungsindikatoren auf Karte anzeigen</string>
     <string name="amount_of_indicators">Anzahl der Indikatoren:</string>

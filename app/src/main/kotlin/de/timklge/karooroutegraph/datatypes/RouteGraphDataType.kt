@@ -281,8 +281,13 @@ class RouteGraphDataType(
                 var previousDrawnPixelsFromLeft = 0.0f
                 var firstPixelsFromTop: Float? = null
 
-                val displayedViewRange = displayViewModel.zoomLevel.getDistanceInMeters(viewModel, settings)
-                val isZoomedIn = displayedViewRange != null && displayedViewRange <= 3_000
+                val displayedViewRange = displayViewModel.verticalZoomLevel.getDistanceInMeters(viewModel, settings)
+                val onlyHighlightClimbsAtZoomLeveLMeters = if (viewModel.isImperial) {
+                    settings.onlyHighlightClimbsAtZoomLevel?.let { it * 1609.344f }
+                } else {
+                    settings.onlyHighlightClimbsAtZoomLevel?.let { it * 1000f }
+                }
+                val isZoomedIn = onlyHighlightClimbsAtZoomLeveLMeters == null || (displayedViewRange != null && displayedViewRange <= onlyHighlightClimbsAtZoomLeveLMeters)
 
                 if (viewModel.sampledElevationData != null){
                     val elevationProfilePath = Path().apply {

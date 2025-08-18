@@ -290,7 +290,12 @@ class VerticalRouteGraphDataType(
                 var firstElevationPixels: Float? = null
 
                 val displayedViewRange = displayViewModel.verticalZoomLevel.getDistanceInMeters(viewModel, settings)
-                val isZoomedIn = displayedViewRange != null && displayedViewRange <= 3_000
+                val onlyHighlightClimbsAtZoomLeveLMeters = if (viewModel.isImperial) {
+                    settings.onlyHighlightClimbsAtZoomLevel?.let { it * 1609.344f }
+                } else {
+                    settings.onlyHighlightClimbsAtZoomLevel?.let { it * 1000f }
+                }
+                val isZoomedIn = onlyHighlightClimbsAtZoomLeveLMeters == null || (displayedViewRange != null && displayedViewRange <= onlyHighlightClimbsAtZoomLeveLMeters)
 
                 data class TextDrawCommand(val x: Float, val y: Float, val text: String, val paint: Paint, val importance: Int = 10,
                                            /** If set, draws this text over the original text */

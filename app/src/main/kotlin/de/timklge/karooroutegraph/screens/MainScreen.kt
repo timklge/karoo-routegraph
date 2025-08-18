@@ -110,6 +110,7 @@ fun MainScreen(onFinish: () -> Unit) {
     var apiTestDialogPending by remember { mutableStateOf(false) }
     var apiTestErrorMessage by remember { mutableStateOf("") }
     var elevationProfileZoomLevels by remember { mutableStateOf(listOf(2, 20, 50, 100)) }
+    var onlyHighlightClimbsAtZoomLevel by remember { mutableStateOf<Int?>(null) }
     var showAddZoomLevelDialog by remember { mutableStateOf(false) }
     var newZoomLevelText by remember { mutableStateOf("") }
     var zoomLevelError by remember { mutableStateOf("") }
@@ -130,7 +131,8 @@ fun MainScreen(onFinish: () -> Unit) {
             showNavigateButtonOnGraphs = showNavigateButtonOnGraphs,
             poiDistanceToRouteMaxMeters = poiDistanceToRouteMaxMeters,
             poiApproachAlertAtDistance = poiApproachAlertAtDistance,
-            elevationProfileZoomLevels = elevationProfileZoomLevels
+            elevationProfileZoomLevels = elevationProfileZoomLevels,
+            onlyHighlightClimbsAtZoomLevel = onlyHighlightClimbsAtZoomLevel
         )
 
         saveSettings(ctx, newSettings)
@@ -148,6 +150,7 @@ fun MainScreen(onFinish: () -> Unit) {
             poiDistanceToRouteMaxMeters = settings.poiDistanceToRouteMaxMeters
             poiApproachAlertAtDistance = settings.poiApproachAlertAtDistance ?: 500.0
             elevationProfileZoomLevels = settings.elevationProfileZoomLevels
+            onlyHighlightClimbsAtZoomLevel = settings.onlyHighlightClimbsAtZoomLevel
         }
     }
 
@@ -205,18 +208,18 @@ fun MainScreen(onFinish: () -> Unit) {
                             Text(stringResource(R.string.show_navigate_button))
                         }
 
+                        // Only Highlight Climbs at Zoom Level Slider
+                        val zoomLevelUnit = if (userProfile?.preferredUnit?.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL) {
+                            ZoomUnit.MILES
+                        } else {
+                            ZoomUnit.KILOMETERS
+                        }
+
+                        val sortedZoomLevels = elevationProfileZoomLevels.sorted()
+
                         // Elevation Profile Zoom Levels
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(R.string.elevation_profile_zoom_levels))
-
-                            // Sort zoom levels in ascending order
-                            val sortedZoomLevels = elevationProfileZoomLevels.sorted()
-
-                            val zoomLevelUnit = if (userProfile?.preferredUnit?.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL) {
-                                ZoomUnit.MILES
-                            } else {
-                                ZoomUnit.KILOMETERS
-                            }
 
                             sortedZoomLevels.forEach { zoomLevel ->
                                 Row(
@@ -264,6 +267,34 @@ fun MainScreen(onFinish: () -> Unit) {
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(stringResource(R.string.add_zoom_level))
+                        }
+
+                        val climbHighlightOptions = sortedZoomLevels + listOf(null) // null represents "Never"
+                        val selectedClimbHighlightIndex = climbHighlightOptions.indexOf(onlyHighlightClimbsAtZoomLevel)
+
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.only_highlight_climbs_at_zoom_level))
+                            Slider(
+                                value = selectedClimbHighlightIndex.toFloat(),
+                                onValueChange = { idx ->
+                                    val newIndex = idx.roundToInt().coerceIn(climbHighlightOptions.indices)
+                                    onlyHighlightClimbsAtZoomLevel = climbHighlightOptions[newIndex]
+                                    coroutineScope.launch { updateSettings() }
+                                },
+                                valueRange = 0f..(climbHighlightOptions.size - 1).toFloat(),
+                                steps = climbHighlightOptions.size - 2,
+                                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp),
+                            )
+                            Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                climbHighlightOptions.forEach { option ->
+                                    val label = if (option == null) {
+                                        stringResource(R.string.never)
+                                    } else {
+                                        "$option${stringResource(zoomLevelUnit.stringResource)}"
+                                    }
+                                    Text(label, style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
                         }
 
                         SectionHeader(stringResource(R.string.gradient_chevrons))
