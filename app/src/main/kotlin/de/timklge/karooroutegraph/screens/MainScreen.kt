@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -51,8 +52,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mapbox.geojson.Point
 import de.timklge.karooroutegraph.GradientIndicatorFrequency
 import de.timklge.karooroutegraph.KarooRouteGraphExtension
@@ -61,12 +64,19 @@ import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.incidents.HereMapsIncidentProvider
 import de.timklge.karooroutegraph.saveSettings
 import de.timklge.karooroutegraph.streamSettings
+import de.timklge.karooroutegraph.streamUserProfile
 import io.hammerhead.karooext.KarooSystemService
+import io.hammerhead.karooext.models.UserProfile
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.koin.compose.koinInject
 import kotlin.math.roundToInt
+
+enum class ZoomUnit(val stringResource: Int) {
+    KILOMETERS(R.string.kilometers),
+    MILES(R.string.miles)
+}
 
 @Composable
 fun SectionHeader(title: String) {
@@ -104,6 +114,8 @@ fun MainScreen(onFinish: () -> Unit) {
     var newZoomLevelText by remember { mutableStateOf("") }
     var zoomLevelError by remember { mutableStateOf("") }
     val hereMapsIncidentProvider = koinInject<HereMapsIncidentProvider>()
+
+    val userProfile by karooSystem.streamUserProfile().collectAsStateWithLifecycle(null)
 
     suspend fun updateSettings(){
         Log.d(KarooRouteGraphExtension.TAG, "Updating settings")
@@ -200,6 +212,12 @@ fun MainScreen(onFinish: () -> Unit) {
                             // Sort zoom levels in ascending order
                             val sortedZoomLevels = elevationProfileZoomLevels.sorted()
 
+                            val zoomLevelUnit = if (userProfile?.preferredUnit?.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL) {
+                                ZoomUnit.MILES
+                            } else {
+                                ZoomUnit.KILOMETERS
+                            }
+
                             sortedZoomLevels.forEach { zoomLevel ->
                                 Row(
                                     modifier = Modifier
@@ -209,7 +227,7 @@ fun MainScreen(onFinish: () -> Unit) {
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = zoomLevel.toString(),
+                                        text = "$zoomLevel ${stringResource(zoomLevelUnit.stringResource)}",
                                     )
 
                                     Icon(
@@ -481,16 +499,29 @@ fun MainScreen(onFinish: () -> Unit) {
                                             style = MaterialTheme.typography.headlineSmall
                                         )
 
+                                        val zoomLevelUnit = if (userProfile?.preferredUnit?.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL) {
+                                            ZoomUnit.MILES
+                                        } else {
+                                            ZoomUnit.KILOMETERS
+                                        }
+
                                         OutlinedTextField(
                                             value = newZoomLevelText,
                                             onValueChange = {
-                                                newZoomLevelText = it
-                                                zoomLevelError = ""
+                                                // Filter input to only allow digits
+                                                if (it.all { char -> char.isDigit() }) {
+                                                    newZoomLevelText = it
+                                                    zoomLevelError = ""
+                                                }
                                             },
                                             label = { Text(stringResource(R.string.enter_zoom_level)) },
                                             modifier = Modifier.fillMaxWidth(),
                                             isError = zoomLevelError.isNotEmpty(),
-                                            singleLine = true
+                                            suffix = { Text(stringResource(zoomLevelUnit.stringResource)) },
+                                            singleLine = true,
+                                            keyboardOptions = KeyboardOptions.Default.copy(
+                                                keyboardType = KeyboardType.Number
+                                            )
                                         )
 
                                         if (zoomLevelError.isNotEmpty()) {

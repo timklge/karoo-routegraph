@@ -100,8 +100,6 @@ class RouteGraphDataType(
     override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
         Log.d(TAG, "Starting route view with $emitter")
 
-        val instanceId = UUID.randomUUID().toString()
-
         val configJob = CoroutineScope(Dispatchers.Default).launch {
             emitter.onNext(UpdateGraphicConfig(showHeader = false))
             emitter.onNext(ShowCustomStreamState("", null))

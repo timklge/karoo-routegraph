@@ -124,4 +124,6 @@
     <string name="end_of_route">End</string>
     <string name="category_attraction">Attraction</string>
     <string name="category_viewpoint">Viewpoint</string>
+    <string name="kilometers">km</string>
+    <string name="miles">mi</string>
 </resources>

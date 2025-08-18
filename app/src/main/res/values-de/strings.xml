@@ -24,7 +24,7 @@
     <string name="add_zoom_level">Zoomstufe hinzufügen</string>
     <string name="remove_zoom_level">Zoomstufe entfernen</string>
     <string name="new_zoom_level">Neue Zoomstufe</string>
-    <string name="enter_zoom_level">Zoomstufe eingeben (1-999)</string>
+    <string name="enter_zoom_level">Zoomstufe</string>
     <string name="delete_zoom_level">Zoomstufe löschen</string>
     <string name="zoom_level_exists">Diese Zoomstufe ist bereits vorhanden</string>
     <string name="invalid_zoom_level">Bitte geben Sie eine gültige Zoomstufe zwischen 1 und 999 ein</string>
@@ -125,4 +125,6 @@
     <string name="error_fetch_pois">POIs konnten nicht abgerufen werden: %1$s</string>
     <string name="start_of_route">Start</string>
     <string name="end_of_route">Ende</string>
+    <string name="kilometers">km</string>
+    <string name="miles">mi</string>
 </resources>
