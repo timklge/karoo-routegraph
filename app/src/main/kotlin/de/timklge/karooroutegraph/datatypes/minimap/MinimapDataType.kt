@@ -87,32 +87,28 @@ enum class MinimapZoomLevel(val level: Float?) {
     COMPLETE_ROUTE(null);
 
     fun next(maxZoomLevel: Float?): MinimapZoomLevel {
-        if (this == COMPLETE_ROUTE) {
-            return CLOSEST
-        }
-
-        val nextLevel = when (this) {
-            CLOSEST -> CLOSE
-            CLOSE -> FAR
-            FAR -> FURTHER
-            FURTHER -> FURTHEST
-            FURTHEST -> COMPLETE_ROUTE
-            else -> null
-        }
-
-        if (nextLevel == COMPLETE_ROUTE && maxZoomLevel == null) {
-            return CLOSEST
-        }
-
-        if (nextLevel?.level == null) {
+        if (this == CLOSEST) {
             return COMPLETE_ROUTE
         }
 
-        return if (maxZoomLevel != null && nextLevel.level < maxZoomLevel) {
-            COMPLETE_ROUTE
-        } else {
-            nextLevel
+        val previousLevel = when (this) {
+            COMPLETE_ROUTE -> {
+                if (maxZoomLevel == null) {
+                    return FURTHEST
+                } else {
+                    val largestZoomLevel = MinimapZoomLevel.entries.filter { it.level != null && it.level >= maxZoomLevel }.sortedBy { it.level }.firstOrNull()
+
+                    largestZoomLevel ?: FURTHEST
+                }
+            }
+            FURTHEST -> FURTHER
+            FURTHER -> FAR
+            FAR -> CLOSE
+            CLOSE -> CLOSEST
+            else -> null
         }
+
+        return previousLevel ?: COMPLETE_ROUTE
     }
 }
 
@@ -250,6 +246,8 @@ class MinimapDataType(
                         viewModel.knownRoute.getCenterPoint()
                     } else if (minimapViewModel.currentLng != null && minimapViewModel.currentLat != null) {
                         Point.fromLngLat(minimapViewModel.currentLng, minimapViewModel.currentLat)
+                    } else if (viewModel.knownRoute != null) {
+                        viewModel.lastKnownPositionOnMainRoute ?: viewModel.knownRoute.coordinates().firstOrNull() ?: defaultMapCenter
                     } else {
                         defaultMapCenter
                     }
