@@ -117,7 +117,7 @@ class PoiApproachAlertService(
                         val nearestPointInRange = pointsAhead.find {
                             val alongRoute = it.distanceFromRouteStart - distanceAlongRoute
 
-                            alongRoute <= (settings.poiApproachAlertAtDistance ?: 500.0) && alongRoute >= 20.0
+                            alongRoute <= (settings.poiApproachAlertAtDistance ?: 500.0) && alongRoute >= 20.0 && it.distanceFromRouteStart > (settings.poiApproachAlertAtDistance ?: 500.0)
                         }
 
                         if (nearestPointInRange == null && lastAlertShownForPoi != null) {
