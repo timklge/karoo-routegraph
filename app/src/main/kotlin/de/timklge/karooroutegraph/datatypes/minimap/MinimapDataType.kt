@@ -92,7 +92,15 @@ enum class MinimapZoomLevel(val level: Float?) {
         }
 
         val previousLevel = when (this) {
-            COMPLETE_ROUTE -> FURTHEST
+            COMPLETE_ROUTE -> {
+                if (maxZoomLevel == null) {
+                    return FURTHEST
+                } else {
+                    val largestZoomLevel = MinimapZoomLevel.entries.filter { it.level != null && it.level >= maxZoomLevel }.sortedBy { it.level }.firstOrNull()
+
+                    largestZoomLevel ?: FURTHEST
+                }
+            }
             FURTHEST -> FURTHER
             FURTHER -> FAR
             FAR -> CLOSE
@@ -100,19 +108,7 @@ enum class MinimapZoomLevel(val level: Float?) {
             else -> null
         }
 
-        if (previousLevel == CLOSEST && maxZoomLevel == null) {
-            return COMPLETE_ROUTE
-        }
-
-        if (previousLevel?.level == null) {
-            return CLOSEST
-        }
-
-        return if (maxZoomLevel != null && previousLevel.level < maxZoomLevel) {
-            CLOSEST
-        } else {
-            previousLevel
-        }
+        return previousLevel ?: COMPLETE_ROUTE
     }
 }
 
@@ -250,6 +246,8 @@ class MinimapDataType(
                         viewModel.knownRoute.getCenterPoint()
                     } else if (minimapViewModel.currentLng != null && minimapViewModel.currentLat != null) {
                         Point.fromLngLat(minimapViewModel.currentLng, minimapViewModel.currentLat)
+                    } else if (viewModel.knownRoute != null) {
+                        viewModel.lastKnownPositionOnMainRoute ?: viewModel.knownRoute.coordinates().firstOrNull() ?: defaultMapCenter
                     } else {
                         defaultMapCenter
                     }
