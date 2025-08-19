@@ -289,7 +289,7 @@ class RouteGraphDataType(
                 } else {
                     settings.onlyHighlightClimbsAtZoomLevel?.let { it * 1000f }
                 }
-                val isZoomedIn = onlyHighlightClimbsAtZoomLeveLMeters == null || (displayedViewRange != null && displayedViewRange <= onlyHighlightClimbsAtZoomLeveLMeters)
+                val isZoomedIn = onlyHighlightClimbsAtZoomLeveLMeters == null || (displayedViewRange != null && displayedViewRange < onlyHighlightClimbsAtZoomLeveLMeters)
 
                 if (viewModel.sampledElevationData != null){
                     val elevationProfilePath = Path().apply {
