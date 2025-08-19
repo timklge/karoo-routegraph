@@ -10,7 +10,6 @@ import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModelProvider
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.ZoomLevel
-import de.timklge.karooroutegraph.streamSettings
 import kotlinx.coroutines.flow.first
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -27,6 +26,7 @@ class ChangeVerticalZoomLevelAction : ActionCallback, KoinComponent {
     ) {
         val viewModel = viewModelProvider.viewModelFlow.first()
         val settings = karooSystemServiceProvider.streamSettings().first()
+        val viewIdParameter = parameters[ActionParameters.Key<String>("view_id")]
 
         displayViewModelProvider.update { displayViewModel ->
             val routeDistance = viewModel.routeDistance
@@ -37,7 +37,7 @@ class ChangeVerticalZoomLevelAction : ActionCallback, KoinComponent {
                 ZoomLevel.CompleteRoute
             }
 
-            Log.d(KarooRouteGraphExtension.TAG, "Updated vertical zoom level: $newZoomLevel")
+            Log.d(KarooRouteGraphExtension.TAG, "Updated vertical zoom level: $newZoomLevel for $viewIdParameter")
 
             displayViewModel.copy(verticalZoomLevel = newZoomLevel)
         }

@@ -73,6 +73,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import java.util.Locale
+import java.util.UUID
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -100,6 +101,8 @@ class VerticalRouteGraphDataType(
 
     override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
         Log.d(TAG, "Starting route view with $emitter")
+
+        val viewId = UUID.randomUUID()
 
         val configJob = CoroutineScope(Dispatchers.Default).launch {
             emitter.onNext(UpdateGraphicConfig(showHeader = false))
@@ -570,7 +573,8 @@ class VerticalRouteGraphDataType(
 
                     if (!config.preview) modifier = modifier.clickable(onClick = actionRunCallback<ChangeVerticalZoomLevelAction>(
                         parameters = actionParametersOf(
-                            ActionParameters.Key<String>("action_type") to "zoom"
+                            ActionParameters.Key<String>("action_type") to "zoom",
+                            ActionParameters.Key<String>("view_id") to viewId.toString()
                         )
                     ))
 

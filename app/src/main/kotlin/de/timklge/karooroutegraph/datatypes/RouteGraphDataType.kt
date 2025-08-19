@@ -101,6 +101,8 @@ class RouteGraphDataType(
     override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
         Log.d(TAG, "Starting route view with $emitter")
 
+        val viewId = UUID.randomUUID()
+
         val configJob = CoroutineScope(Dispatchers.Default).launch {
             emitter.onNext(UpdateGraphicConfig(showHeader = false))
             emitter.onNext(ShowCustomStreamState("", null))
@@ -568,7 +570,8 @@ class RouteGraphDataType(
 
                     if (!config.preview) modifier = modifier.clickable(onClick = actionRunCallback<ChangeZoomLevelAction>(
                         parameters = actionParametersOf(
-                            ActionParameters.Key<String>("action_type") to "zoom"
+                            ActionParameters.Key<String>("action_type") to "zoom",
+                            ActionParameters.Key<String>("view_id") to viewId.toString()
                         )
                     ))
 
