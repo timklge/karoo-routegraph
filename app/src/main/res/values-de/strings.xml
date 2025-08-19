@@ -17,7 +17,21 @@
 
     <!-- MainScreen strings -->
     <string name="device_status_warning">Gerätestatus konnte nicht gelesen werden. Bitte Karoo-Software aktualisieren.</string>
+    <string name="elevation_profile">Höhenprofil</string>
+    <string name="zoom_levels">Zoomstufen:</string>
+    <string name="elevation_profile_zoom_levels">Zoomstufen:</string>
+    <string name="zoom_level">Zoomstufe</string>
+    <string name="add_zoom_level">Zoomstufe hinzufügen</string>
+    <string name="remove_zoom_level">Zoomstufe entfernen</string>
+    <string name="new_zoom_level">Neue Zoomstufe</string>
+    <string name="enter_zoom_level">Zoomstufe</string>
+    <string name="delete_zoom_level">Zoomstufe löschen</string>
+    <string name="zoom_level_exists">Diese Zoomstufe ist bereits vorhanden</string>
+    <string name="invalid_zoom_level">Bitte geben Sie eine gültige Zoomstufe zwischen 1 und 999 ein</string>
+    <string name="add">Hinzufügen</string>
     <string name="show_navigate_button">Navigations-Knopf in Graphen anzeigen</string>
+    <string name="only_highlight_climbs_at_zoom_level">Nur Anstiege hervorheben ab Zoomstufe:</string>
+    <string name="never">Nie</string>
     <string name="gradient_chevrons">Steigungsindikatoren</string>
     <string name="show_gradient_indicators">Steigungsindikatoren auf Karte anzeigen</string>
     <string name="amount_of_indicators">Anzahl der Indikatoren:</string>
@@ -113,4 +127,6 @@
     <string name="error_fetch_pois">POIs konnten nicht abgerufen werden: %1$s</string>
     <string name="start_of_route">Start</string>
     <string name="end_of_route">Ende</string>
+    <string name="kilometers">km</string>
+    <string name="miles">mi</string>
 </resources>

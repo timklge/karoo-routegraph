@@ -117,7 +117,7 @@ class PoiApproachAlertService(
                         val nearestPointInRange = pointsAhead.find {
                             val alongRoute = it.distanceFromRouteStart - distanceAlongRoute
 
-                            alongRoute <= (settings.poiApproachAlertAtDistance ?: 500.0) && alongRoute >= 20.0
+                            alongRoute <= (settings.poiApproachAlertAtDistance ?: 500.0) && alongRoute >= 20.0 && it.distanceFromRouteStart > (settings.poiApproachAlertAtDistance ?: 500.0)
                         }
 
                         if (nearestPointInRange == null && lastAlertShownForPoi != null) {
@@ -127,8 +127,12 @@ class PoiApproachAlertService(
                         }
 
                         if (nearestPointInRange != null && (lastAlertShownForPoi == null || lastAlertShownForPoi.isBefore(checkForPoiApproachAlertsAfter))) {
-                            val distance = distanceToPoi(poi.symbol, viewModel.sampledElevationData,
-                                viewModel.poiDistances, currentPosition, PoiSortOption.AHEAD_ON_ROUTE, distanceAlongRoute)?.formatDistance(applicationContext, isImperial, flat = true)
+                            val distance = distanceToPoi(poi.symbol,
+                                viewModel.sampledElevationData,
+                                viewModel.poiDistances, currentPosition, PoiSortOption.AHEAD_ON_ROUTE,
+                                distanceAlongRoute,
+                                forNearestPoint = nearestPointInRange
+                            )?.formatDistance(applicationContext, isImperial, flat = true)
 
                             val text = applicationContext.getString(R.string.poi_in_distance, poi.symbol.name, distance ?: "")
 

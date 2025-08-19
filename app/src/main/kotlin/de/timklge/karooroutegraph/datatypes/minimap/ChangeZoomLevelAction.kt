@@ -25,17 +25,19 @@ class ChangeZoomLevelAction : ActionCallback, KoinComponent {
         parameters: ActionParameters
     ) {
         val viewModel = viewModelProvider.viewModelFlow.first()
+        val settings = karooSystemServiceProvider.streamSettings().first()
+        val viewIdParameer = parameters[ActionParameters.Key<String>("view_id")]
 
         displayViewModelProvider.update { displayViewModel ->
             val routeDistance = viewModel.routeDistance
 
             val newZoomLevel = if(routeDistance != null){
-                displayViewModel.zoomLevel.next(routeDistance.toDouble(), viewModel.isImperial)
+                displayViewModel.zoomLevel.next(viewModel, settings)
             } else {
-                ZoomLevel.COMPLETE_ROUTE
+                ZoomLevel.CompleteRoute
             }
 
-            Log.d(KarooRouteGraphExtension.Companion.TAG, "Updated zoom level: $newZoomLevel")
+            Log.d(KarooRouteGraphExtension.Companion.TAG, "Updated zoom level: $newZoomLevel for $viewIdParameer")
 
             displayViewModel.copy(zoomLevel = newZoomLevel)
         }

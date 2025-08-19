@@ -54,6 +54,7 @@ import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.streamDatatypeIsVisible
 import de.timklge.karooroutegraph.streamSettings
 import de.timklge.karooroutegraph.streamUserProfile
+import de.timklge.karooroutegraph.throttle
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.DataTypeImpl
 import io.hammerhead.karooext.internal.ViewEmitter
@@ -72,6 +73,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import java.util.Locale
+import java.util.UUID
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -100,6 +102,8 @@ class VerticalRouteGraphDataType(
     override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
         Log.d(TAG, "Starting route view with $emitter")
 
+        val viewId = UUID.randomUUID()
+
         val configJob = CoroutineScope(Dispatchers.Default).launch {
             emitter.onNext(UpdateGraphicConfig(showHeader = false))
             emitter.onNext(ShowCustomStreamState("", null))
@@ -121,7 +125,7 @@ class VerticalRouteGraphDataType(
         }
 
         val viewJob = CoroutineScope(Dispatchers.Default).launch {
-            flow.filter { it.isVisible }.collect { (viewModel, displayViewModel, userProfile, settings) ->
+            flow.throttle(1_000L).filter { it.isVisible }.collect { (viewModel, displayViewModel, userProfile, settings) ->
                 val bitmap = createBitmap(config.viewSize.first, config.viewSize.second)
 
                 val canvas = Canvas(bitmap)
@@ -244,19 +248,19 @@ class VerticalRouteGraphDataType(
                 }
 
                 val zoomLevel = displayViewModel.verticalZoomLevel
-                val viewDistanceStart = if (zoomLevel == ZoomLevel.COMPLETE_ROUTE){
+                val viewDistanceStart = if (zoomLevel == ZoomLevel.CompleteRoute){
                     0.0f
                 } else {
                     val distanceAlongRoute = viewModel.distanceAlongRoute ?: 0.0f
-                    val displayedMeters = zoomLevel.getDistanceInMeters(viewModel.isImperial) ?: 0.0f
+                    val displayedMeters = zoomLevel.getDistanceInMeters(viewModel, settings) ?: 0.0f
 
                     (distanceAlongRoute - displayedMeters * 0.1f).coerceAtLeast(0.0f)
                 }
-                val viewDistanceEnd = if (zoomLevel == ZoomLevel.COMPLETE_ROUTE){
+                val viewDistanceEnd = if (zoomLevel == ZoomLevel.CompleteRoute){
                     viewModel.routeDistance ?: 0.0f
                 } else {
                     val distanceAlongRoute = viewModel.distanceAlongRoute ?: 0.0f
-                    val displayedMeters = zoomLevel.getDistanceInMeters(viewModel.isImperial) ?: 0.0f
+                    val displayedMeters = zoomLevel.getDistanceInMeters(viewModel, settings) ?: 0.0f
 
                     (distanceAlongRoute + displayedMeters * 0.9f).coerceAtMost(viewModel.routeDistance ?: 0.0f)
                 }
@@ -287,6 +291,14 @@ class VerticalRouteGraphDataType(
                 var firstProgressPixels = 0.0f
                 var previousDrawnProgressPixels = 0.0f
                 var firstElevationPixels: Float? = null
+
+                val displayedViewRange = displayViewModel.verticalZoomLevel.getDistanceInMeters(viewModel, settings)
+                val onlyHighlightClimbsAtZoomLeveLMeters = if (viewModel.isImperial) {
+                    settings.onlyHighlightClimbsAtZoomLevel?.let { it * 1609.344f }
+                } else {
+                    settings.onlyHighlightClimbsAtZoomLevel?.let { it * 1000f }
+                }
+                val isZoomedIn = onlyHighlightClimbsAtZoomLeveLMeters == null || (displayedViewRange != null && displayedViewRange <= onlyHighlightClimbsAtZoomLeveLMeters)
 
                 data class TextDrawCommand(val x: Float, val y: Float, val text: String, val paint: Paint, val importance: Int = 10,
                                            /** If set, draws this text over the original text */
@@ -355,7 +367,7 @@ class VerticalRouteGraphDataType(
 
                             val clipRect = RectF(graphBounds.left, clampedClimbEndProgressPixels, graphBounds.right, clampedClimbStartProgressPixels)
 
-                            if (displayViewModel.verticalZoomLevel != ZoomLevel.TWO_UNITS) {
+                            if (!isZoomedIn) {
                                 canvas.withClip(clipRect) {
                                     canvas.withClip(filledPath) {
                                         categoryPaints[climb.category]?.let { paint ->
@@ -374,7 +386,7 @@ class VerticalRouteGraphDataType(
                             val climbMaxIncline = climb.getMaxIncline(viewModel.sampledElevationData)
                             val climbMaxInclineLength = distanceToString(climbMaxIncline.end - climbMaxIncline.start, isImperial, false)
 
-                            if (climb.category.number <= 2){
+                            if (climb.category.number < 3){
                                 textDrawCommands.add(TextDrawCommand(graphBounds.right + 100f, climbStartProgressPixels + 15f, "⛰ $climbGain, $climbLength", textPaint, climb.category.importance, "⛰", Paint(textPaint).apply {
                                     color = applicationContext.getColor(climb.category.colorRes)
                                 }))
@@ -385,7 +397,7 @@ class VerticalRouteGraphDataType(
                         }
                     }
 
-                    if (displayViewModel.verticalZoomLevel == ZoomLevel.TWO_UNITS) {
+                    if (isZoomedIn) {
                         for (i in 0 until viewModel.sampledElevationData.elevations.size-1){
                             val distance = i * viewModel.sampledElevationData.interval
                             if (distance !in viewRange) continue
@@ -542,7 +554,7 @@ class VerticalRouteGraphDataType(
                     )
 
                     val progress = ((viewDistanceStart + tickInterval * i) / unitFactor)
-                    val text = if (zoomLevel == ZoomLevel.TWO_UNITS){
+                    val text = if (displayedViewRange == null || displayedViewRange <= 2000.0f) {
                         String.format(Locale.US, "%.1f", progress)
                     } else "${progress.toInt()}"
 
@@ -561,7 +573,8 @@ class VerticalRouteGraphDataType(
 
                     if (!config.preview) modifier = modifier.clickable(onClick = actionRunCallback<ChangeVerticalZoomLevelAction>(
                         parameters = actionParametersOf(
-                            ActionParameters.Key<String>("action_type") to "zoom"
+                            ActionParameters.Key<String>("action_type") to "zoom",
+                            ActionParameters.Key<String>("view_id") to viewId.toString()
                         )
                     ))
 

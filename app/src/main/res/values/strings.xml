@@ -16,7 +16,21 @@
 
     <!-- MainScreen strings -->
     <string name="device_status_warning">Could not read device status. Is your Karoo updated?</string>
+    <string name="elevation_profile">Elevation profile</string>
+    <string name="zoom_levels">Zoom levels:</string>
+    <string name="elevation_profile_zoom_levels">Zoom levels:</string>
+    <string name="zoom_level">Zoom level</string>
+    <string name="add_zoom_level">Add zoom level</string>
+    <string name="remove_zoom_level">Remove zoom level</string>
+    <string name="new_zoom_level">New zoom level</string>
+    <string name="enter_zoom_level">Enter zoom level</string>
+    <string name="delete_zoom_level">Delete zoom level</string>
+    <string name="zoom_level_exists">This zoom level already exists</string>
+    <string name="invalid_zoom_level">Please enter a valid zoom level</string>
+    <string name="add">Add</string>
     <string name="show_navigate_button">Show navigate button on graphs</string>
+    <string name="only_highlight_climbs_at_zoom_level">Only highlight climbs at zoom level:</string>
+    <string name="never">Never</string>
     <string name="gradient_chevrons">Gradient chevrons</string>
     <string name="show_gradient_indicators">Show gradient indicators on map</string>
     <string name="amount_of_indicators">Amount of indicators:</string>
@@ -112,4 +126,6 @@
     <string name="end_of_route">End</string>
     <string name="category_attraction">Attraction</string>
     <string name="category_viewpoint">Viewpoint</string>
+    <string name="kilometers">km</string>
+    <string name="miles">mi</string>
 </resources>

@@ -25,17 +25,19 @@ class ChangeVerticalZoomLevelAction : ActionCallback, KoinComponent {
         parameters: ActionParameters
     ) {
         val viewModel = viewModelProvider.viewModelFlow.first()
+        val settings = karooSystemServiceProvider.streamSettings().first()
+        val viewIdParameter = parameters[ActionParameters.Key<String>("view_id")]
 
         displayViewModelProvider.update { displayViewModel ->
             val routeDistance = viewModel.routeDistance
 
             val newZoomLevel = if(routeDistance != null){
-                displayViewModel.verticalZoomLevel.next(routeDistance.toDouble(), viewModel.isImperial)
+                displayViewModel.verticalZoomLevel.next(viewModel, settings)
             } else {
-                ZoomLevel.COMPLETE_ROUTE
+                ZoomLevel.CompleteRoute
             }
 
-            Log.d(KarooRouteGraphExtension.TAG, "Updated vertical zoom level: $newZoomLevel")
+            Log.d(KarooRouteGraphExtension.TAG, "Updated vertical zoom level: $newZoomLevel for $viewIdParameter")
 
             displayViewModel.copy(verticalZoomLevel = newZoomLevel)
         }

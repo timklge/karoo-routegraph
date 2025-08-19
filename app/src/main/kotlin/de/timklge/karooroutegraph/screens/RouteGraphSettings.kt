@@ -17,6 +17,8 @@ data class RouteGraphSettings(
     val poiDistanceToRouteMaxMeters: Double = 1000.0,
     val poiApproachAlertAtDistance: Double? = 500.0,
     val poiApproachAlertReminderIntervalSeconds: Int = 300,
+    val elevationProfileZoomLevels: List<Int> = listOf(2, 10, 25, 50),
+    val onlyHighlightClimbsAtZoomLevel: Int? = 1, // null means "Never"
 ){
 
     companion object {

@@ -1,48 +1,77 @@
 package de.timklge.karooroutegraph
 
 import de.timklge.karooroutegraph.datatypes.minimap.MinimapZoomLevel
+import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-enum class ZoomLevel(val displayedUnits: Int?) {
-    COMPLETE_ROUTE(null),
-    TWO_UNITS(2),
-    TWENTY_UNITS(20),
-    FIFTY_UNITS(50),
-    HUNDRED_UNITS(100);
+sealed class ZoomLevel {
+    object CompleteRoute : ZoomLevel() {
+        override fun getDistanceInMeters(viewModel: RouteGraphViewModel, settings: RouteGraphSettings): Float? {
+            return viewModel.routeDistance
+        }
 
-    fun getDistanceInMeters(isImperial: Boolean): Float? {
-        return displayedUnits?.let {
-            if (isImperial) {
-                it * 1609.34f
-            } else {
-                it * 1000f
+        override fun next(
+            viewModel: RouteGraphViewModel,
+            settings: RouteGraphSettings,
+        ): ZoomLevel {
+            // Return first configured zoom level smaller than the route length
+            val routeLength = viewModel.routeDistance
+            if (routeLength == null) {
+                val maxZoomLevel = settings.elevationProfileZoomLevels.maxOrNull()
+
+                return if (maxZoomLevel != null) {
+                    Units(maxZoomLevel)
+                } else {
+                    CompleteRoute
+                }
+            }
+
+            return settings.elevationProfileZoomLevels
+                .map { Units(it) }
+                .sortedByDescending { it.displayedUnits }
+                .firstOrNull {
+                    (it.getDistanceInMeters(viewModel, settings) ?: Float.MAX_VALUE) < routeLength
+                } ?: CompleteRoute
+        }
+    }
+
+    data class Units(val displayedUnits: Int) : ZoomLevel() {
+        override fun getDistanceInMeters(viewModel: RouteGraphViewModel, settings: RouteGraphSettings): Float? {
+            return displayedUnits.let {
+                if (viewModel.isImperial) {
+                    it * 1609.34f
+                } else {
+                    it * 1000f
+                }
             }
         }
+
+        override fun next(
+            viewModel: RouteGraphViewModel,
+            settings: RouteGraphSettings,
+        ): ZoomLevel {
+            val currentDistance = getDistanceInMeters(viewModel, settings)
+            if (currentDistance == null) {
+                return CompleteRoute
+            }
+
+            return settings.elevationProfileZoomLevels
+                .map { Units(it) }
+                .sortedByDescending { it.displayedUnits }
+                .firstOrNull {
+                    (it.getDistanceInMeters(viewModel, settings) ?: Float.MAX_VALUE) < currentDistance
+                } ?: CompleteRoute
+        }
     }
 
-    fun next(routeLengthInMeters: Double, isImperial: Boolean): ZoomLevel {
-        val nextZoomLevel = when (this) {
-            COMPLETE_ROUTE -> TWO_UNITS
-            TWO_UNITS -> TWENTY_UNITS
-            TWENTY_UNITS -> FIFTY_UNITS
-            FIFTY_UNITS -> HUNDRED_UNITS
-            HUNDRED_UNITS -> COMPLETE_ROUTE
-        }
-
-        val nextLevelInMeters = nextZoomLevel.getDistanceInMeters(isImperial)
-
-        return if (nextLevelInMeters != null && nextLevelInMeters >= routeLengthInMeters) {
-            COMPLETE_ROUTE
-        } else {
-            nextZoomLevel
-        }
-    }
+    abstract fun getDistanceInMeters(viewModel: RouteGraphViewModel, settings: RouteGraphSettings): Float?
+    abstract fun next(viewModel: RouteGraphViewModel, settings: RouteGraphSettings): ZoomLevel
 }
 
-data class RouteGraphDisplayViewModel(val zoomLevel: ZoomLevel = ZoomLevel.COMPLETE_ROUTE,
-                                      val verticalZoomLevel: ZoomLevel = ZoomLevel.COMPLETE_ROUTE,
+data class RouteGraphDisplayViewModel(val zoomLevel: ZoomLevel = ZoomLevel.CompleteRoute,
+                                      val verticalZoomLevel: ZoomLevel = ZoomLevel.CompleteRoute,
                                       val minimapZoomLevel: MinimapZoomLevel = MinimapZoomLevel.FAR,
                                       val minimapWidth: Int? = null, val minimapHeight: Int? = null,)
 
