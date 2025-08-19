@@ -181,7 +181,7 @@ private fun calculatePoiDistance(polyline: LineString, poi: POI, maxDistanceToRo
     }
 }
 
-fun distanceToPoi(poi: Symbol.POI, sampledElevationData: SampledElevationData?, nearestPointsOnRouteToFoundPois: Map<POI, List<NearestPoint>>?, currentPosition: Point?, selectedSort: PoiSortOption, distanceAlongRoute: Float?): DistanceToPoiResult? {
+fun distanceToPoi(poi: Symbol.POI, sampledElevationData: SampledElevationData?, nearestPointsOnRouteToFoundPois: Map<POI, List<NearestPoint>>?, currentPosition: Point?, selectedSort: PoiSortOption, distanceAlongRoute: Float?, forNearestPoint: NearestPoint? = null): DistanceToPoiResult? {
     val linearDistance = currentPosition?.let {
         TurfMeasurement.distance(
             Point.fromLngLat(poi.lng, poi.lat),
@@ -196,7 +196,7 @@ fun distanceToPoi(poi: Symbol.POI, sampledElevationData: SampledElevationData?, 
         }
         PoiSortOption.AHEAD_ON_ROUTE -> {
             val nearestPoints = nearestPointsOnRouteToFoundPois?.entries?.find { it.key.symbol == poi }?.value
-            val nearestPointOnRoute = nearestPoints?.minByOrNull { it.distanceFromPointOnRoute + it.distanceFromRouteStart }
+            val nearestPointOnRoute = forNearestPoint ?: nearestPoints?.minByOrNull { it.distanceFromPointOnRoute + it.distanceFromRouteStart }
 
             val distanceAheadOnRoute = nearestPointOnRoute?.let {
                 val elevationMetersRemaining = if (distanceAlongRoute != null) {
