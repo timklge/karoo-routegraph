@@ -3,6 +3,7 @@ package de.timklge.karooroutegraph
 import com.mapbox.geojson.LineString
 import com.mapbox.turf.TurfConstants
 import com.mapbox.turf.TurfMeasurement
+import kotlin.math.abs
 
 class SampledElevationData(val interval: Float, val elevations: FloatArray) {
     fun getMinimumElevationInRange(startDistance: Float, endDistance: Float): Float {
@@ -29,6 +30,25 @@ class SampledElevationData(val interval: Float, val elevations: FloatArray) {
         }
 
         return maxElevation
+    }
+
+    fun getMaximumInclineInRange(startDistance: Float, endDistance: Float): Float {
+        var maxIncline = 0f
+
+        for(i in 0 until elevations.size - 1) {
+            val currentPosition = i * interval
+            val nextPosition = (i + 1) * interval
+
+            if (currentPosition < endDistance && nextPosition > startDistance) {
+                val incline = (elevations[i + 1] - elevations[i]) / interval
+
+                if (abs(incline) > abs(maxIncline)) {
+                    maxIncline = incline
+                }
+            }
+        }
+
+        return maxIncline
     }
 
     fun getTotalClimb(startDistance: Float, endDistance: Float): Double {
