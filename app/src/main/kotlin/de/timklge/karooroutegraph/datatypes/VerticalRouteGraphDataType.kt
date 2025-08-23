@@ -477,7 +477,7 @@ class VerticalRouteGraphDataType(
                     }
 
                     canvas.drawRect(
-                        graphBounds.right + 1f, graphBounds.top,
+                        graphBounds.right + 1f, 0f,
                         config.viewSize.first.toFloat(), config.viewSize.second.toFloat(),
                         backgroundFillPaintInv
                     )
