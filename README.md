@@ -16,7 +16,7 @@ Compatible with Karoo 2 and Karoo 3 devices.
 
 ![Minimap](minimap.png)
 ![POI navigation](poinav.png)
-![Vertical Route Graph](vertical_routegraph.png)
+<img width="200" height="333" alt="Vertical Route Graph" src="vertical_routegraph.png" />
 ![Chevrons](chevrons.png)
 
 ## Installation

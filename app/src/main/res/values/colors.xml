@@ -5,10 +5,10 @@
     <color name="colorPrimaryDarkBg">#80CBBA00</color>
 
     <color name="white">#ffffff</color>
-    <color name="whiteBg">#B3FFFFFF</color>
+    <color name="whiteBg">#CCFFFFFF</color>
     <color name="gray">#808080</color>
     <color name="black">#000000</color>
-    <color name="blackBg">#B3000000</color>
+    <color name="blackBg">#CC000000</color>
 
     <color name="yellow">#FFE900</color>
     <color name="bgblue">#214559</color>
