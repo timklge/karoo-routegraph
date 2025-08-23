@@ -70,7 +70,7 @@ tasks.register("generateManifest") {
             "latestVersionCode" to android.defaultConfig.versionCode,
             "developer" to "github.com/timklge",
             "description" to "Open-source extension that provides an elevation graph datafield depicting the complete current route, including climbs and POIs (e. g. checkpoints and refueling stops)",
-            "releaseNotes" to "* Add route start and route end POIs if no other POIs are nearby\n* Add german localization\n* Fix navigating reversed routes",
+            "releaseNotes" to "* Use the climbs and elevation profile exposed by the Karoo instead of fetching it from a third-party API\n* Add elevation profile zoom step level customization in settings\n* Add route start and route end POIs if no other POIs are nearby\n* Add german localization\n* Fix navigating reversed routes",
             "screenshotUrls" to listOf(
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/minimap.png",
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/poinav.png",
