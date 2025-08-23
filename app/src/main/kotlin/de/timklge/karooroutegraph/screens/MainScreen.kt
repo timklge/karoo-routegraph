@@ -270,7 +270,7 @@ fun MainScreen(onFinish: () -> Unit) {
                         }
 
                         val climbHighlightOptions = sortedZoomLevels + listOf(null) // null represents "Never"
-                        val selectedClimbHighlightIndex = climbHighlightOptions.indexOf(onlyHighlightClimbsAtZoomLevel)
+                        val selectedClimbHighlightIndex = (onlyHighlightClimbsAtZoomLevel?.coerceIn(climbHighlightOptions.indices) ?: climbHighlightOptions.getOrNull(1)) ?: 0
 
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(R.string.only_highlight_climbs_at_zoom_level))
@@ -278,7 +278,7 @@ fun MainScreen(onFinish: () -> Unit) {
                                 value = selectedClimbHighlightIndex.toFloat(),
                                 onValueChange = { idx ->
                                     val newIndex = idx.roundToInt().coerceIn(climbHighlightOptions.indices)
-                                    onlyHighlightClimbsAtZoomLevel = climbHighlightOptions[newIndex]
+                                    onlyHighlightClimbsAtZoomLevel = newIndex
                                     coroutineScope.launch { updateSettings() }
                                 },
                                 valueRange = 0f..(climbHighlightOptions.size - 1).toFloat(),

@@ -294,9 +294,9 @@ class VerticalRouteGraphDataType(
 
                 val displayedViewRange = displayViewModel.verticalZoomLevel.getDistanceInMeters(viewModel, settings)
                 val onlyHighlightClimbsAtZoomLeveLMeters = if (viewModel.isImperial) {
-                    settings.onlyHighlightClimbsAtZoomLevel?.let { it * 1609.344f }
+                    settings.elevationProfileZoomLevels.getOrNull(settings.onlyHighlightClimbsAtZoomLevel ?: Int.MAX_VALUE)?.let { it * 1609.344f }
                 } else {
-                    settings.onlyHighlightClimbsAtZoomLevel?.let { it * 1000f }
+                    settings.elevationProfileZoomLevels.getOrNull(settings.onlyHighlightClimbsAtZoomLevel ?: Int.MAX_VALUE)?.let { it * 1000f }
                 }
                 val isZoomedIn = onlyHighlightClimbsAtZoomLeveLMeters == null || (displayedViewRange != null && displayedViewRange < onlyHighlightClimbsAtZoomLeveLMeters)
 
@@ -309,8 +309,12 @@ class VerticalRouteGraphDataType(
                 val textDrawCommands = mutableListOf<TextDrawCommand>()
 
                 if (viewModel.sampledElevationData != null){
+                    val firstIndexInRange = floor(viewDistanceStart / viewModel.sampledElevationData.interval).toInt().coerceIn(0, viewModel.sampledElevationData.elevations.size - 1)
+                    val lastIndexInRange = ceil(viewDistanceEnd / viewModel.sampledElevationData.interval).toInt().coerceIn(0, viewModel.sampledElevationData.elevations.size - 1)
+                    val indexRange = firstIndexInRange until lastIndexInRange
+
                     val elevationProfilePath = Path().apply {
-                        for (i in 1 until viewModel.sampledElevationData.elevations.size){
+                        for (i in indexRange.first+1..<indexRange.last){
                             val previousDistance = (i - 1) * viewModel.sampledElevationData.interval
                             val distance = i * viewModel.sampledElevationData.interval
 
@@ -326,7 +330,6 @@ class VerticalRouteGraphDataType(
                                 val previousElevationPixels = remap(previousElevation, maxElevation, minElevation, graphBounds.right, graphBounds.left)
 
                                 moveTo(previousElevationPixels, previousProgressPixels)
-                                // moveTo(previousDrawnProgressPixels, elevationPixels)
                                 firstProgressPixels = previousProgressPixels
                                 firstElevationPixels = previousElevationPixels
                                 previousDrawnProgressPixels = progressPixels
@@ -357,13 +360,15 @@ class VerticalRouteGraphDataType(
                             var climbStartProgressPixels = remap(climb.startDistance, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top)
                             var climbEndProgressPixels = remap(climb.endDistance, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top)
 
-                            while(abs(climbStartProgressPixels - climbEndProgressPixels) < 6){
+                            while(abs(climbStartProgressPixels - climbEndProgressPixels) < 5){
                                 climbStartProgressPixels -= 1
                                 climbEndProgressPixels += 1
                             }
 
                             val clampedClimbStartProgressPixels = climbStartProgressPixels.coerceIn(graphBounds.top, graphBounds.bottom)
                             val clampedClimbEndProgressPixels = climbEndProgressPixels.coerceIn(graphBounds.top, graphBounds.bottom)
+
+                            if (clampedClimbEndProgressPixels < graphBounds.top || clampedClimbStartProgressPixels > graphBounds.bottom) return@forEach
 
                             val clipRect = RectF(graphBounds.left, clampedClimbEndProgressPixels, graphBounds.right, clampedClimbStartProgressPixels)
 
@@ -392,26 +397,29 @@ class VerticalRouteGraphDataType(
                                 }))
 
                                 val maxInclineString = if (climbMaxIncline.incline > climbAverageIncline) ", ${climbMaxIncline.incline}% $climbMaxInclineLength" else ""
-                                textDrawCommands.add(TextDrawCommand(graphBounds.right + 100f, climbStartProgressPixels + 16f, "⌀ ${climbAverageIncline}%${maxInclineString}", textPaint, climb.category.importance))
+                                textDrawCommands.add(TextDrawCommand(graphBounds.right + 100f, climbStartProgressPixels + 16f, "⌀ ${climbAverageIncline}%${maxInclineString}", textPaint, climb.category.importance-1))
                             }
                         }
                     }
 
                     if (isZoomedIn) {
-                        for (i in 0 until viewModel.sampledElevationData.elevations.size-1){
-                            val distance = i * viewModel.sampledElevationData.interval
-                            if (distance !in viewRange) continue
+                        val viewedDistance = viewDistanceEnd - viewDistanceStart
+                        val inclineStep = viewedDistance / (config.gridSize.second * 1.5f)
+                        val steps = viewedDistance / inclineStep
 
-                            val incline = (viewModel.sampledElevationData.elevations[i+1] - viewModel.sampledElevationData.elevations[i]) / viewModel.sampledElevationData.interval
+                        for (i in 0..floor(steps).toInt()){
+                            val distance = viewDistanceStart + i * inclineStep
+
+                            val incline = viewModel.sampledElevationData.getMaximumInclineInRange(distance, distance + inclineStep)
                             val inclineIndicator = getInclineIndicatorColor(incline * 100) ?: continue
 
                             val inclineColor = applicationContext.getColor(inclineIndicator)
 
                             val clipRect = RectF(
                                 graphBounds.left,
-                                remap(distance, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top).roundToInt().toFloat() + 1,
+                                remap(distance, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top).roundToInt().toFloat(),
                                 graphBounds.right,
-                                remap(distance + viewModel.sampledElevationData.interval, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top).roundToInt().toFloat(),
+                                remap(distance + inclineStep, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top).roundToInt().toFloat(),
                             )
 
                             canvas.withClip(clipRect){

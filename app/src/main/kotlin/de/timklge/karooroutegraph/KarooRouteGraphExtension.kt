@@ -431,8 +431,26 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     }
                     else -> null
                 }
+                val routeDistance = if (navigatingToDestinationPolyline != null) {
+                    try {
+                        TurfMeasurement.length(navigatingToDestinationPolyline, TurfConstants.UNIT_METERS)
+                    } catch(e: Exception) {
+                        Log.e(TAG, "Failed to calculate route distance", e)
+                        null
+                    }
+                } else {
+                    (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.routeDistance
+                }
+                val interval = if(routeDistance != null) {
+                    when (routeDistance) {
+                        in 0f..100_000f -> 60f
+                        in 100_000f..200_000f -> 80f
+                        in 200_000f..400_000f -> 100f
+                        else -> 120f
+                    }
+                } else 60f
                 val sampledElevationData = elevationPolyline?.let {
-                    SampledElevationData.fromSparseElevationData(it)
+                    SampledElevationData.fromSparseElevationData(it, interval)
                 }
                 val climbs = karooClimbs?.let {
                     karooClimbs.mapNotNull { karooClimb ->
@@ -451,17 +469,6 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     }
                 }
                 val isNavigatingToDestination = navigatingToDestinationPolyline != null
-
-                val routeDistance = if (navigatingToDestinationPolyline != null) {
-                    try {
-                        TurfMeasurement.length(navigatingToDestinationPolyline, TurfConstants.UNIT_METERS)
-                    } catch(e: Exception) {
-                        Log.e(TAG, "Failed to calculate route distance", e)
-                        null
-                    }
-                } else {
-                    (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.routeDistance
-                }
 
                 val routeLineString = when (navigationStateEvent) {
                     is OnNavigationState.NavigationState.NavigatingRoute -> {
