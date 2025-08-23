@@ -13,12 +13,12 @@ enum class ClimbCategory(
 ) {
     LARGE_CLIMB(0.075f, 500f, 1, 9, R.color.eleRed, R.color.eleRed),
     MEDIUM_CLIMB(0.046f, 500f, 2, 2, R.color.eleYellow, R.color.eleDarkOrange),
-    SMALL_CLIMB(null, 0f, 3, 1, R.color.eleDarkGreen, R.color.eleDarkGreen);
+    SMALL_CLIMB(null, null, 3, 1, R.color.eleDarkGreen, R.color.eleDarkGreen);
 
     companion object {
         fun categorize(gradient: Float, length: Float): ClimbCategory? {
             return entries.firstOrNull { category ->
-                gradient >= (category.minGradient ?: 0f)
+                gradient >= (category.minGradient ?: 0f) && length >= (category.minLength ?: 0f)
             }
         }
     }
