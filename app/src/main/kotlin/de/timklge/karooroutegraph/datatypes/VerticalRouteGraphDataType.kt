@@ -397,9 +397,7 @@ class VerticalRouteGraphDataType(
                             val climbAverageIncline = (climb.getAverageIncline(viewModel.sampledElevationData) * 100).roundToInt()
                             val climbMaxIncline = climb.getMaxIncline(viewModel.sampledElevationData)
                             val maxInclineString = if (climbMaxIncline.incline > climbAverageIncline) ", ${climbMaxIncline.incline}% ${distanceToString(climbMaxIncline.end - climbMaxIncline.start, isImperial, false)}" else ""
-
-                            Log.i(TAG, "CLIMB PARAM: ${climb.category}, ${climb.startDistance}-${climb.endDistance}, gain ${climbGain}, length ${climbLength}, avg ${climbAverageIncline}%, max ${climbMaxIncline.incline}% over ${climbMaxIncline.start}-${climbMaxIncline.end}")
-
+                            
                             if (climb.category.number < 3){
                                 textDrawCommands.add(TextDrawCommandGroup(listOf(
                                     TextDrawCommand(graphBounds.right + 100f, climbStartProgressPixels + 15f, "⛰ $climbGain, $climbLength", textPaint, climb.category.importance, "⛰", Paint(textPaint).apply {
