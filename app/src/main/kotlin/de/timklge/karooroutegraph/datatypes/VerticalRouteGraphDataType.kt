@@ -391,7 +391,7 @@ class VerticalRouteGraphDataType(
                             val climbMaxIncline = climb.getMaxIncline(viewModel.sampledElevationData)
                             val climbMaxInclineLength = distanceToString(climbMaxIncline.end - climbMaxIncline.start, isImperial, false)
 
-                            if (climb.category.number <= 3){
+                            if (climb.category.number < 3){
                                 textDrawCommands.add(TextDrawCommand(graphBounds.right + 100f, climbStartProgressPixels + 15f, "⛰ $climbGain, $climbLength", textPaint, climb.category.importance, "⛰", Paint(textPaint).apply {
                                     color = applicationContext.getColor(climb.category.colorRes)
                                 }))
