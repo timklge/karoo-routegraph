@@ -525,11 +525,6 @@ fun MainScreen(onFinish: () -> Unit) {
                                         modifier = Modifier.padding(20.dp),
                                         verticalArrangement = Arrangement.spacedBy(16.dp)
                                     ) {
-                                        Text(
-                                            text = stringResource(R.string.new_zoom_level),
-                                            style = MaterialTheme.typography.headlineSmall
-                                        )
-
                                         val zoomLevelUnit = if (userProfile?.preferredUnit?.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL) {
                                             ZoomUnit.MILES
                                         } else {

@@ -502,23 +502,23 @@ class VerticalRouteGraphDataType(
                 }
 
                 // Group commands by their original Y position and importance
-                data class TextGroup(val commands: List<TextDrawCommand>, val originalY: Float, val priority: Int)
+                data class TextGroup(val commands: List<TextDrawCommand>, val originalY: Float, val priority: Int, val originalIndex: Int)
 
                 val textGroups = textDrawCommands.mapIndexed { index, group ->
                     // For groups with multiple commands, use the first command's Y and highest importance
                     val originalY = group.commands.firstOrNull()?.y ?: 0f
                     val priority = group.commands.maxOfOrNull { it.importance } ?: 0
-                    TextGroup(group.commands, originalY, priority)
+                    TextGroup(group.commands, originalY, priority, index)
                 }
 
                 val occupiedRanges = mutableListOf<ClosedFloatingPointRange<Float>>() // Just track occupied ranges
                 val textHeight = 40f
                 val groupSpacing = 5f // Minimum spacing between groups
 
-                // Sort by priority (higher first), then by Y position
+                // Process groups in original order to maintain label sequence
                 textGroups
                     .filter { group -> group.commands.any { it.y >= 0 && it.y < config.viewSize.second } }
-                    .sortedWith(compareByDescending<TextGroup> { it.priority }.thenBy { it.originalY })
+                    .sortedBy { it.originalIndex } // Maintain original order
                     .forEach { group ->
                         // Calculate the height needed for this group
                         val groupHeight = group.commands.size * textHeight + (group.commands.size - 1) * 5f
@@ -544,12 +544,32 @@ class VerticalRouteGraphDataType(
                                 val testRange = testY..(testY + groupHeight)
 
                                 // Check if this position is valid (within bounds and no conflicts)
-                                if (testRange.start >= 0 && testRange.endInclusive <= config.viewSize.second &&
+                                if (testRange.start >= 0 && testRange.endInclusive <= config.viewSize.second + textHeight / 2 &&
                                     !occupiedRanges.any { it.overlaps(testRange) }) {
                                     bestY = testY
                                     foundPosition = true
                                 }
                                 attempts++
+                            }
+
+                            // If moving up didn't work, try moving down
+                            if (!foundPosition) {
+                                testY = group.originalY
+                                attempts = 0
+                                val maxDownwardAttempts = ((config.viewSize.second - group.originalY) / step).toInt()
+
+                                while (attempts < maxDownwardAttempts && !foundPosition) {
+                                    testY += step
+                                    val testRange = testY..(testY + groupHeight)
+
+                                    // Check if this position is valid (within bounds and no conflicts)
+                                    if (testRange.start >= 0 && testRange.endInclusive <= config.viewSize.second &&
+                                        !occupiedRanges.any { it.overlaps(testRange) }) {
+                                        bestY = testY
+                                        foundPosition = true
+                                    }
+                                    attempts++
+                                }
                             }
                         }
 
