@@ -93,11 +93,24 @@ class VerticalRouteGraphDataType(
         return nightModeFlags == Configuration.UI_MODE_NIGHT_YES
     }
 
+    // Extension function to check if two ranges overlap
+    private fun ClosedFloatingPointRange<Float>.overlaps(other: ClosedFloatingPointRange<Float>): Boolean {
+        return this.start < other.endInclusive && this.endInclusive > other.start
+    }
+
     data class StreamData(val routeGraphViewModel: RouteGraphViewModel,
                           val routeGraphDisplayViewModel: RouteGraphDisplayViewModel,
                           val profile: UserProfile,
                           val settings: RouteGraphSettings,
                           val isVisible: Boolean)
+
+    data class TextDrawCommand(val x: Float, val y: Float, val text: String, val paint: Paint, val importance: Int = 10,
+                               /** If set, draws this text over the original text */
+                               val overdrawText: String? = null,
+                               val overdrawPaint: Paint = paint,
+                               @DrawableRes val leadingIcon: Int? = null,)
+
+    data class TextDrawCommandGroup(val commands: List<TextDrawCommand>)
 
     override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
         Log.d(TAG, "Starting route view with $emitter")
@@ -300,13 +313,7 @@ class VerticalRouteGraphDataType(
                 }
                 val isZoomedIn = onlyHighlightClimbsAtZoomLeveLMeters == null || (displayedViewRange != null && displayedViewRange < onlyHighlightClimbsAtZoomLeveLMeters)
 
-                data class TextDrawCommand(val x: Float, val y: Float, val text: String, val paint: Paint, val importance: Int = 10,
-                                           /** If set, draws this text over the original text */
-                                           val overdrawText: String? = null,
-                                           val overdrawPaint: Paint = paint,
-                                           @DrawableRes val leadingIcon: Int? = null,)
-
-                val textDrawCommands = mutableListOf<TextDrawCommand>()
+                val textDrawCommands = mutableListOf<TextDrawCommandGroup>()
 
                 if (viewModel.sampledElevationData != null){
                     val firstIndexInRange = floor(viewDistanceStart / viewModel.sampledElevationData.interval).toInt().coerceIn(0, viewModel.sampledElevationData.elevations.size - 1)
@@ -387,17 +394,17 @@ class VerticalRouteGraphDataType(
                             val climbGain = distanceToString(climb.totalGain(viewModel.sampledElevationData).toFloat(), isImperial, true)
                             val climbLength = distanceToString(climb.length, isImperial, false)
 
-                            val climbAverageIncline = (climb.getAverageIncline(viewModel.sampledElevationData) * 100).roundToInt()   // String.format(Locale.getDefault(), "%.1f", climb.getAverageIncline(viewModel.sampledElevationData) * 100)
+                            val climbAverageIncline = (climb.getAverageIncline(viewModel.sampledElevationData) * 100).roundToInt()
                             val climbMaxIncline = climb.getMaxIncline(viewModel.sampledElevationData)
-                            val climbMaxInclineLength = distanceToString(climbMaxIncline.end - climbMaxIncline.start, isImperial, false)
-
+                            val maxInclineString = if (climbMaxIncline.incline > climbAverageIncline) ", ${climbMaxIncline.incline}% ${distanceToString(climbMaxIncline.end - climbMaxIncline.start, isImperial, false)}" else ""
+                            
                             if (climb.category.number < 3){
-                                textDrawCommands.add(TextDrawCommand(graphBounds.right + 100f, climbStartProgressPixels + 15f, "⛰ $climbGain, $climbLength", textPaint, climb.category.importance, "⛰", Paint(textPaint).apply {
-                                    color = applicationContext.getColor(climb.category.colorRes)
-                                }))
-
-                                val maxInclineString = if (climbMaxIncline.incline > climbAverageIncline) ", ${climbMaxIncline.incline}% $climbMaxInclineLength" else ""
-                                textDrawCommands.add(TextDrawCommand(graphBounds.right + 100f, climbStartProgressPixels + 16f, "⌀ ${climbAverageIncline}%${maxInclineString}", textPaint, climb.category.importance-1))
+                                textDrawCommands.add(TextDrawCommandGroup(listOf(
+                                    TextDrawCommand(graphBounds.right + 100f, climbStartProgressPixels + 15f, "⛰ $climbGain, $climbLength", textPaint, climb.category.importance, "⛰", Paint(textPaint).apply {
+                                        color = applicationContext.getColor(climb.category.colorRes)
+                                    }),
+                                    TextDrawCommand(graphBounds.right + 100f, climbStartProgressPixels + 16f, "⌀ ${climbAverageIncline}%${maxInclineString}", textPaint, climb.category.importance-1)
+                                )))
                             }
                         }
                     }
@@ -467,7 +474,8 @@ class VerticalRouteGraphDataType(
                         canvas.drawLine(graphBounds.left, progressPixels, config.viewSize.first.toFloat(), progressPixels, backgroundStrokePaintDashed)
                         canvas.drawLine(graphBounds.left, progressPixels, config.viewSize.first.toFloat(), progressPixels, if (poi.type == PoiType.INCIDENT) incidentLinePaintDashed else poiLinePaintDashed)
 
-                        textDrawCommands.add(TextDrawCommand(graphBounds.right + 100f + 40f, progressPixels + 15f, text, textPaintBold, labelPriority, leadingIcon = mapPoiToIcon(poi.symbol.type)))
+                        val poiCommands = mutableListOf<TextDrawCommand>()
+                        poiCommands.add(TextDrawCommand(graphBounds.right + 100f + 40f, progressPixels + 15f, text, textPaintBold, labelPriority, leadingIcon = mapPoiToIcon(poi.symbol.type)))
 
                         val isImperial = userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
 
@@ -480,8 +488,10 @@ class VerticalRouteGraphDataType(
                                 distanceStr += " ↗ ${distanceToString(elevationMetersRemaining.toFloat(), isImperial, true)}"
                             }
 
-                            textDrawCommands.add(TextDrawCommand(graphBounds.right + 100f, progressPixels + 15f, distanceStr, textPaint, labelPriority))
+                            poiCommands.add(TextDrawCommand(graphBounds.right + 100f, progressPixels + 15f, distanceStr, textPaint, labelPriority))
                         }
+
+                        textDrawCommands.add(TextDrawCommandGroup(poiCommands))
                     }
 
                     canvas.drawRect(
@@ -491,27 +501,61 @@ class VerticalRouteGraphDataType(
                     )
                 }
 
-                val occupiedRanges = mutableListOf<ClosedFloatingPointRange<Float>>()
-                val textHeight = 40f
+                // Group commands by their original Y position and importance
+                data class TextGroup(val commands: List<TextDrawCommand>, val originalY: Float, val priority: Int)
 
-                textDrawCommands
-                    .filter { it.y < config.viewSize.second }
-                    .sortedWith(compareByDescending<TextDrawCommand> { it.importance }.thenBy { it.y })
-                    .forEach { cmd ->
-                        var currentY = cmd.y
-                        // While there is an overlap and text still fits, shift text down.
-                        while (occupiedRanges.any { range -> currentY < range.endInclusive && (currentY + textHeight) > range.start }
-                            && currentY + textHeight < config.viewSize.second) {
-                            val maxConflictEnd = occupiedRanges
-                                .filter { range -> currentY < range.endInclusive && (currentY + textHeight) > range.start }
-                                .maxOf { it.endInclusive }
-                            currentY = maxConflictEnd
+                val textGroups = textDrawCommands.mapIndexed { index, group ->
+                    // For groups with multiple commands, use the first command's Y and highest importance
+                    val originalY = group.commands.firstOrNull()?.y ?: 0f
+                    val priority = group.commands.maxOfOrNull { it.importance } ?: 0
+                    TextGroup(group.commands, originalY, priority)
+                }
+
+                val occupiedRanges = mutableListOf<ClosedFloatingPointRange<Float>>() // Just track occupied ranges
+                val textHeight = 40f
+                val groupSpacing = 5f // Minimum spacing between groups
+
+                // Sort by priority (higher first), then by Y position
+                textGroups
+                    .filter { group -> group.commands.any { it.y >= 0 && it.y < config.viewSize.second } }
+                    .sortedWith(compareByDescending<TextGroup> { it.priority }.thenBy { it.originalY })
+                    .forEach { group ->
+                        // Calculate the height needed for this group
+                        val groupHeight = group.commands.size * textHeight + (group.commands.size - 1) * 5f
+
+                        // Try different positions starting from the original position
+                        var bestY = group.originalY
+                        var foundPosition = false
+
+                        // First, try the original position
+                        val originalRange = bestY..(bestY + groupHeight)
+                        if (originalRange.start >= 0 && originalRange.endInclusive <= config.viewSize.second &&
+                            !occupiedRanges.any { it.overlaps(originalRange) }) {
+                            foundPosition = true
+                        } else {
+                            // Try moving up in small steps to find a free position
+                            var testY = group.originalY
+                            val step = textHeight / 2f // Move in smaller steps
+                            var attempts = 0
+                            val maxAttempts = ((group.originalY + groupHeight) / step).toInt()
+
+                            while (attempts < maxAttempts && !foundPosition) {
+                                testY -= step
+                                val testRange = testY..(testY + groupHeight)
+
+                                // Check if this position is valid (within bounds and no conflicts)
+                                if (testRange.start >= 0 && testRange.endInclusive <= config.viewSize.second &&
+                                    !occupiedRanges.any { it.overlaps(testRange) }) {
+                                    bestY = testY
+                                    foundPosition = true
+                                }
+                                attempts++
+                            }
                         }
 
-                        var shouldDrawLabel = true
-                        // Assuming climb labels have importance < 10 and POI labels have importance 11 or higher.
-                        if (cmd.importance < 10 && viewModel.poiDistances != null) {
-                            val climbStartProgressPixels = cmd.y - 15f
+                        // Additional check for climb labels vs POI lines (existing logic)
+                        if (foundPosition && group.priority < 10 && viewModel.poiDistances != null) {
+                            val climbStartProgressPixels = group.originalY - 15f
 
                             poiLoop@ for ((_, nearestPointList) in viewModel.poiDistances.entries) {
                                 for (nearestPoint in nearestPointList) {
@@ -519,32 +563,41 @@ class VerticalRouteGraphDataType(
                                     if (poiDistanceOnRoute in viewRange) {
                                         val poiLineYOnGraph = remap(poiDistanceOnRoute, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top)
 
-                                        // If the climb starts before the POI line (smaller y-value on graph)
-                                        // and the label's current top (currentY) is now below the POI line (larger y-value on graph)
-                                        if (climbStartProgressPixels > poiLineYOnGraph && currentY > poiLineYOnGraph) {
-                                            shouldDrawLabel = false
-                                            break@poiLoop // Exit all POI checks for this command
+                                        // If the climb starts after the POI line and the label would be drawn above it
+                                        if (climbStartProgressPixels > poiLineYOnGraph && bestY < poiLineYOnGraph) {
+                                            foundPosition = false
+                                            break@poiLoop
                                         }
                                     }
                                 }
                             }
                         }
 
-                        if (shouldDrawLabel && currentY + textHeight <= config.viewSize.second) {
-                            canvas.drawText(cmd.text, cmd.x, currentY, cmd.paint)
-                            if (cmd.overdrawText != null){
-                                canvas.drawText(cmd.overdrawText, cmd.x, currentY, cmd.overdrawPaint)
-                            }
-                            if (cmd.leadingIcon != null){
-                                val sizeX = 35
-                                val sizeY = 35
+                        // Draw the group if we found a valid position
+                        if (foundPosition) {
+                            var currentCommandY = bestY
 
-                                val iconPaint = if (isNightMode()) inversePaintFilter else textPaint;
+                            group.commands.forEach { cmd ->
+                                canvas.drawText(cmd.text, cmd.x, currentCommandY, cmd.paint)
 
-                                val bitmap = AppCompatResources.getDrawable(context, cmd.leadingIcon)?.toBitmap(sizeX, sizeY)
-                                if (bitmap != null) canvas.drawBitmap(bitmap, cmd.x - 40f, currentY - sizeY + 2.5f, iconPaint)
+                                if (cmd.overdrawText != null) {
+                                    canvas.drawText(cmd.overdrawText, cmd.x, currentCommandY, cmd.overdrawPaint)
+                                }
+
+                                if (cmd.leadingIcon != null) {
+                                    val sizeX = 35
+                                    val sizeY = 35
+                                    val iconPaint = if (isNightMode()) inversePaintFilter else textPaint
+                                    val bitmap = AppCompatResources.getDrawable(context, cmd.leadingIcon)?.toBitmap(sizeX, sizeY)
+                                    if (bitmap != null) canvas.drawBitmap(bitmap, cmd.x - 40f, currentCommandY - sizeY + 2.5f, iconPaint)
+                                }
+
+                                currentCommandY += textHeight + 5f // Move down for next command in group
                             }
-                            occupiedRanges.add(currentY..(currentY + textHeight))
+
+                            // Mark this range as occupied (with some padding)
+                            val occupiedRange = (bestY - groupSpacing)..(bestY + groupHeight + groupSpacing)
+                            occupiedRanges.add(occupiedRange)
                         }
                     }
 
