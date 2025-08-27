@@ -60,13 +60,6 @@ You can input a HERE Maps API key in the settings to enable traffic incident rep
 fetch traffic incidents along the route and display them on the minimap, the route graphs and the main karoo map.
 You will also get a notification when loading a route if there are traffic incidents along the route.
 
-## Open issues
-
-- Because karoo extensions can currently not access the route elevation data directly, once you load a route, the extension will attempt 
-to fetch the elevation profile from the Valhalla API hosted by FOSSGIS e. V. Your karoo thus needs an active internet connection.
-- Because karoo extensions can currently not access the climb segments identified by the Karoo, the extension will
-try to identify climbs using an alternate algorithm, so they will not perfectly match up with the Karoo Climber feature.
-
 ## Credits
 
 - OpenStreetMap Data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors (<a href="https://opendatacommons.org/licenses/odbl/index.html">ODbL</a>), <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, <a href="https://openstreetmap.org/fixthemap">participate/fix mistakes</a>
