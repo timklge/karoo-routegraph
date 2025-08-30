@@ -1,6 +1,7 @@
 package de.timklge.karooroutegraph
 
 import android.content.Context
+import android.util.Log
 import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
 import com.mapbox.turf.TurfConstants
@@ -16,7 +17,7 @@ enum class PoiType {
     POI, INCIDENT
 }
 
-data class POI(val symbol: Symbol.POI, val type: PoiType = PoiType.POI)
+data class POI(val symbol: Symbol.POI, val type: PoiType = PoiType.POI, val showOnlyAtRouteDistance: Float? = null)
 
 sealed class DistanceToPoiResult : Comparable<DistanceToPoiResult> {
     data class LinearDistance(val distance: Double) : DistanceToPoiResult()
@@ -154,7 +155,11 @@ private fun calculatePoiDistance(polyline: LineString, poi: POI, maxDistanceToRo
         val nearestPointOnSegment = getNearestPointOnLine(poiPoint, startPoint, endPoint)
         val nearestPointDist = TurfMeasurement.distance(poiPoint, nearestPointOnSegment, TurfConstants.UNIT_METERS).toFloat()
 
-        if (nearestPointDist < maxDistanceToRoute){
+        val isInRouteDistanceProximity = poi.showOnlyAtRouteDistance?.let { showOnlyAtRouteDistance ->
+            currentRouteDistance in (showOnlyAtRouteDistance - maxDistanceToRoute).toFloat()..(showOnlyAtRouteDistance + maxDistanceToRoute).toFloat()
+        } ?: true
+
+        if (nearestPointDist < maxDistanceToRoute && isInRouteDistanceProximity){
             val nearestPointRouteDistance = currentRouteDistance + TurfMeasurement.distance(startPoint, nearestPointOnSegment, TurfConstants.UNIT_METERS).toFloat()
             nearestPointCandidates.add(NearestPoint(nearestPointOnSegment, nearestPointDist, nearestPointRouteDistance, poiPoint))
         }
@@ -221,6 +226,14 @@ fun getStartAndEndPoiIfNone(routeLineString: LineString?, pois: List<Symbol.POI>
     return buildList {
         val startPoint = routeLineString?.coordinates()?.firstOrNull()
         val endPoint = routeLineString?.coordinates()?.lastOrNull()
+        val routeLength = routeLineString?.let {
+            try {
+                TurfMeasurement.length(routeLineString, TurfConstants.UNIT_METERS).toFloat()
+            } catch(e: Exception) {
+                Log.e(KarooRouteGraphExtension.TAG, "Failed to calculate route length", e)
+                null
+            }
+        }
 
         // Add start and end of route POIs if no POIs are present there yet
         if (startPoint != null) {
@@ -238,7 +251,8 @@ fun getStartAndEndPoiIfNone(routeLineString: LineString?, pois: List<Symbol.POI>
                         type = Symbol.POI.Types.GENERIC,
                         name = applicationContext.getString(R.string.start_of_route)
                     ),
-                    PoiType.POI
+                    PoiType.POI,
+                    showOnlyAtRouteDistance = 0f
                 ))
             }
         }
@@ -258,7 +272,8 @@ fun getStartAndEndPoiIfNone(routeLineString: LineString?, pois: List<Symbol.POI>
                         type = Symbol.POI.Types.GENERIC,
                         name = applicationContext.getString(R.string.end_of_route)
                     ),
-                    PoiType.POI
+                    PoiType.POI,
+                    showOnlyAtRouteDistance = routeLength
                 ))
             }
         }
