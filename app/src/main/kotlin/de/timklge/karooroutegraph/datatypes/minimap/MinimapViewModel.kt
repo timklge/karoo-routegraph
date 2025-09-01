@@ -6,9 +6,6 @@ import kotlinx.coroutines.flow.update
 import java.time.Instant
 
 data class MinimapViewModel(/* val pastPoints: List<Point>? = null, */
-                            val currentLat: Double? = null,
-                            val currentLng: Double? = null,
-                            val currentBearing: Double? = null,
                             val lastTileDownloadedAt: Instant? = null)
 
 class MinimapViewModelProvider {

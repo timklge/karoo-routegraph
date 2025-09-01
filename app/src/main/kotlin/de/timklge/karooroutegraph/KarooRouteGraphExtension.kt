@@ -33,7 +33,6 @@ import io.hammerhead.karooext.models.OnLocationChanged
 import io.hammerhead.karooext.models.OnMapZoomLevel
 import io.hammerhead.karooext.models.OnNavigationState
 import io.hammerhead.karooext.models.PlayBeepPattern
-import io.hammerhead.karooext.models.RideState
 import io.hammerhead.karooext.models.ShowPolyline
 import io.hammerhead.karooext.models.ShowSymbols
 import io.hammerhead.karooext.models.StreamState
@@ -80,7 +79,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
             VerticalRouteGraphDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, displayViewModelProvider, applicationContext),
             DistanceToNextPOIDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, applicationContext),
             ElevationToNextPOIDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, applicationContext),
-            MinimapDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, displayViewModelProvider, minimapViewModelProvider, tileDownloadService, applicationContext),
+            MinimapDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, displayViewModelProvider, minimapViewModelProvider, tileDownloadService, locationViewModelProvider, applicationContext),
             PoiButtonDataType(karooSystem.karooSystemService, applicationContext),
         )
     }
