@@ -38,6 +38,7 @@ import com.mapbox.turf.TurfMeasurement
 import com.mapbox.turf.TurfMisc
 import de.timklge.karooroutegraph.KarooRouteGraphExtension
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
+import de.timklge.karooroutegraph.LocationViewModelProvider
 import de.timklge.karooroutegraph.NearestPoint
 import de.timklge.karooroutegraph.POI
 import de.timklge.karooroutegraph.PoiType
@@ -119,6 +120,7 @@ class MinimapDataType(
     private val displayViewModelProvider: RouteGraphDisplayViewModelProvider,
     private val minimapViewModelProvider: MinimapViewModelProvider,
     private val tileDownloadService: TileDownloadService,
+    private val locationViewModelProvider: LocationViewModelProvider,
     private val applicationContext: Context
 ) : DataTypeImpl("karoo-routegraph", "minimap") {
     private val glance = GlanceRemoteViews()
@@ -141,6 +143,7 @@ class MinimapDataType(
         val displayViewModel: RouteGraphDisplayViewModel,
         val settings: RouteGraphSettings,
         val dataPageIsVisible: Boolean,
+        val locationViewModel: Point?
     )
 
     @OptIn(DelicateCoroutinesApi::class)
@@ -186,7 +189,8 @@ class MinimapDataType(
                         ),
                         displayViewModel = RouteGraphDisplayViewModel(),
                         settings = context.streamSettings(karooSystem).first(),
-                        dataPageIsVisible = true
+                        dataPageIsVisible = true,
+                        locationViewModel = Point.fromLngLat(13.3774302, 52.5159305)
                     ))
 
                     delay(2_000)
@@ -199,7 +203,8 @@ class MinimapDataType(
                 karooSystem.streamUserProfile(),
                 displayViewModelProvider.viewModelFlow,
                 context.streamSettings(karooSystem),
-                karooSystem.streamDatatypeIsVisible(dataTypeId)
+                karooSystem.streamDatatypeIsVisible(dataTypeId),
+                locationViewModelProvider.viewModelFlow.throttle(20_000L),
             ) { data ->
                 val viewModel = data[0] as RouteGraphViewModel
                 val minimapViewModel = data[1] as MinimapViewModel
@@ -207,8 +212,9 @@ class MinimapDataType(
                 val displayViewModel = data[3] as RouteGraphDisplayViewModel
                 val settings = data[4] as RouteGraphSettings
                 val isVisible = data[5] as Boolean
+                val locationViewModel = data[6] as Point?
 
-                StreamData(viewModel, minimapViewModel, profile, displayViewModel, settings, isVisible)
+                StreamData(viewModel, minimapViewModel, profile, displayViewModel, settings, isVisible, locationViewModel)
             }
         }
 
@@ -220,7 +226,7 @@ class MinimapDataType(
                 displayViewModel.copy(minimapWidth = width, minimapHeight = height)
             }
 
-            flow.throttle(1_000L).filter { it.dataPageIsVisible }.collect { (viewModel, minimapViewModel, userProfile, displayViewModel, settings) ->
+            flow.throttle(1_000L).filter { it.dataPageIsVisible }.collect { (viewModel, minimapViewModel, userProfile, displayViewModel, settings, isVisible, locationViewModel) ->
                 Log.d(TAG, "Redrawing minimap view")
 
                 val width = config.viewSize.first
@@ -244,8 +250,8 @@ class MinimapDataType(
                         viewModel.rejoin.getCenterPoint()
                     } else if (viewModel.knownRoute != null && viewModel.isOnRoute == true) {
                         viewModel.knownRoute.getCenterPoint()
-                    } else if (minimapViewModel.currentLng != null && minimapViewModel.currentLat != null) {
-                        Point.fromLngLat(minimapViewModel.currentLng, minimapViewModel.currentLat)
+                    } else if (locationViewModel != null) {
+                        Point.fromLngLat(locationViewModel.longitude(), locationViewModel.latitude())
                     } else if (viewModel.knownRoute != null) {
                         viewModel.lastKnownPositionOnMainRoute ?: viewModel.knownRoute.coordinates().firstOrNull() ?: defaultMapCenter
                     } else {
@@ -256,8 +262,8 @@ class MinimapDataType(
                         viewModel.rejoin.previewRemainingRoute(zoomLevel, null, width, height) ?: defaultMapCenter
                     } else if (viewModel.knownRoute != null) {
                         viewModel.knownRoute.previewRemainingRoute(zoomLevel, viewModel.distanceAlongRoute, width, height) ?: defaultMapCenter
-                    } else if (minimapViewModel.currentLng != null && minimapViewModel.currentLat != null) {
-                        Point.fromLngLat(minimapViewModel.currentLng, minimapViewModel.currentLat)
+                    } else if (locationViewModel != null) {
+                        Point.fromLngLat(locationViewModel.longitude(), locationViewModel.latitude())
                     } else {
                         defaultMapCenter
                     }
