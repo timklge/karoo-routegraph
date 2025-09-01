@@ -53,6 +53,7 @@ import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import kotlin.math.pow
+import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.seconds
 
 class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.VERSION_NAME) {
@@ -379,6 +380,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         Log.d(TAG, "Starting graph updater")
 
         var knownRoute: LineString? = null
+        var knownClimbs = mutableSetOf<Climb>()
         var knownPois: Set<POI> = mutableSetOf()
         var knownSettings: RouteGraphSettings? = null
         var knownIncidents: IncidentsResponse? = null
@@ -451,7 +453,8 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 val sampledElevationData = elevationPolyline?.let {
                     SampledElevationData.fromSparseElevationData(it, interval)
                 }
-                val climbs = karooClimbs?.let {
+
+                val newClimbs = karooClimbs?.let {
                     karooClimbs.mapNotNull { karooClimb ->
                         val category = ClimbCategory.categorize(
                             karooClimb.grade.toFloat() / 100.0f,
@@ -461,12 +464,14 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                         category?.let {
                             Climb(
                                 category,
-                                karooClimb.startDistance.toFloat(),
-                                karooClimb.startDistance.toFloat() + karooClimb.length.toFloat()
+                                karooClimb.startDistance.roundToInt(),
+                                karooClimb.startDistance.roundToInt() + karooClimb.length.roundToInt()
                             )
                         }
                     }
                 }
+                newClimbs?.let { knownClimbs.addAll(newClimbs) }
+
                 val isNavigatingToDestination = navigatingToDestinationPolyline != null
 
                 val routeLineString = when (navigationStateEvent) {
@@ -497,6 +502,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     knownIncidentWarningShown = false
                     lastKnownPositionAlongRoute = null
                     knownSettings = settings
+                    knownClimbs = mutableSetOf()
 
                     true
                 } else false
@@ -751,7 +757,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                         knownRoute = knownRoute,
                         poiDistances = poiDistances,
                         sampledElevationData = sampledElevationData,
-                        climbs = climbs,
+                        climbs = knownClimbs.sortedBy { it.startDistance },
                         isImperial = isImperial,
                         navigatingToDestination = navigationStateEvent is OnNavigationState.NavigationState.NavigatingToDestination,
                         rejoin = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.rejoinPolyline?.let { LineString.fromPolyline(it, 5) },

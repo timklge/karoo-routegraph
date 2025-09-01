@@ -26,13 +26,13 @@ enum class ClimbCategory(
 
 data class Climb(
     val category: ClimbCategory,
-    val startDistance: Float,
-    val endDistance: Float
+    val startDistance: Int,
+    val endDistance: Int
 ) {
-    val length: Float get() = endDistance - startDistance
+    val length: Float get() = (endDistance - startDistance).toFloat()
 
     fun totalGain(sampledElevationData: SampledElevationData): Double {
-        return sampledElevationData.getTotalClimb(startDistance, endDistance)
+        return sampledElevationData.getTotalClimb(startDistance.toFloat(), endDistance.toFloat())
     }
 
     fun getAverageIncline(elevationData: SampledElevationData): Double {
@@ -41,7 +41,7 @@ data class Climb(
 
         for(i in 1 until elevationData.elevations.size) {
             val currentPosition = i * elevationData.interval
-            if (currentPosition in startDistance..endDistance) {
+            if (currentPosition in startDistance.toFloat()..endDistance.toFloat()) {
                 val incline = (elevationData.elevations[i] - elevationData.elevations[i-1]) / elevationData.interval
                 totalIncline += incline
                 count++
