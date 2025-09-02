@@ -13,6 +13,7 @@
     <string name="minimap_description">Secondary map display (with route and POIs)</string>
     <string name="poi_button">POI Button</string>
     <string name="poi_button_description">Button to quickly open the POI list</string>
+    <string name="no_route">No route loaded</string>
 
     <!-- MainScreen strings -->
     <string name="device_status_warning">Could not read device status. Is your Karoo updated?</string>
