@@ -262,7 +262,7 @@ class RouteGraphDataType(
                 val maxElevation = (viewModel.sampledElevationData?.getMaximumElevationInRange(viewDistanceStart, viewDistanceEnd) ?: 0.0f).let { ceil(it / 100.0f) * 100.0f }
 
                 if (viewModel.routeDistance == null) {
-                    emitter.onNext(ShowCustomStreamState("No route loaded", if (isNightMode()) Color.WHITE else Color.BLACK))
+                    emitter.onNext(ShowCustomStreamState(applicationContext.getString( R.string.no_route), if (isNightMode()) Color.WHITE else Color.BLACK))
                     Log.d(TAG, "Not drawing route graph: No route loaded")
                     emitter.updateView(glance.compose(context, DpSize.Unspecified) {
                         Box(modifier = GlanceModifier.fillMaxSize()){
