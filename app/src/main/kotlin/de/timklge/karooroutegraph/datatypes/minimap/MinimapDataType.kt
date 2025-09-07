@@ -370,10 +370,7 @@ class MinimapDataType(
                             outlinePaint
                         )
                     }
-                    /* if (minimapViewModel.pastPoints != null) {
-                        val lineString = LineString.fromLngLats(minimapViewModel.pastPoints)
-                        drawPolyline(lineString, canvas, Color.GRAY, 8f, centerPosition, zoomLevel)
-                    } */
+
                     if (viewModel.rejoin != null) {
                         this@MinimapDataType.drawPolyline(
                             viewModel.rejoin,
@@ -383,6 +380,26 @@ class MinimapDataType(
                             zoomLevel
                         )
                     }
+
+                    data class ClimbPolyline(val polyline: LineString, val color: Int, val startDistance: Int, val endDistance: Int)
+
+                    val climbPolylines = if (viewModel.knownRoute != null && viewModel.climbs != null) {
+                        viewModel.climbs.map { climb ->
+                            val polyline = TurfMisc.lineSliceAlong(
+                                viewModel.knownRoute,
+                                climb.startDistance.toDouble().coerceAtLeast(0.0),
+                                climb.endDistance.toDouble(),
+                                UNIT_METERS
+                            )
+
+                            val color = this@MinimapDataType.applicationContext.getColor(climb.category.minimapColorRes)
+
+                            ClimbPolyline(polyline, color, climb.startDistance, climb.endDistance)
+                        }
+                    } else emptyList()
+
+                    val climbPolylineSkipRanges = climbPolylines.map { climb -> IntRange(climb.startDistance, climb.endDistance) }
+
                     if (viewModel.knownRoute != null) {
                         if (viewModel.distanceAlongRoute != null) {
                             // Only draw the part of the route that is ahead of the current position
@@ -420,14 +437,18 @@ class MinimapDataType(
                                 canvas,
                                 Color.LTGRAY,
                                 centerPosition,
-                                zoomLevel
+                                zoomLevel,
+                                drawDirectionIndicatorChevrons = true,
+                                skipChevronsInIntervals = climbPolylineSkipRanges
                             )
                             if (routeSlice != null) this@MinimapDataType.drawPolyline(
                                 routeSlice,
                                 canvas,
                                 if (viewModel.navigatingToDestination) Color.rgb(1.0f, 0.0f, 1.0f) else Color.YELLOW,
                                 centerPosition,
-                                zoomLevel
+                                zoomLevel,
+                                drawDirectionIndicatorChevrons = true,
+                                skipChevronsInIntervals = climbPolylineSkipRanges
                             )
                         } else {
                             this@MinimapDataType.drawPolyline(
@@ -435,24 +456,19 @@ class MinimapDataType(
                                 canvas,
                                 if (viewModel.navigatingToDestination) Color.rgb(1.0f, 0.0f, 1.0f) else Color.YELLOW,
                                 centerPosition,
-                                zoomLevel
+                                zoomLevel,
+                                drawDirectionIndicatorChevrons = true,
+                                skipChevronsInIntervals = climbPolylineSkipRanges
                             )
                         }
                     }
                     if (viewModel.knownRoute != null) {
-                        viewModel.climbs?.forEach { climb ->
+                        climbPolylines.forEach { climb ->
                             try {
-                                val polyline = TurfMisc.lineSliceAlong(
-                                    viewModel.knownRoute,
-                                    climb.startDistance.toDouble().coerceAtLeast(0.0),
-                                    climb.endDistance.toDouble(),
-                                    UNIT_METERS
-                                )
-
                                 this@MinimapDataType.drawPolyline(
-                                    polyline,
+                                    climb.polyline,
                                     canvas,
-                                    this@MinimapDataType.applicationContext.getColor(climb.category.minimapColorRes),
+                                    climb.color,
                                     centerPosition,
                                     zoomLevel
                                 )
@@ -701,13 +717,16 @@ class MinimapDataType(
         }
     }
 
+    data class IntRange(val start: Int, val end: Int)
+
     private fun drawPolyline(
         lineString: LineString,
         canvas: Canvas,
         color: Int,
         mapCenter: Point,
         zoomLevel: Float,
-        drawDirectionIndicatorChevrons: Boolean = true
+        drawDirectionIndicatorChevrons: Boolean = true,
+        skipChevronsInIntervals: List<IntRange> = emptyList()
     ) {
         val strokeWidth = 12f
 
@@ -828,8 +847,13 @@ class MinimapDataType(
                     chevronPath.lineTo(chevronX, chevronY)
                     chevronPath.lineTo(rightX, rightY)
 
-                    canvas.drawPath(chevronPath, chevronOutlinePaint)
-                    canvas.drawPath(chevronPath, chevronPaint)
+                    val skipChevron = skipChevronsInIntervals.any { range ->
+                        nextChevronDistance >= range.start && nextChevronDistance <= range.end
+                    }
+                    if (!skipChevron) {
+                        canvas.drawPath(chevronPath, chevronOutlinePaint)
+                        canvas.drawPath(chevronPath, chevronPaint)
+                    }
 
                     nextChevronDistance += chevronIntervalPx
                 }
