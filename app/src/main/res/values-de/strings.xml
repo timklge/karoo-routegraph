@@ -15,6 +15,8 @@
     <string name="poi_button">POI-Knopf</string>
     <string name="poi_button_description">Knopf zum schnellen Öffnen der POI-Liste</string>
     <string name="shift_for_radar_swim_lane">Verschiebung für Radar</string>
+    <string name="no_route">Keine Route geladen</string>
+
     <!-- MainScreen strings -->
     <string name="device_status_warning">Gerätestatus konnte nicht gelesen werden. Bitte Karoo-Software aktualisieren.</string>
     <string name="elevation_profile">Höhenprofil</string>
