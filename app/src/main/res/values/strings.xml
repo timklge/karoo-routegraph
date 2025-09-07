@@ -128,4 +128,5 @@
     <string name="category_viewpoint">Viewpoint</string>
     <string name="kilometers">km</string>
     <string name="miles">mi</string>
+    <string name="shift_for_radar_swim_lane">Shift for radar swim lane</string>
 </resources>

@@ -9,11 +9,13 @@ import de.timklge.karooroutegraph.screens.RouteGraphPoiSettings
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.screens.RouteGraphTemporaryPOIs
 import io.hammerhead.karooext.KarooSystemService
+import io.hammerhead.karooext.models.DataType
 import io.hammerhead.karooext.models.KarooEvent
 import io.hammerhead.karooext.models.OnStreamState
 import io.hammerhead.karooext.models.StreamState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.Flow
@@ -21,7 +23,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 
@@ -153,6 +158,31 @@ class KarooSystemServiceProvider(private val context: Context) {
         }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun streamRadarSwimLaneIsVisible(): Flow<Boolean> {
+        return streamDataFlow(DataType.Type.RADAR).map { state ->
+            (state as? StreamState.Streaming)?.dataPoint?.values?.get(DataType.Field.RADAR_TARGET_1_RANGE) != null
+        }
+            .distinctUntilChanged()
+            .scan(Pair<Boolean?, Boolean>(null, false)) { acc, current ->
+                Pair(acc.second, current)
+            }
+            .flatMapLatest { (previous, current) ->
+                when {
+                    // First emission or transition from false to true: emit immediately
+                    previous == null || (!previous && current) -> flowOf(current)
+                    // Transition from true to false: delay by 3 seconds
+                    previous && !current -> callbackFlow {
+                        kotlinx.coroutines.delay(3000)
+                        trySendBlocking(current)
+                        awaitClose { }
+                    }
+                    // No change: emit immediately
+                    else -> flowOf(current)
+                }
+            }
+    }
+
     inline fun<reified T : KarooEvent> stream(): Flow<T> {
         return callbackFlow {
             val listenerId = karooSystemService.addConsumer { event: T ->
@@ -164,4 +194,5 @@ class KarooSystemServiceProvider(private val context: Context) {
         }
     }
 }
+
 
