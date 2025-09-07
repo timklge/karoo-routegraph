@@ -92,3 +92,45 @@ data class Climb(
         return MaxIncline(start, end, avgMaxIncline)
     }
 }
+
+fun cleanupClimbs(climbs: Set<Climb>): Set<Climb> {
+    if (climbs.isEmpty()) return emptySet()
+
+    // Sort climbs by start distance
+    val sorted = climbs.sortedBy { it.startDistance }
+
+    // Helper to choose category when merging: prefer higher importance, then lower number
+    val chooseCategory: (ClimbCategory, ClimbCategory) -> ClimbCategory = { a, b ->
+        when {
+            a.importance != b.importance -> if (a.importance > b.importance) a else b
+            else -> if (a.number <= b.number) a else b
+        }
+    }
+
+    // Merge climbs that are closer than 100 meters
+    val merged = mutableListOf<Climb>()
+    var current = sorted.first()
+
+    for (next in sorted.drop(1)) {
+        val gap = next.startDistance - current.endDistance
+        if (gap < 100) {
+            val newStart = minOf(current.startDistance, next.startDistance)
+            val newEnd = maxOf(current.endDistance, next.endDistance)
+            val newCategory = chooseCategory(current.category, next.category)
+            current = Climb(newCategory, newStart, newEnd)
+        } else {
+            merged.add(current)
+            current = next
+        }
+    }
+    merged.add(current)
+
+    // Remove climbs that are fully contained in another climb
+    val filtered = merged.filter { c ->
+        merged.none { other ->
+            other !== c && other.startDistance <= c.startDistance && other.endDistance >= c.endDistance
+        }
+    }.toSet()
+
+    return filtered
+}

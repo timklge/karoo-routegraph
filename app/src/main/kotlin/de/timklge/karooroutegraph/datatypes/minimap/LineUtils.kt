@@ -263,15 +263,16 @@ fun LineString.previewRemainingRoute(zoomLevel: Float, distanceAlongRoute: Float
             (2.0.pow(zoomLevel.toDouble()) * tileScaleFactor)
     val viewportWidthMeters = screenWidthPixels * metersPerPixel
     val viewportHeightMeters = screenHeightPixels * metersPerPixel
+    val shortAxisMeters = min(viewportWidthMeters, viewportHeightMeters)
 
     // Get the start point (must always be visible)
     val startPoint = remainingPoints[0]
 
     // If remaining path is very short, just return a point that keeps the start visible
     val pathLength = TurfMeasurement.length(remainingPath, UNIT_METERS)
-    if (pathLength < viewportWidthMeters / 2) {
+    if (pathLength < shortAxisMeters / 2) {
         // For short paths, return a point slightly ahead of the start point
-        val lookAheadDistance = min(pathLength, viewportWidthMeters * 0.3)
+        val lookAheadDistance = min(pathLength, shortAxisMeters * 0.3)
         val aheadPoint = TurfMeasurement.along(remainingPath, lookAheadDistance, UNIT_METERS)
 
         // Calculate a point between start and ahead point to keep both visible
@@ -282,9 +283,14 @@ fun LineString.previewRemainingRoute(zoomLevel: Float, distanceAlongRoute: Float
     }
 
     // For longer paths, calculate how much we can show while keeping start point visible
-    // We'll show enough path to fill about 60% of the viewport width
-    val visiblePathLength = min(pathLength, viewportWidthMeters * 0.6)
-    val visiblePath = TurfMisc.lineSliceAlong(remainingPath, 0.0, visiblePathLength, UNIT_METERS)
+    // We'll show enough path to fill about 60% of the viewport width / height, whichever is smaller
+    val visiblePathLength = min(pathLength, shortAxisMeters * 0.6)
+    val visiblePath = try {
+        TurfMisc.lineSliceAlong(remainingPath, 0.0, visiblePathLength, UNIT_METERS)
+    } catch (e: Exception) {
+        Log.e(TAG, "Error slicing visible path: ${e.message}")
+        remainingPath
+    }
 
     // Get the bounds of the visible path
     val visiblePoints = visiblePath.coordinates()
@@ -303,31 +309,6 @@ fun LineString.previewRemainingRoute(zoomLevel: Float, distanceAlongRoute: Float
     // Calculate center of the bounding box, ensuring start point is within view
     val centerLat = (minLat + maxLat) / 2
     val centerLng = (minLng + maxLng) / 2
-
-    // Convert bounds to meters for comparison with viewport
-    val latDiff = maxLat - minLat
-    val lngDiff = maxLng - minLng
-    val latDiffMeters = latDiff * 111000
-    val lngDiffMeters = lngDiff * 111000 * cos(Math.toRadians(centerLat))
-
-    // If the path is too narrow in either dimension, look further ahead
-    if ((latDiffMeters < viewportHeightMeters * 0.3 || lngDiffMeters < viewportWidthMeters * 0.3) && pathLength > visiblePathLength) {
-        // Calculate how far to look ahead while keeping start point visible
-        val maxLookAhead = min(pathLength, viewportWidthMeters * 0.8)  // Don't look too far ahead
-        val lookAheadPoint = TurfMeasurement.along(remainingPath, maxLookAhead, UNIT_METERS)
-
-        // Calculate new bounds including the lookahead point
-        val newMinLat = min(minLat, lookAheadPoint.latitude())
-        val newMaxLat = max(maxLat, lookAheadPoint.latitude())
-        val newMinLng = min(minLng, lookAheadPoint.longitude())
-        val newMaxLng = max(maxLng, lookAheadPoint.longitude())
-
-        // Calculate center that keeps both start and lookahead point visible
-        return Point.fromLngLat(
-            (newMinLng + newMaxLng) / 2,
-            (newMinLat + newMaxLat) / 2
-        )
-    }
 
     // Default case: return center of the visible path bounds
     return Point.fromLngLat(centerLng, centerLat)

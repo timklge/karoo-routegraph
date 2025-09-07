@@ -472,6 +472,8 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 }
                 newClimbs?.let { knownClimbs.addAll(newClimbs) }
 
+                knownClimbs = cleanupClimbs(knownClimbs).toMutableSet()
+
                 val isNavigatingToDestination = navigatingToDestinationPolyline != null
 
                 val routeLineString = when (navigationStateEvent) {
