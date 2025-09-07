@@ -107,7 +107,7 @@ class VerticalRouteGraphDataType(
      * @param maxLines Maximum number of lines to return (if text exceeds, it will be truncated)
      * @return List of wrapped text lines
      */
-    private fun wrapText(text: String, paint: Paint, maxWidth: Float, maxLines: Int): List<String> {
+    private fun wrapText(text: String, paint: Paint, maxWidth: Float, maxLines: Int = 3): List<String> {
         if (paint.measureText(text) <= maxWidth) {
             return listOf(text)
         }
