@@ -77,7 +77,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     override val types by lazy {
         listOf(
             RouteGraphDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, displayViewModelProvider, applicationContext),
-            VerticalRouteGraphDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, displayViewModelProvider, applicationContext),
+            VerticalRouteGraphDataType(routeGraphViewModelProvider, displayViewModelProvider, karooSystem, applicationContext),
             DistanceToNextPOIDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, applicationContext),
             ElevationToNextPOIDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, applicationContext),
             MinimapDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, displayViewModelProvider, minimapViewModelProvider, tileDownloadService, locationViewModelProvider, applicationContext),

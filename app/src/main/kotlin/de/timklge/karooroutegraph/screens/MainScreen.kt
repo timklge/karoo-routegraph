@@ -102,6 +102,7 @@ fun MainScreen(onFinish: () -> Unit) {
     var gradientIndicatorFrequency by remember { mutableStateOf(GradientIndicatorFrequency.HIGH) }
     var showPOIsOnMinimap by remember { mutableStateOf(true) }
     var showNavigateButtonOnGraphs by remember { mutableStateOf(true) }
+    var shiftForRadarSwimLane by remember { mutableStateOf(true) }
     var hereMapsApiKey by remember { mutableStateOf("") }
     var enableTrafficIncidentReporting by remember { mutableStateOf(false) }
     var poiDistanceToRouteMaxMeters by remember { mutableDoubleStateOf(1000.0) }
@@ -129,6 +130,7 @@ fun MainScreen(onFinish: () -> Unit) {
             gradientIndicatorFrequency = gradientIndicatorFrequency,
             enableTrafficIncidentReporting = enableTrafficIncidentReporting,
             showNavigateButtonOnGraphs = showNavigateButtonOnGraphs,
+            shiftForRadarSwimLane = shiftForRadarSwimLane,
             poiDistanceToRouteMaxMeters = poiDistanceToRouteMaxMeters,
             poiApproachAlertAtDistance = poiApproachAlertAtDistance,
             elevationProfileZoomLevels = elevationProfileZoomLevels,
@@ -147,6 +149,7 @@ fun MainScreen(onFinish: () -> Unit) {
             hereMapsApiKey = settings.hereMapsApiKey
             enableTrafficIncidentReporting = settings.enableTrafficIncidentReporting
             showNavigateButtonOnGraphs = settings.showNavigateButtonOnGraphs
+            shiftForRadarSwimLane = settings.shiftForRadarSwimLane
             poiDistanceToRouteMaxMeters = settings.poiDistanceToRouteMaxMeters
             poiApproachAlertAtDistance = settings.poiApproachAlertAtDistance ?: 500.0
             elevationProfileZoomLevels = settings.elevationProfileZoomLevels
@@ -206,6 +209,15 @@ fun MainScreen(onFinish: () -> Unit) {
                             })
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(stringResource(R.string.show_navigate_button))
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Switch(checked = shiftForRadarSwimLane, onCheckedChange = {
+                                shiftForRadarSwimLane = it
+                                coroutineScope.launch { updateSettings() }
+                            })
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(stringResource(R.string.shift_for_radar_swim_lane))
                         }
 
                         // Only Highlight Climbs at Zoom Level Slider
@@ -631,7 +643,6 @@ fun MainScreen(onFinish: () -> Unit) {
             confirmButton = { Button(onClick = {
                 coroutineScope.launch {
                     saveSettings(ctx, RouteGraphSettings(
-                        showGradientIndicatorsOnMap = showGradientIndicatorsOnMap,
                         welcomeDialogAccepted = true
                     ))
                 }

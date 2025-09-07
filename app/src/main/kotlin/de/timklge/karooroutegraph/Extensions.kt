@@ -24,20 +24,3 @@ fun KarooSystemService.streamDatatypeIsVisible(
         page.page.elements.any { it.dataTypeId == datatype }
     }
 }
-
-@Serializable
-data class HeightResponse(
-    @SerialName("encoded_polyline") val encodedPolyline: String,
-    @SerialName("range_height") val rangeHeight: List<List<Double>>,
-    val warnings: List<String>? = emptyList(),
-)
-
-@Serializable
-data class HeightRequest(
-    val range: Boolean,
-    @SerialName("shape_format") val shapeFormat: String,
-    @SerialName("encoded_polyline") val encodedPolyline: String,
-    @SerialName("resample_distance") val resampleDistance: Double? = null,
-    @SerialName("height_precision") val heightPrecision: Int = 0,
-)
-

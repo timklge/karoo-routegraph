@@ -34,6 +34,7 @@ import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import de.timklge.karooroutegraph.ClimbCategory
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
+import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.NearestPoint
 import de.timklge.karooroutegraph.POI
 import de.timklge.karooroutegraph.POIActivity
@@ -81,9 +82,9 @@ import kotlin.math.roundToInt
 
 @OptIn(ExperimentalGlanceRemoteViewsApi::class)
 class VerticalRouteGraphDataType(
-    private val karooSystem: KarooSystemService,
     private val viewModelProvider: RouteGraphViewModelProvider,
     private val displayViewModelProvider: RouteGraphDisplayViewModelProvider,
+    private val karooSystemServiceProvider: KarooSystemServiceProvider,
     private val applicationContext: Context
 ) : DataTypeImpl("karoo-routegraph", "verticalroutegraph") {
     private val glance = GlanceRemoteViews()
@@ -98,17 +99,83 @@ class VerticalRouteGraphDataType(
         return this.start < other.endInclusive && this.endInclusive > other.start
     }
 
+    /**
+     * Wraps text to fit within the specified maximum width
+     * @param text The text to wrap
+     * @param paint The paint object used to measure text
+     * @param maxWidth Maximum width in pixels
+     * @param maxLines Maximum number of lines to return (if text exceeds, it will be truncated)
+     * @return List of wrapped text lines
+     */
+    private fun wrapText(text: String, paint: Paint, maxWidth: Float, maxLines: Int = 3): List<String> {
+        if (paint.measureText(text) <= maxWidth) {
+            return listOf(text)
+        }
+
+        val words = text.split(" ")
+        val lines = mutableListOf<String>()
+        var currentLine = ""
+
+        for (word in words) {
+            val testLine = if (currentLine.isEmpty()) word else "$currentLine $word"
+
+            if (paint.measureText(testLine) <= maxWidth) {
+                currentLine = testLine
+            } else {
+                if (currentLine.isNotEmpty()) {
+                    lines.add(currentLine)
+                    currentLine = word
+                } else {
+                    // Single word is too long, break it character by character
+                    var partialWord = ""
+                    for (char in word) {
+                        val testChar = "$partialWord$char"
+                        if (paint.measureText(testChar) <= maxWidth) {
+                            partialWord = testChar
+                        } else {
+                            if (partialWord.isNotEmpty()) {
+                                lines.add(partialWord)
+                                partialWord = char.toString()
+                            } else {
+                                // Even single character is too wide, just add it
+                                lines.add(char.toString())
+                            }
+                        }
+                    }
+                    if (partialWord.isNotEmpty()) {
+                        currentLine = partialWord
+                    }
+                }
+            }
+        }
+
+        if (currentLine.isNotEmpty()) {
+            lines.add(currentLine)
+        }
+
+        if (lines.size > maxLines) {
+            val capped = lines.take(maxLines).toMutableList()
+            capped[maxLines - 1] = capped[maxLines - 1].trimEnd() + "..." // Add ellipsis to last line
+            return capped
+        }
+
+        return lines.ifEmpty { listOf(text) }
+    }
+
     data class StreamData(val routeGraphViewModel: RouteGraphViewModel,
                           val routeGraphDisplayViewModel: RouteGraphDisplayViewModel,
                           val profile: UserProfile,
                           val settings: RouteGraphSettings,
-                          val isVisible: Boolean)
+                          val isVisible: Boolean,
+                          val radarLaneIsVisible: Boolean)
 
     data class TextDrawCommand(val x: Float, val y: Float, val text: String, val paint: Paint, val importance: Int = 10,
                                /** If set, draws this text over the original text */
                                val overdrawText: String? = null,
                                val overdrawPaint: Paint = paint,
-                               @DrawableRes val leadingIcon: Int? = null,)
+                               @DrawableRes val leadingIcon: Int? = null,
+                               /** Maximum width for text wrapping in pixels */
+                               val maxWidth: Float? = null)
 
     data class TextDrawCommandGroup(val commands: List<TextDrawCommand>)
 
@@ -129,22 +196,33 @@ class VerticalRouteGraphDataType(
             combine(
                 viewModelProvider.viewModelFlow,
                 displayViewModelProvider.viewModelFlow,
-                karooSystem.streamUserProfile(),
-                context.streamSettings(karooSystem),
-                karooSystem.streamDatatypeIsVisible(dataTypeId)
-            ) { viewModel, displayViewModel, profile, settings, isVisible ->
-                StreamData(viewModel, displayViewModel, profile, settings, isVisible)
+                karooSystemServiceProvider.karooSystemService.streamUserProfile(),
+                context.streamSettings(karooSystemServiceProvider.karooSystemService),
+                karooSystemServiceProvider.karooSystemService.streamDatatypeIsVisible(dataTypeId),
+                karooSystemServiceProvider.streamRadarSwimLaneIsVisible()
+            ) { data ->
+                val viewModel = data[0] as RouteGraphViewModel
+                val displayViewModel = data[1] as RouteGraphDisplayViewModel
+                val profile = data[2] as UserProfile
+                val settings = data[3] as RouteGraphSettings
+                val isVisible = data[4] as Boolean
+                val radarLaneIsVisible = data[5] as Boolean
+
+                StreamData(viewModel, displayViewModel, profile, settings, isVisible, radarLaneIsVisible)
             }
         }
 
         val viewJob = CoroutineScope(Dispatchers.Default).launch {
-            flow.throttle(1_000L).filter { it.isVisible }.collect { (viewModel, displayViewModel, userProfile, settings) ->
+            flow.throttle(1_000L).filter { it.isVisible }.collect { (viewModel, displayViewModel, userProfile, settings, _, radarLaneIsVisibleValue) ->
                 val bitmap = createBitmap(config.viewSize.first, config.viewSize.second)
 
                 val canvas = Canvas(bitmap)
                 val nightMode = isNightMode()
 
-                val graphBounds = RectF(15f, 15f, 90f, config.viewSize.second.toFloat() - 25f)
+                val radarLaneIsVisible = radarLaneIsVisibleValue && settings.shiftForRadarSwimLane
+                val left = 5f + (if (radarLaneIsVisible) 30f else 0f)
+                val right = 80f + (if (radarLaneIsVisible) 30f else 0f)
+                val graphBounds = RectF(left, 15f, right, config.viewSize.second.toFloat() - 25f)
 
                 val poiLinePaint = Paint().apply {
                     color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
@@ -159,7 +237,7 @@ class VerticalRouteGraphDataType(
                 }
 
                 val poiLinePaintDashed = Paint(poiLinePaint).apply {
-                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 5f)
+                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 0f)
                 }
 
                 val incidentLinePaintDashed = Paint(incidentPaint).apply {
@@ -182,18 +260,8 @@ class VerticalRouteGraphDataType(
                     strokeWidth = 4f
                 }
 
-                val backgroundFillPaint = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.whiteBg else R.color.blackBg)
-                    style = Paint.Style.FILL
-                }
-
                 val backgroundFillPaintInv = Paint().apply {
                     color = applicationContext.getColor(if(nightMode) R.color.blackBg else R.color.whiteBg)
-                    style = Paint.Style.FILL
-                }
-
-                val backgroundFillPaintInvSolid = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.black else R.color.white)
                     style = Paint.Style.FILL
                 }
 
@@ -230,16 +298,9 @@ class VerticalRouteGraphDataType(
                 val textPaintBold = Paint().apply {
                     color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
                     style = Paint.Style.FILL
-                    textSize = 40f
+                    textSize = 35f
                     textAlign = Paint.Align.LEFT
                     typeface = Typeface.DEFAULT_BOLD
-                }
-
-                val textPaintInv = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.black else R.color.white)
-                    style = Paint.Style.FILL
-                    textSize = 40f
-                    textAlign = Paint.Align.LEFT
                 }
 
                 val inversePaintFilter = Paint().apply {
@@ -315,6 +376,22 @@ class VerticalRouteGraphDataType(
 
                 val textDrawCommands = mutableListOf<TextDrawCommandGroup>()
 
+                val unitFactor = if (!viewModel.isImperial) 1000.0f else 1609.344f
+                val ticks = if (config.gridSize.first == 60) 5 else 2
+                val tickInterval = (viewDistanceEnd - viewDistanceStart) / ticks
+
+                var maxTickLabelWidth = 0f
+                for (i in 0..ticks) {
+                    val progress = ((viewDistanceStart + tickInterval * i) / unitFactor)
+                    val text = if (displayedViewRange == null || displayedViewRange <= 2000.0f) {
+                        String.format(Locale.US, "%.1f", progress)
+                    } else "${progress.toInt()}"
+                    maxTickLabelWidth = maxTickLabelWidth.coerceAtLeast(textPaint.measureText(text))
+                }
+
+                val axisLabelOffset = 15f
+                val labelStartX = graphBounds.right + axisLabelOffset + maxTickLabelWidth + 15f
+
                 if (viewModel.sampledElevationData != null){
                     val firstIndexInRange = floor(viewDistanceStart / viewModel.sampledElevationData.interval).toInt().coerceIn(0, viewModel.sampledElevationData.elevations.size - 1)
                     val lastIndexInRange = ceil(viewDistanceEnd / viewModel.sampledElevationData.interval).toInt().coerceIn(0, viewModel.sampledElevationData.elevations.size - 1)
@@ -375,8 +452,6 @@ class VerticalRouteGraphDataType(
                             val clampedClimbStartProgressPixels = climbStartProgressPixels.coerceIn(graphBounds.top, graphBounds.bottom)
                             val clampedClimbEndProgressPixels = climbEndProgressPixels.coerceIn(graphBounds.top, graphBounds.bottom)
 
-                            if (clampedClimbEndProgressPixels < graphBounds.top || clampedClimbStartProgressPixels > graphBounds.bottom) return@forEach
-
                             val clipRect = RectF(graphBounds.left, clampedClimbEndProgressPixels, graphBounds.right, clampedClimbStartProgressPixels)
 
                             if (!isZoomedIn) {
@@ -397,13 +472,14 @@ class VerticalRouteGraphDataType(
                             val climbAverageIncline = (climb.getAverageIncline(viewModel.sampledElevationData) * 100).roundToInt()
                             val climbMaxIncline = climb.getMaxIncline(viewModel.sampledElevationData)
                             val maxInclineString = if (climbMaxIncline.incline > climbAverageIncline) ", ${climbMaxIncline.incline}% ${distanceToString(climbMaxIncline.end - climbMaxIncline.start, isImperial, false)}" else ""
-                            
+
                             if (climb.category.number < 3){
+                                val availableWidth = config.viewSize.first.toFloat() - (labelStartX) - 20f
                                 textDrawCommands.add(TextDrawCommandGroup(listOf(
-                                    TextDrawCommand(graphBounds.right + 100f, climbStartProgressPixels + 15f, "⛰ $climbGain, $climbLength", textPaint, climb.category.importance, "⛰", Paint(textPaint).apply {
+                                    TextDrawCommand(labelStartX, climbStartProgressPixels + 15f, "⛰ $climbGain, $climbLength", textPaint, climb.category.importance, "⛰", Paint(textPaint).apply {
                                         color = applicationContext.getColor(climb.category.colorRes)
-                                    }),
-                                    TextDrawCommand(graphBounds.right + 100f, climbStartProgressPixels + 16f, "⌀ ${climbAverageIncline}%${maxInclineString}", textPaint, climb.category.importance-1)
+                                    }, maxWidth = availableWidth),
+                                    TextDrawCommand(labelStartX, climbStartProgressPixels + 16f, "⌀ ${climbAverageIncline}%${maxInclineString}", textPaint, climb.category.importance-1, maxWidth = availableWidth)
                                 )))
                             }
                         }
@@ -475,7 +551,8 @@ class VerticalRouteGraphDataType(
                         canvas.drawLine(graphBounds.left, progressPixels, config.viewSize.first.toFloat(), progressPixels, if (poi.type == PoiType.INCIDENT) incidentLinePaintDashed else poiLinePaintDashed)
 
                         val poiCommands = mutableListOf<TextDrawCommand>()
-                        poiCommands.add(TextDrawCommand(graphBounds.right + 100f + 40f, progressPixels + 15f, text, textPaintBold, labelPriority, leadingIcon = mapPoiToIcon(poi.symbol.type)))
+                        val availableWidth = config.viewSize.first.toFloat() - (labelStartX + 40f) - 20f
+                        poiCommands.add(TextDrawCommand(labelStartX + 40f, progressPixels + 15f, text, textPaintBold, labelPriority, leadingIcon = mapPoiToIcon(poi.symbol.type), maxWidth = availableWidth))
 
                         val isImperial = userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
 
@@ -488,7 +565,8 @@ class VerticalRouteGraphDataType(
                                 distanceStr += " ↗ ${distanceToString(elevationMetersRemaining.toFloat(), isImperial, true)}"
                             }
 
-                            poiCommands.add(TextDrawCommand(graphBounds.right + 100f, progressPixels + 15f, distanceStr, textPaint, labelPriority))
+                            val distanceAvailableWidth = config.viewSize.first.toFloat() - (labelStartX) - 20f
+                            poiCommands.add(TextDrawCommand(labelStartX, progressPixels + 15f, distanceStr, textPaint, labelPriority, maxWidth = distanceAvailableWidth))
                         }
 
                         textDrawCommands.add(TextDrawCommandGroup(poiCommands))
@@ -520,15 +598,20 @@ class VerticalRouteGraphDataType(
                     .filter { group -> group.commands.any { it.y >= 0 && it.y < config.viewSize.second } }
                     .sortedBy { it.originalIndex } // Maintain original order
                     .forEach { group ->
-                        // Calculate the height needed for this group
-                        val groupHeight = group.commands.size * textHeight + (group.commands.size - 1) * 5f
+                        // Calculate the total height needed for this group considering text wrapping
+                        var totalGroupHeight = 0f
+                        group.commands.forEach { cmd ->
+                            val availableWidth = cmd.maxWidth ?: (config.viewSize.first.toFloat() - cmd.x - 20f)
+                            val wrappedLines = wrapText(cmd.text, cmd.paint, availableWidth)
+                            totalGroupHeight += (wrappedLines.size * textHeight)
+                        }
 
                         // Try different positions starting from the original position
                         var bestY = group.originalY
                         var foundPosition = false
 
                         // First, try the original position
-                        val originalRange = bestY..(bestY + groupHeight)
+                        val originalRange = bestY..(bestY + totalGroupHeight)
                         if (originalRange.start >= 0 && originalRange.endInclusive <= config.viewSize.second &&
                             !occupiedRanges.any { it.overlaps(originalRange) }) {
                             foundPosition = true
@@ -537,11 +620,11 @@ class VerticalRouteGraphDataType(
                             var testY = group.originalY
                             val step = textHeight / 2f // Move in smaller steps
                             var attempts = 0
-                            val maxAttempts = ((group.originalY + groupHeight) / step).toInt()
+                            val maxAttempts = ((group.originalY + totalGroupHeight) / step).toInt()
 
                             while (attempts < maxAttempts && !foundPosition) {
                                 testY -= step
-                                val testRange = testY..(testY + groupHeight)
+                                val testRange = testY..(testY + totalGroupHeight)
 
                                 // Check if this position is valid (within bounds and no conflicts)
                                 if (testRange.start >= 0 && testRange.endInclusive <= config.viewSize.second + textHeight / 2 &&
@@ -560,7 +643,7 @@ class VerticalRouteGraphDataType(
 
                                 while (attempts < maxDownwardAttempts && !foundPosition) {
                                     testY += step
-                                    val testRange = testY..(testY + groupHeight)
+                                    val testRange = testY..(testY + totalGroupHeight)
 
                                     // Check if this position is valid (within bounds and no conflicts)
                                     if (testRange.start >= 0 && testRange.endInclusive <= config.viewSize.second &&
@@ -598,10 +681,33 @@ class VerticalRouteGraphDataType(
                             var currentCommandY = bestY
 
                             group.commands.forEach { cmd ->
-                                canvas.drawText(cmd.text, cmd.x, currentCommandY, cmd.paint)
+                                // Calculate available width for text wrapping
+                                val availableWidth = cmd.maxWidth ?: (config.viewSize.first.toFloat() - cmd.x - 20f)
+                                val wrappedLines = wrapText(cmd.text, cmd.paint, availableWidth)
+
+                                var lineY = currentCommandY
+                                wrappedLines.forEachIndexed { lineIndex, line ->
+                                    val textX = if (lineIndex > 0 && cmd.leadingIcon != null) {
+                                        cmd.x - 40f // Icon starts at cmd.x - 40f, so text aligns with icon left edge
+                                    } else {
+                                        cmd.x
+                                    }
+                                    canvas.drawText(line, textX, lineY, cmd.paint)
+                                    lineY += textHeight
+                                }
 
                                 if (cmd.overdrawText != null) {
-                                    canvas.drawText(cmd.overdrawText, cmd.x, currentCommandY, cmd.overdrawPaint)
+                                    val overdrawLines = wrapText(cmd.overdrawText, cmd.overdrawPaint, availableWidth)
+                                    lineY = currentCommandY
+                                    overdrawLines.forEachIndexed { lineIndex, line ->
+                                        val textX = if (lineIndex > 0 && cmd.leadingIcon != null) {
+                                            cmd.x - 40f // Icon starts at cmd.x - 40f, so text aligns with icon left edge
+                                        } else {
+                                            cmd.x
+                                        }
+                                        canvas.drawText(line, textX, lineY, cmd.overdrawPaint)
+                                        lineY += textHeight
+                                    }
                                 }
 
                                 if (cmd.leadingIcon != null) {
@@ -612,18 +718,15 @@ class VerticalRouteGraphDataType(
                                     if (bitmap != null) canvas.drawBitmap(bitmap, cmd.x - 40f, currentCommandY - sizeY + 2.5f, iconPaint)
                                 }
 
-                                currentCommandY += textHeight + 5f // Move down for next command in group
+                                // Move Y position down by the height of all wrapped lines plus spacing
+                                currentCommandY += (wrappedLines.size * textHeight)
                             }
 
                             // Mark this range as occupied (with some padding)
-                            val occupiedRange = (bestY - groupSpacing)..(bestY + groupHeight + groupSpacing)
+                            val occupiedRange = (bestY - groupSpacing)..(bestY + totalGroupHeight + groupSpacing)
                             occupiedRanges.add(occupiedRange)
                         }
                     }
-
-                val unitFactor = if (!viewModel.isImperial) 1000.0f else 1609.344f
-                val ticks = if (config.gridSize.first == 60) 5 else 2
-                val tickInterval = (viewDistanceEnd - viewDistanceStart) / ticks
 
                 for (i in 0..ticks){
                     canvas.drawLine(
@@ -678,15 +781,15 @@ class VerticalRouteGraphDataType(
     }
 
     private fun previewFlow() = flow {
-        val settings = applicationContext.streamSettings(karooSystem).first()
+        val settings = applicationContext.streamSettings(karooSystemServiceProvider.karooSystemService).first()
 
         while (true){
             val distanceAlongRoute = (0..50_000).random()
             val routeGraphViewModel = RouteGraphViewModel(50_000.0f, distanceAlongRoute.toFloat(), true, null, null,
                 mapOf(
-                    POI(Symbol.POI("checkpoint", 0.0, 0.0, name = "Checkpoint", type = "control")) to listOf(NearestPoint(null, 20.0f, 35_000.0f, null)),
+                    POI(Symbol.POI("checkpoint", 0.0, 0.0, name = "Very Long Checkpoint Name That Should Wrap", type = "control")) to listOf(NearestPoint(null, 20.0f, 35_000.0f, null)),
                     POI(Symbol.POI("test", 0.0, 0.0, name = "Toilet", type = "restroom")) to listOf(NearestPoint(null, 20.0f, 5_000.0f, null)),
-                    POI(Symbol.POI("refuel", 0.0, 0.0, name = "Refuel", type = "food")) to listOf(NearestPoint(null, 20.0f, 20_000.0f, null))
+                    POI(Symbol.POI("refuel", 0.0, 0.0, name = "Refuel Station", type = "food")) to listOf(NearestPoint(null, 20.0f, 20_000.0f, null))
                 ),
                 sampledElevationData = SparseElevationData(
                     floatArrayOf(0f, 10_000f, 20_000f, 30_000f, 40_000f, 50_000f),
@@ -694,7 +797,10 @@ class VerticalRouteGraphDataType(
                 ).toSampledElevationData(100.0f)
             )
             val routeGraphDisplayViewModel = RouteGraphDisplayViewModel()
-            val streamData = StreamData(routeGraphViewModel, routeGraphDisplayViewModel, karooSystem.streamUserProfile().first(), settings, true)
+            val streamData = StreamData(routeGraphViewModel, routeGraphDisplayViewModel, karooSystemServiceProvider.karooSystemService.streamUserProfile().first(), settings,
+                isVisible = true,
+                radarLaneIsVisible = false
+            )
 
             emit(streamData)
 

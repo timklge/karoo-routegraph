@@ -14,6 +14,7 @@
     <string name="minimap_description">Sekundäre Kartenanzeige (mit Route und POIs)</string>
     <string name="poi_button">POI-Knopf</string>
     <string name="poi_button_description">Knopf zum schnellen Öffnen der POI-Liste</string>
+    <string name="shift_for_radar_swim_lane">Verschiebung für Radar</string>
     <string name="no_route">Keine Route geladen</string>
 
     <!-- MainScreen strings -->
