@@ -298,7 +298,7 @@ class VerticalRouteGraphDataType(
                 val textPaintBold = Paint().apply {
                     color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
                     style = Paint.Style.FILL
-                    textSize = 35f
+                    textSize = 40f
                     textAlign = Paint.Align.LEFT
                     typeface = Typeface.DEFAULT_BOLD
                 }
