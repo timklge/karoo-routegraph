@@ -339,8 +339,8 @@ class RouteGraphDataType(
                             val climbsSortedByCategory = viewModel.climbs.sortedByDescending { it.category.number }
 
                             climbsSortedByCategory.forEach { climb ->
-                                var climbStartPixelsFromLeft = remap(climb.startDistance.toFloat(), viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
-                                var climbEndPixelsFromLeft = remap(climb.endDistance.toFloat(), viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
+                                var climbStartPixelsFromLeft = remap(climb.startDistance.toFloat(), viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right, false)
+                                var climbEndPixelsFromLeft = remap(climb.endDistance.toFloat(), viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right, false)
 
                                 if (climbEndPixelsFromLeft > climbStartPixelsFromLeft){
                                     while(climbEndPixelsFromLeft - climbStartPixelsFromLeft < 5){
