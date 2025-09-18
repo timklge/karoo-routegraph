@@ -441,8 +441,11 @@ class VerticalRouteGraphDataType(
                         val climbsSortedByCategory = viewModel.climbs.sortedByDescending { it.category.number }
 
                         climbsSortedByCategory.forEach { climb ->
-                            var climbStartProgressPixels = remap(climb.startDistance.toFloat(), viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top)
-                            var climbEndProgressPixels = remap(climb.endDistance.toFloat(), viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top)
+                            // Skip climbs that are not in view at all
+                            if (climb.startDistance.toFloat() !in viewRange && climb.endDistance.toFloat() !in viewRange) return@forEach
+
+                            var climbStartProgressPixels = remap(climb.startDistance.toFloat(), viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top, false)
+                            var climbEndProgressPixels = remap(climb.endDistance.toFloat(), viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top, false)
 
                             while(abs(climbStartProgressPixels - climbEndProgressPixels) < 5){
                                 climbStartProgressPixels -= 1
@@ -664,7 +667,7 @@ class VerticalRouteGraphDataType(
                                 for (nearestPoint in nearestPointList) {
                                     val poiDistanceOnRoute = nearestPoint.distanceFromRouteStart
                                     if (poiDistanceOnRoute in viewRange) {
-                                        val poiLineYOnGraph = remap(poiDistanceOnRoute, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top)
+                                        val poiLineYOnGraph = remap(poiDistanceOnRoute, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top, false)
 
                                         // If the climb starts after the POI line and the label would be drawn above it
                                         if (climbStartProgressPixels > poiLineYOnGraph && bestY < poiLineYOnGraph) {
