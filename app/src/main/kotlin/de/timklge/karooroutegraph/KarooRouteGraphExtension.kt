@@ -227,12 +227,14 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         mapScope.launch {
             val zoomLevelFlow = karooSystem.stream<OnMapZoomLevel>()
             val locationFlow = karooSystem.stream<OnLocationChanged>()
+            val distanceToDestinationFlow = karooSystem.streamDataFlow(DataType.Type.DISTANCE_TO_DESTINATION)
 
             data class StreamData(
                 val settings: RouteGraphSettings,
                 val location: OnLocationChanged,
                 val mapZoom: OnMapZoomLevel,
-                val viewModel: RouteGraphViewModel
+                val viewModel: RouteGraphViewModel,
+                val isOnRoute: Boolean
             )
 
             val redrawInterval = if (karooSystem.karooSystemService.hardwareType == HardwareType.K2) {
@@ -241,10 +243,13 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 10.seconds
             }
 
-            combine(applicationContext.streamSettings(karooSystem.karooSystemService), locationFlow, zoomLevelFlow, routeGraphViewModelProvider.viewModelFlow) { settings, location, mapZoom, viewModel ->
-                StreamData(settings, location, mapZoom, viewModel)
-            }.throttle(redrawInterval.inWholeMilliseconds).collect { (settings, location, mapZoom, viewModel) ->
-                Log.d(TAG, "Location: $location, MapZoom: $mapZoom")
+            combine(applicationContext.streamSettings(karooSystem.karooSystemService), locationFlow, zoomLevelFlow, routeGraphViewModelProvider.viewModelFlow, distanceToDestinationFlow) { settings, location, mapZoom, viewModel, distanceToDestination ->
+                val isOnRoute = (distanceToDestination as? StreamState.Streaming)?.dataPoint?.values?.get(DataType.Field.ON_ROUTE) == 0.0
+
+                StreamData(settings, location, mapZoom, viewModel, isOnRoute)
+            }.throttle(redrawInterval.inWholeMilliseconds).collect { (settings, location, mapZoom, viewModel, isOnRoute) ->
+                Log.d(TAG, "Location: $location, MapZoom: $mapZoom, Settings: $settings, IsOnRoute: $isOnRoute")
+
                 if (settings.showGradientIndicatorsOnMap) {
                     val boundingBox =
                         calculateBoundingBox(location.lat, location.lng, mapZoom.zoomLevel)
@@ -348,7 +353,8 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                                      val userProfile: UserProfile,
                                      val pois: OnGlobalPOIs,
                                      val locationAndRemainingRouteDistance: LocationAndRemainingRouteDistance,
-                                     val temporaryPOIs: RouteGraphTemporaryPOIs)
+                                     val temporaryPOIs: RouteGraphTemporaryPOIs,
+                                     val onRoute: Boolean)
 
     data class LocationAndRemainingRouteDistance(val lat: Double?, val lon: Double?, val bearing: Double?, val remainingRouteDistance: Double?)
 
@@ -380,10 +386,10 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         Log.d(TAG, "Starting graph updater")
 
         var knownRoute: LineString? = null
-        var knownClimbs = mutableSetOf<Climb>()
         var knownPois: Set<POI> = mutableSetOf()
         var knownSettings: RouteGraphSettings? = null
         var knownIncidents: IncidentsResponse? = null
+        var knownClimbs: List<Climb>? = null
         var knownIncidentWarningShown: Boolean = false
         var poiDistances: Map<POI, List<NearestPoint>>? = null
         var lastKnownPositionAlongRoute: Double? = null
@@ -395,7 +401,8 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 karooSystem.stream<UserProfile>(),
                 streamLocationAndRemainingRouteDistance(),
                 karooSystem.stream<OnGlobalPOIs>(),
-                karooSystem.streamTemporaryPOIs()
+                karooSystem.streamTemporaryPOIs(),
+                karooSystem.streamDataFlow(DataType.Type.DISTANCE_TO_DESTINATION)
             ) { data ->
                 val settings = data[0] as RouteGraphSettings
                 val navigationState = data[1] as OnNavigationState
@@ -403,15 +410,17 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 val locationAndRemainingRouteDistance = data[3] as LocationAndRemainingRouteDistance
                 val pois = data[4] as OnGlobalPOIs
                 val temporaryPOIs = data[5] as RouteGraphTemporaryPOIs
+                val onRoute = (data[6] as? StreamState.Streaming)?.dataPoint?.values?.get(DataType.Field.ON_ROUTE) == 0.0
 
-                NavigationStreamState(settings, navigationState.state, userProfile, pois, locationAndRemainingRouteDistance, temporaryPOIs)
+                NavigationStreamState(settings, navigationState.state, userProfile, pois, locationAndRemainingRouteDistance, temporaryPOIs, onRoute)
             }.distinctUntilChanged().transformLatest { value ->
                 while(true){
                     emit(value)
                     delay(60.seconds)
                 }
             }
-            .collect { (settings, navigationStateEvent: OnNavigationState.NavigationState, userProfile, globalPOIs, locationAndRemainingRouteDistance, temporaryPOIs: RouteGraphTemporaryPOIs) ->
+            .throttle(5_000L)
+            .collect { (settings, navigationStateEvent: OnNavigationState.NavigationState, userProfile, globalPOIs, locationAndRemainingRouteDistance, temporaryPOIs: RouteGraphTemporaryPOIs, onRoute: Boolean) ->
                 val isImperial = userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
                 val navigatingToDestinationPolyline = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingToDestination)?.polyline?.let { LineString.fromPolyline(it, 5) }
                 val elevationPolyline: LineString? = when (navigationStateEvent) {
@@ -454,25 +463,42 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     SampledElevationData.fromSparseElevationData(it, interval)
                 }
 
+                val currentDistanceAlongRoute = if (routeDistance != null && locationAndRemainingRouteDistance.remainingRouteDistance != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute){
+                    if (navigationStateEvent.rejoinDistance == null && navigationStateEvent.rejoinPolyline == null) {
+                        routeDistance - locationAndRemainingRouteDistance.remainingRouteDistance
+                    } else {
+                        null
+                    }
+                } else if (routeDistance != null && locationAndRemainingRouteDistance.remainingRouteDistance != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingToDestination){
+                    routeDistance - locationAndRemainingRouteDistance.remainingRouteDistance
+                } else null
+
+                val distanceAlongRoute = currentDistanceAlongRoute ?: lastKnownPositionAlongRoute
+
+                if (currentDistanceAlongRoute != null) {
+                    lastKnownPositionAlongRoute = currentDistanceAlongRoute
+                }
+
                 val newClimbs = karooClimbs?.let {
+                    val offsetDistance = 0
+                    Log.d(TAG, "Karoo reported climbs: $karooClimbs, Offset Distance: $offsetDistance")
+
                     karooClimbs.mapNotNull { karooClimb ->
                         val category = ClimbCategory.categorize(
                             karooClimb.grade.toFloat() / 100.0f,
                             karooClimb.length.toFloat()
                         )
+                        val startDistance = (karooClimb.startDistance + offsetDistance).toFloat()
 
                         category?.let {
                             Climb(
                                 category,
-                                karooClimb.startDistance.roundToInt(),
-                                karooClimb.startDistance.roundToInt() + karooClimb.length.roundToInt()
+                                startDistance.roundToInt(),
+                                startDistance.roundToInt() + karooClimb.length.roundToInt()
                             )
                         }
                     }
                 }
-                newClimbs?.let { knownClimbs.addAll(newClimbs) }
-
-                knownClimbs = cleanupClimbs(knownClimbs).toMutableSet()
 
                 val isNavigatingToDestination = navigatingToDestinationPolyline != null
 
@@ -504,10 +530,14 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     knownIncidentWarningShown = false
                     lastKnownPositionAlongRoute = null
                     knownSettings = settings
-                    knownClimbs = mutableSetOf()
+                    knownClimbs = null
 
                     true
                 } else false
+
+                if (onRoute) {
+                    knownClimbs = newClimbs
+                }
 
                 if (routeChanged) {
                     displayViewModelProvider.update {
@@ -693,23 +723,8 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 val poisChanged = knownPois != pois.toSet()
                 knownPois = pois.toSet()
 
-                val currentDistanceAlongRoute = if (routeDistance != null && locationAndRemainingRouteDistance.remainingRouteDistance != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute){
-                    if (navigationStateEvent.rejoinDistance == null && navigationStateEvent.rejoinPolyline == null) {
-                        routeDistance - locationAndRemainingRouteDistance.remainingRouteDistance
-                    } else {
-                        null
-                    }
-                } else if (routeDistance != null && locationAndRemainingRouteDistance.remainingRouteDistance != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingToDestination){
-                    routeDistance - locationAndRemainingRouteDistance.remainingRouteDistance
-                } else null
-
-                val distanceAlongRoute = currentDistanceAlongRoute ?: lastKnownPositionAlongRoute
-
-                if (currentDistanceAlongRoute != null) {
-                    lastKnownPositionAlongRoute = currentDistanceAlongRoute
-                }
-
                 Log.d(TAG, "Received navigation state: $navigationStateEvent")
+                Log.d(TAG, "Current known climbs: ${knownClimbs}")
 
                 if (routeChanged || poisChanged) {
                     if (routeLineString != null){
@@ -741,7 +756,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 val lastKnownPointAlongRoute = knownRoute?.let { knownRoute ->
                     if (distanceAlongRoute != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute) {
                         try {
-                            TurfMeasurement.along(knownRoute, distanceAlongRoute.toDouble().coerceIn(0.0, routeDistance), TurfConstants.UNIT_METERS)
+                            TurfMeasurement.along(knownRoute, distanceAlongRoute.coerceIn(0.0, routeDistance), TurfConstants.UNIT_METERS)
                         } catch(e: Exception){
                             Log.e(TAG, "Failed to calculate last known point along route", e)
                             null
@@ -759,7 +774,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                         knownRoute = knownRoute,
                         poiDistances = poiDistances,
                         sampledElevationData = sampledElevationData,
-                        climbs = knownClimbs.sortedBy { it.startDistance },
+                        climbs = knownClimbs,
                         isImperial = isImperial,
                         navigatingToDestination = navigationStateEvent is OnNavigationState.NavigationState.NavigatingToDestination,
                         rejoin = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.rejoinPolyline?.let { LineString.fromPolyline(it, 5) },
