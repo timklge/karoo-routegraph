@@ -113,6 +113,10 @@
     <string name="category_waste_basket">Waste Basket</string>
     <string name="category_bench">Bench</string>
     <string name="category_bike_shop">Bike Shop</string>
+    <string name="category_pharmacy">Pharmacy</string>
+    <string name="category_hospital">Hospital</string>
+    <string name="category_village">Village</string>
+    <string name="category_town">Town</string>
 
     <!-- Distance formatting strings -->
     <string name="distance_ahead">%1$s ahead, %2$s from route</string>

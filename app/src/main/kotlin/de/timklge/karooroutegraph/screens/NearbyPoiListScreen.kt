@@ -75,27 +75,32 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import kotlin.math.roundToInt
 
-enum class NearbyPoiCategory(val labelRes: Int, val osmTag: String) {
-    DRINKING_WATER(R.string.category_water, "amenity=drinking_water"),
-    GAS_STATIONS(R.string.category_gas_station, "amenity=fuel"),
-    SUPERMARKETS(R.string.category_supermarket, "shop=supermarket"),
-    RESTAURANTS(R.string.category_restaurant, "amenity=restaurant"),
-    CAFES(R.string.category_cafe, "amenity=cafe"),
-    ICE_CREAM(R.string.category_ice_cream, "amenity=ice_cream"),
-    BAKERY(R.string.category_bakery, "shop=bakery"),
-    TOILETS(R.string.category_toilets, "amenity=toilets"),
-    SHOWERS(R.string.category_showers, "amenity=shower"),
-    ATMS(R.string.category_atms, "amenity=atm"),
-    SHELTER(R.string.category_shelter, "amenity=shelter"),
-    CAMPING_SITE(R.string.category_camping_site, "tourism=camp_site"),
-    HOTEL(R.string.category_hotel, "tourism=hotel"),
-    TRAIN_STATION(R.string.category_train_station, "railway=station"),
-    WASTE_BASKET(R.string.category_waste_basket, "amenity=waste_basket"),
-    BENCH(R.string.category_bench, "amenity=bench"),
-    BIKE_SHOP(R.string.category_bike_shop, "shop=bicycle"),
-    TOURISM_ATTRACTION(R.string.category_attraction, "tourism=attraction"),
-    VIEWPOINT(R.string.category_viewpoint, "tourism=viewpoint"),
+enum class NearbyPoiCategory(val labelRes: Int, val osmTag: Set<String>) {
+    DRINKING_WATER(R.string.category_water, setOf("amenity=drinking_water")),
+    GAS_STATIONS(R.string.category_gas_station, setOf("amenity=fuel")),
+    SUPERMARKETS(R.string.category_supermarket, setOf("shop=supermarket")),
+    RESTAURANTS(R.string.category_restaurant, setOf("amenity=restaurant")),
+    CAFES(R.string.category_cafe, setOf("amenity=cafe")),
+    ICE_CREAM(R.string.category_ice_cream, setOf("amenity=ice_cream")),
+    BAKERY(R.string.category_bakery, setOf("shop=bakery")),
+    TOILETS(R.string.category_toilets, setOf("amenity=toilets")),
+    SHOWERS(R.string.category_showers, setOf("amenity=shower")),
+    ATMS(R.string.category_atms, setOf("amenity=atm")),
+    SHELTER(R.string.category_shelter, setOf("amenity=shelter")),
+    CAMPING_SITE(R.string.category_camping_site, setOf("tourism=camp_site")),
+    HOTEL(R.string.category_hotel, setOf("tourism=hotel")),
+    TRAIN_STATION(R.string.category_train_station, setOf("railway=station")),
+    WASTE_BASKET(R.string.category_waste_basket, setOf("amenity=waste_basket")),
+    BENCH(R.string.category_bench, setOf("amenity=bench")),
+    BIKE_SHOP(R.string.category_bike_shop, setOf("shop=bicycle")),
+    TOURISM_ATTRACTION(R.string.category_attraction, setOf("tourism=attraction")),
+    VIEWPOINT(R.string.category_viewpoint, setOf("tourism=viewpoint")),
+    PHARMACY(R.string.category_pharmacy, setOf("amenity=pharmacy")),
+    HOSPITAL(R.string.category_hospital, setOf("amenity=hospital")),
+    VILLAGE(R.string.category_village, setOf("place=village")),
+    TOWN(R.string.category_town, setOf("place=town", "place=city")),
 }
 
 data class NearbyPoi(val element: Element, val poi: Symbol.POI)
@@ -232,16 +237,23 @@ fun NearbyPoiListScreen() {
                     return@launch
                 }
 
-                val radiusSteps = listOf(2_000, 5_000, 10_000)
-                val desiredCount = 10 // Desired number of POIs to fetch
+                val desiredCount = 20 // Desired number of POIs to fetch
                 val limit = 30
+
+                val onlyTownOrVillagesSelected = selectedCategories.all { it == NearbyPoiCategory.TOWN || it == NearbyPoiCategory.VILLAGE }
 
                 var overpassResponse: OverpassResponse? = null
 
                 if (selectedSort == PoiSortOption.LINEAR_DISTANCE) {
+                    val radiusSteps = if (onlyTownOrVillagesSelected) {
+                        listOf(5_000, 10_000, 20_000, 50_000)
+                    } else {
+                        listOf(2_000, 5_000, 10_000)
+                    }
+
                     for (step in radiusSteps) {
                         overpassResponse = overpassPOIProvider.requestOverpassPOIs(
-                            selectedCategories.map { it.osmTag },
+                            selectedCategories.flatMap { it.osmTag }.distinct(),
                             points = listOf(currentPos),
                             radius = step,
                             limit = limit
@@ -263,7 +275,7 @@ fun NearbyPoiListScreen() {
 
                     val routeAhead = try {
                         val routeLength = viewModel?.routeDistance?.toDouble() ?: TurfMeasurement.length(route, TurfConstants.UNIT_METERS)
-                        val startDistance = ((viewModel?.distanceAlongRoute?.toDouble() ?: 0.0) - 5_000).coerceAtLeast(0.0) // 5 km behind
+                        val startDistance = ((viewModel?.distanceAlongRoute?.toDouble() ?: 0.0) - 2_000).coerceAtLeast(0.0) // 2 km behind
                         val endDistance = (startDistance + 50_000).coerceAtMost(routeLength) // 50 km ahead
                         TurfMisc.lineSliceAlong(route, startDistance, endDistance, TurfConstants.UNIT_METERS)
                     } catch(e: Exception) {
@@ -271,10 +283,12 @@ fun NearbyPoiListScreen() {
                         route
                     }
 
+                    val radius = if (onlyTownOrVillagesSelected) 5_000 else maxDistanceFromRoute.roundToInt()
+
                     overpassResponse = overpassPOIProvider.requestOverpassPOIs(
-                        requestedTags = selectedCategories.map { it.osmTag },
+                        requestedTags = selectedCategories.flatMap { it.osmTag }.distinct(),
                         points = routeAhead.coordinates(),
-                        radius = 1_000,
+                        radius = radius,
                         limit = 100
                     )
                 }
