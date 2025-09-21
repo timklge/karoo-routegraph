@@ -50,9 +50,9 @@ class OverpassPOIProvider(
 ) {
     suspend fun requestOverpassPOIs(requestedTags: List<String>, points: List<Point>, radius: Int = 1_000, limit: Int = 20): OverpassResponse {
         return callbackFlow {
-            val simplifiedPolyline = TurfTransformation.simplify(points, TurfConversion.convertLength(radius.toDouble(), TurfConstants.UNIT_METERS, TurfConstants.UNIT_DEGREES), true)
+            val simplifiedPolyline = TurfTransformation.simplify(points, TurfConversion.convertLength(radius.toDouble() / 2, TurfConstants.UNIT_METERS, TurfConstants.UNIT_DEGREES), true)
             val polylineString = simplifiedPolyline.joinToString(separator = ",") { point ->
-                String.format(Locale.US, "%.5f,%.5f", point.latitude(), point.longitude())
+                String.format(Locale.US, "%.4f,%.4f", point.latitude(), point.longitude())
             }
 
             val url = "https://overpass-api.de/api/interpreter"

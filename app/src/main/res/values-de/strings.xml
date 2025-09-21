@@ -115,6 +115,10 @@
     <string name="category_waste_basket">Mülleimer</string>
     <string name="category_bench">Bank</string>
     <string name="category_bike_shop">Radladen</string>
+    <string name="category_pharmacy">Apotheke</string>
+    <string name="category_hospital">Krankenhaus</string>
+    <string name="category_village">Dorf</string>
+    <string name="category_town">Stadt</string>
     <string name="category_attraction">Attraktion</string>
     <string name="category_viewpoint">Aussicht</string>
 
