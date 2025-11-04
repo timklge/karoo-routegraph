@@ -429,7 +429,6 @@ class VerticalRouteGraphDataType(
                         }
                     }
 
-                    canvas.drawPath(elevationProfilePath, pastLinePaint)
 
                     val filledPath = Path(elevationProfilePath)
                     filledPath.lineTo(graphBounds.left, lastProgressPixels)
@@ -530,6 +529,9 @@ class VerticalRouteGraphDataType(
                             canvas.drawPath(elevationProfilePath, upcomingLinePaint)
                         }
                     }
+
+                    // Draw the elevation polyline after all fill operations so it's on top
+                    canvas.drawPath(elevationProfilePath, pastLinePaint)
                 }
 
                 if (viewModel.distanceAlongRoute != null){
