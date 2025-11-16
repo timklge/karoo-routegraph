@@ -14,7 +14,8 @@ android {
     defaultConfig {
         applicationId = "de.timklge.karooroutegraph"
         minSdk = 26
-        targetSdk = 35
+        //noinspection ExpiredTargetSdkVersion
+        targetSdk = 32
         versionCode = 100 + (System.getenv("BUILD_NUMBER")?.toInt() ?: 1)
         versionName = System.getenv("RELEASE_VERSION") ?: "1.0"
     }
@@ -104,5 +105,6 @@ dependencies {
     implementation(libs.androidx.glance.preview)
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
+    implementation(libs.mapsforge.map.reader)
     testImplementation(libs.testng)
 }

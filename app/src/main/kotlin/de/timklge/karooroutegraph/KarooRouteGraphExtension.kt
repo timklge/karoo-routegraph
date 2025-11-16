@@ -71,6 +71,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     private val tileDownloadService: TileDownloadService by inject()
     private val locationViewModelProvider: LocationViewModelProvider by inject()
     private val poiApproachAlertService: PoiApproachAlertService by inject()
+    private val surfaceConditionRetrievalService: SurfaceConditionRetrievalService by inject()
 
     private val extensionScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -794,6 +795,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         tileDownloadService.startDownloadJob()
         locationViewModelProvider.startUpdateJob()
         poiApproachAlertService.startAlertJob()
+        surfaceConditionRetrievalService.startMapScanJob()
     }
 
     override fun onDestroy() {
