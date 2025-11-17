@@ -72,14 +72,18 @@ class SurfaceConditionRetrievalService(
                         continue
                     }
 
-                    val mapDirectoryOnExternalStorage = File(Environment.getExternalStorageDirectory(), "offline")
+                    val mapDirectoryOnExternalStorage = File(File(Environment.getExternalStorageDirectory(), "offline"), "maps")
                     if (!mapDirectoryOnExternalStorage.exists() || !mapDirectoryOnExternalStorage.isDirectory) {
                         Log.w(KarooRouteGraphExtension.TAG, "Map directory does not exist: ${mapDirectoryOnExternalStorage.absolutePath}")
                         delay(MAPFILE_SCAN_INTERVAL_MS)
                         continue
                     }
 
+                    Log.d(KarooRouteGraphExtension.TAG, "Scanning for mapfiles in ${mapDirectoryOnExternalStorage.absolutePath}")
+
                     val mapFiles = mapDirectoryOnExternalStorage.listFiles { file ->
+                        Log.d(KarooRouteGraphExtension.TAG, "Found file: ${file.name}")
+
                         file.isFile && file.extension.equals("map", ignoreCase = true)
                     } ?: arrayOf()
 

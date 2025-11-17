@@ -9,13 +9,13 @@ plugins {
 
 android {
     namespace = "de.timklge.karooroutegraph"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "de.timklge.karooroutegraph"
         minSdk = 26
         //noinspection ExpiredTargetSdkVersion
-        targetSdk = 32
+        targetSdk = 28
         versionCode = 100 + (System.getenv("BUILD_NUMBER")?.toInt() ?: 1)
         versionName = System.getenv("RELEASE_VERSION") ?: "1.0"
     }
