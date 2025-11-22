@@ -1,26 +1,55 @@
 package de.timklge.karooroutegraph
 
 import android.content.Context
+import android.content.res.Configuration
+import android.graphics.BitmapFactory
+import android.graphics.Paint
 import android.os.Environment
 import android.util.Log
 import com.mapbox.geojson.LineString
+import com.mapbox.geojson.Point
+import com.mapbox.turf.TurfConstants
+import com.mapbox.turf.TurfMeasurement
 import io.hammerhead.karooext.models.OnNavigationState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.mapsforge.core.model.BoundingBox
+import org.mapsforge.core.model.LatLong
 import org.mapsforge.map.reader.MapFile
 import java.io.File
-import java.lang.Math.toRadians
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.ln
-import kotlin.math.pow
-import kotlin.math.sqrt
-import kotlin.math.tan
+import java.time.Instant
+
+fun isNightMode(applicationContext: Context): Boolean {
+    val nightModeFlags = applicationContext.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+    return nightModeFlags == Configuration.UI_MODE_NIGHT_YES
+}
+
+// Surface condition paints with hatched patterns
+fun getSurfaceConditionPaints(applicationContext: Context) = mapOf(
+    SurfaceConditionRetrievalService.SurfaceCondition.GRAVEL to Paint().apply {
+        style = Paint.Style.FILL
+        alpha = 255 / 2
+        val patternBitmap = BitmapFactory.decodeResource(applicationContext.resources, if (isNightMode(applicationContext)) R.drawable.cross_pattern_white else R.drawable.cross_pattern)
+        shader = android.graphics.BitmapShader(patternBitmap, android.graphics.Shader.TileMode.REPEAT, android.graphics.Shader.TileMode.REPEAT)
+    },
+    SurfaceConditionRetrievalService.SurfaceCondition.LOOSE to Paint().apply {
+        style = Paint.Style.FILL
+        alpha = 255 / 2
+        val patternBitmap = BitmapFactory.decodeResource(applicationContext.resources, if (isNightMode(applicationContext)) R.drawable.cross_pattern_white else R.drawable.cross_pattern)
+        shader = android.graphics.BitmapShader(patternBitmap, android.graphics.Shader.TileMode.REPEAT, android.graphics.Shader.TileMode.REPEAT)
+    }
+)
 
 class SurfaceConditionRetrievalService(
     private val context: Context,
@@ -35,9 +64,9 @@ class SurfaceConditionRetrievalService(
         val boundingBox: BoundingBox,
     )
 
-    enum class SurfaceCondition {
-        GRAVEL,
-        UNPAVED
+    enum class SurfaceCondition(val redColorFactor: Float, val strokeThickness: Float) {
+        GRAVEL(redColorFactor = 0f, strokeThickness = 8f),
+        LOOSE(redColorFactor = 1f, strokeThickness = 10f),
     }
 
     data class SurfaceConditionSegment(
@@ -49,15 +78,17 @@ class SurfaceConditionRetrievalService(
     private var knownMapfiles = setOf<MapFileInfo>()
 
     private fun hasExternalStoragePermission(): Boolean {
-        val permission = android.Manifest.permission.READ_EXTERNAL_STORAGE
-        val res = context.checkCallingOrSelfPermission(permission)
+        val readGranted = context.checkCallingOrSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+        val writeGranted = context.checkCallingOrSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
 
-        return res == android.content.pm.PackageManager.PERMISSION_GRANTED
+        return readGranted == android.content.pm.PackageManager.PERMISSION_GRANTED &&
+               writeGranted == android.content.pm.PackageManager.PERMISSION_GRANTED
     }
 
     private var mapScanJob: Job? = null
 
     private var surfaceConditionUpdateJob: Job? = null
+
 
     fun startMapScanJob() {
         mapScanJob = CoroutineScope(Dispatchers.IO).launch {
@@ -82,314 +113,304 @@ class SurfaceConditionRetrievalService(
                     Log.d(KarooRouteGraphExtension.TAG, "Scanning for mapfiles in ${mapDirectoryOnExternalStorage.absolutePath}")
 
                     val mapFiles = mapDirectoryOnExternalStorage.listFiles { file ->
-                        Log.d(KarooRouteGraphExtension.TAG, "Found file: ${file.name}")
-
                         file.isFile && file.extension.equals("map", ignoreCase = true)
                     } ?: arrayOf()
 
+                    val startTime = Instant.now()
+
                     knownMapfiles = mapFiles.map { file ->
                         val mapfile = MapFile(file)
-                        val boundingBox = mapfile.mapFileInfo.boundingBox
+                        try {
+                            val boundingBox = mapfile.mapFileInfo.boundingBox
 
-                        MapFileInfo(
-                            file = file,
-                            boundingBox = boundingBox,
-                        )
+                            MapFileInfo(
+                                file = file,
+                                boundingBox = boundingBox,
+                            )
+                        } finally {
+                            mapfile.close()
+                        }
                     }.toSet()
+
+                    Log.d(KarooRouteGraphExtension.TAG, "Found ${knownMapfiles.size} mapfiles in ${(Instant.now().toEpochMilli() - startTime.toEpochMilli())} ms")
 
                     delay(MAPFILE_SCAN_INTERVAL_MS)
                 } while(true)
             }
         }
     }
-
-    private fun getTilesIntersectedByPolyline(polyline: LineString, zoomLevel: Int = 18): Set<Tile> {
-        val coords = polyline.coordinates()
-        if (coords.isEmpty()) return emptySet()
-
-        fun latLonToTile(latRaw: Double, lon: Double, z: Int): Pair<Int, Int> {
-            val lat = latRaw.coerceIn(-85.05112878, 85.05112878)
-            val n = 1 shl z
-            val xTile = ((lon + 180.0) / 360.0 * n).toInt()
-            val latRad = toRadians(lat)
-            val yTile = ((1.0 - (ln(tan(latRad) + 1.0 / cos(latRad)) / Math.PI)) / 2.0 * n).toInt()
-            return Pair(xTile, yTile)
-        }
-
-        val tiles = mutableSetOf<Tile>()
-        var prev: Pair<Int, Int>? = null
-
-        for (pt in coords) {
-            val (tx, ty) = latLonToTile(pt.latitude(), pt.longitude(), zoomLevel)
-            tiles.add(Tile(tx, ty, zoomLevel))
-
-            prev?.let { (x0, y0) ->
-                var x = x0
-                var y = y0
-                val x1 = tx
-                val y1 = ty
-                val dx = kotlin.math.abs(x1 - x)
-                val dy = kotlin.math.abs(y1 - y)
-                val sx = if (x < x1) 1 else -1
-                val sy = if (y < y1) 1 else -1
-                var err = if (dx > dy) dx else -dy
-
-                while (true) {
-                    tiles.add(Tile(x, y, zoomLevel))
-                    if (x == x1 && y == y1) break
-                    val e2 = 2 * err
-                    if (e2 > -dy) {
-                        err -= dy
-                        x += sx
-                    }
-                    if (e2 < dx) {
-                        err += dx
-                        y += sy
-                    }
-                }
-            }
-
-            prev = Pair(tx, ty)
-        }
-
-        return tiles
-    }
-
-    private fun haversineDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val R = 6371000.0 // Earth radius in meters
-        val dLat = toRadians(lat2 - lat1)
-        val dLon = toRadians(lon2 - lon1)
-        val a = kotlin.math.sin(dLat / 2).pow(2) +
-                cos(toRadians(lat1)) * cos(toRadians(lat2)) *
-                kotlin.math.sin(dLon / 2).pow(2)
-        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-        return R * c
-    }
-
-    private fun calculateRouteDistances(lineString: LineString): List<Double> {
-        val coords = lineString.coordinates()
-        val distances = mutableListOf(0.0)
-
-        for (i in 1 until coords.size) {
-            val prev = coords[i - 1]
-            val curr = coords[i]
-            val segmentDist = haversineDistance(
-                prev.latitude(), prev.longitude(),
-                curr.latitude(), curr.longitude()
-            )
-            distances.add(distances.last() + segmentDist)
-        }
-
-        return distances
-    }
+    val gravelSurfaces = setOf("unpaved", "dirt", "ground", "gravel", "fine_gravel", "compacted", "pebblestone", "cobblestone")
+    val looseSurfaces = setOf("grass", "sand", "mud")
 
     private fun getSurfaceConditionFromTags(tags: List<org.mapsforge.core.model.Tag>): SurfaceCondition? {
         val surfaceTag = tags.find { it.key.equals("surface", ignoreCase = true) }?.value?.lowercase()
         val trackTypeTag = tags.find { it.key.equals("tracktype", ignoreCase = true) }?.value?.lowercase()
 
-        // Check for gravel surfaces
-        val gravelSurfaces = setOf("gravel", "fine_gravel", "compacted", "pebblestone")
         if (surfaceTag in gravelSurfaces) {
             return SurfaceCondition.GRAVEL
         }
 
-        // Check for unpaved surfaces
-        val unpavedSurfaces = setOf("unpaved", "dirt", "ground", "earth", "grass", "sand", "mud")
-        if (surfaceTag in unpavedSurfaces) {
-            return SurfaceCondition.UNPAVED
+        if (surfaceTag in looseSurfaces) {
+            return SurfaceCondition.LOOSE
         }
 
         // Check tracktype
-        if (trackTypeTag in setOf("grade3", "grade4", "grade5")) {
-            return SurfaceCondition.UNPAVED
+        if (trackTypeTag in setOf("grade2", "grade3", "grade4")) {
+            return SurfaceCondition.GRAVEL
+        }
+
+        if (trackTypeTag in setOf("grade5")) {
+            return SurfaceCondition.LOOSE
         }
 
         return null
     }
 
-    private fun pointToSegmentDistance(
-        px: Double, py: Double,
-        x1: Double, y1: Double,
-        x2: Double, y2: Double
-    ): Double {
-        val dx = x2 - x1
-        val dy = y2 - y1
-        if (dx == 0.0 && dy == 0.0) {
-            return haversineDistance(px, py, x1, y1)
-        }
+    data class RouteSamplePoint(
+        val latLong: LatLong,
+        val distanceMeters: Double,
+    )
 
-        val t = ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)
-        val tClamped = t.coerceIn(0.0, 1.0)
-
-        val closestX = x1 + tClamped * dx
-        val closestY = y1 + tClamped * dy
-
-        return haversineDistance(px, py, closestX, closestY)
-    }
-
-    private fun findClosestRouteSegment(
-        lat: Double, lon: Double,
-        lineString: LineString
-    ): Pair<Int, Double>? {
-        val coords = lineString.coordinates()
-        var minDist = Double.MAX_VALUE
-        var closestSegmentIdx = -1
-
-        for (i in 0 until coords.size - 1) {
-            val p1 = coords[i]
-            val p2 = coords[i + 1]
-            val dist = pointToSegmentDistance(
-                lat, lon,
-                p1.latitude(), p1.longitude(),
-                p2.latitude(), p2.longitude()
-            )
-
-            if (dist < minDist) {
-                minDist = dist
-                closestSegmentIdx = i
-            }
-        }
-
-        return if (closestSegmentIdx >= 0) Pair(closestSegmentIdx, minDist) else null
-    }
+    data class MapfileTile(
+        val tile: Tile,
+        val samples: List<RouteSamplePoint>,
+    )
 
     private fun buildSurfaceConditionSegments(
-        lineString: LineString,
-        mapfilesToTiles: Map<File, List<Tile>>
+        routeLength: Double,
+        coords: List<RouteSamplePoint>,
+        mapfilesToTiles: Map<File?, List<MapfileTile>>,
     ): List<SurfaceConditionSegment> {
-        val routeDistances = calculateRouteDistances(lineString)
-        val coords = lineString.coordinates()
+        val sampledSurfaceConditions = mutableMapOf<RouteSamplePoint, SurfaceCondition>()
 
-        // Track surface conditions for each route segment
-        val segmentConditions = mutableMapOf<Int, SurfaceCondition>()
+        for ((mapFile, tiles) in mapfilesToTiles) {
+            if (mapFile == null) continue
 
-        mapfilesToTiles.forEach { (file, tilesForMapfile) ->
-            val mapfile = MapFile(file)
+            val mapFileReader = MapFile(mapFile)
+            try {
+                // Process each tile covered by this mapfile
+                for (mapfileTile in tiles) {
+                    val samples = mapfileTile.samples
+                    val tile = mapfileTile.tile
 
-            tilesForMapfile.forEach { tile ->
-                val mapdata = mapfile.readMapData(
-                    org.mapsforge.core.model.Tile(tile.x, tile.y, tile.z.toByte(), 0)
-                )
+                    // Read map data from the tile
+                    val mapReadResult = mapFileReader.readMapData(org.mapsforge.core.model.Tile(
+                        tile.x,
+                        tile.y,
+                        tile.z.toByte(),
+                        256
+                    ))
 
-                mapdata.ways.forEach { way ->
-                    val condition = getSurfaceConditionFromTags(way.tags) ?: return@forEach
+                    // Process each sample point in this tile
+                    for (sample in samples) {
+                        val point = Point.fromLngLat(sample.latLong.longitude, sample.latLong.latitude)
 
-                    // Check each way coordinate against route segments
-                    // latLongs is a 2D array where each sub-array is a line string
-                    for (wayLineString in way.latLongs) {
-                        for (latLong in wayLineString) {
-                            val result = findClosestRouteSegment(
-                                latLong.latitude,
-                                latLong.longitude,
-                                lineString
-                            )
-
-                            if (result != null) {
-                                val (segmentIdx, distance) = result
-                                // Only consider if within 10 meters of route
-                                if (distance < 10.0) {
-                                    segmentConditions[segmentIdx] = condition
-                                }
+                        // Get the closest way to the sample point
+                        val closestWay = mapReadResult.ways.minByOrNull { way ->
+                            val segments = way.latLongs.map { seg ->
+                                seg.map { latLong -> Point.fromLngLat(latLong.longitude, latLong.latitude) }
                             }
+
+                            val minDistanceToSegments = segments.mapNotNull { segment ->
+                                getNearestPointOnLineDistance(point, segment)
+                            }
+
+                            minDistanceToSegments.minOrNull() ?: Double.MAX_VALUE
+                        }
+
+                        val surfaceCondition = closestWay?.let { way -> getSurfaceConditionFromTags(closestWay.tags) }
+
+                        if (surfaceCondition != null) {
+                            // Log.d(KarooRouteGraphExtension.TAG, "Found surface condition $surfaceCondition for sample at ${sample.latLong} from way with tags: ${closestWay.tags}")
+                            sampledSurfaceConditions[sample] = surfaceCondition
                         }
                     }
                 }
+            } catch (e: Exception) {
+                Log.e(KarooRouteGraphExtension.TAG, "Error reading map data from ${mapFile.name}: ${e.message}", e)
+            } finally {
+                mapFileReader.close()
             }
         }
 
-        // Build continuous segments
-        val segments = mutableListOf<SurfaceConditionSegment>()
-        var currentCondition: SurfaceCondition? = null
-        var segmentStart: Double? = null
+        // Map each sample point to its surface condition
+        var currentSurfaceCondition: SurfaceCondition? = null
+        var currentSurfaceConditionStartedAt: Double? = null
+        val surfaceConditions = mutableListOf<SurfaceConditionSegment>()
 
-        for (i in 0 until coords.size - 1) {
-            val condition = segmentConditions[i]
+        fun finishCurrentSurfaceConditionSegment(currentDistance: Double) {
+            val condition = currentSurfaceCondition
+            val startedAt = currentSurfaceConditionStartedAt
 
-            if (condition != null) {
-                if (condition != currentCondition) {
-                    // End previous segment if exists
-                    if (currentCondition != null && segmentStart != null) {
-                        segments.add(
-                            SurfaceConditionSegment(
-                                startMeters = segmentStart,
-                                endMeters = routeDistances[i],
-                                condition = currentCondition
-                            )
-                        )
-                    }
+            if (condition != null && startedAt != null) {
+                surfaceConditions.add(SurfaceConditionSegment(
+                    startMeters = startedAt,
+                    endMeters = currentDistance,
+                    condition = condition
+                ))
+
+                currentSurfaceCondition = null
+                currentSurfaceConditionStartedAt = null
+            }
+        }
+
+        for (sample in coords) {
+            val matchingCondition = sampledSurfaceConditions[sample]
+
+            if (matchingCondition != null) {
+                if (matchingCondition != currentSurfaceCondition) {
+                    // Finish previous segment
+                    finishCurrentSurfaceConditionSegment(sample.distanceMeters)
+
                     // Start new segment
-                    currentCondition = condition
-                    segmentStart = routeDistances[i]
+                    currentSurfaceCondition = matchingCondition
+                    currentSurfaceConditionStartedAt = sample.distanceMeters
                 }
-            } else if (currentCondition != null && segmentStart != null) {
-                // End current segment
-                segments.add(
-                    SurfaceConditionSegment(
-                        startMeters = segmentStart,
-                        endMeters = routeDistances[i],
-                        condition = currentCondition
-                    )
-                )
-                currentCondition = null
-                segmentStart = null
+            } else {
+                // No matching condition, finish any ongoing segment
+                finishCurrentSurfaceConditionSegment(sample.distanceMeters)
             }
         }
 
-        // Close final segment if exists
-        if (currentCondition != null && segmentStart != null) {
-            segments.add(
-                SurfaceConditionSegment(
-                    startMeters = segmentStart,
-                    endMeters = routeDistances.last(),
-                    condition = currentCondition
-                )
-            )
-        }
+        finishCurrentSurfaceConditionSegment(routeLength)
 
-        return segments
+        return surfaceConditions
     }
 
+    private val stateFlow: MutableStateFlow<List<SurfaceConditionSegment>?> = MutableStateFlow(null)
+    val flow: Flow<List<SurfaceConditionSegment>?> = stateFlow
+
     fun startSurfaceConditionUpdateJob() {
+        var lastKnownPolyline: String? = null
+
         surfaceConditionUpdateJob = CoroutineScope(Dispatchers.IO).launch {
-            karooSystemServiceProvider.stream<OnNavigationState>().collect { navigationState ->
-                val polyline = if (navigationState.state is OnNavigationState.NavigationState.NavigatingRoute) {
-                    (navigationState.state as OnNavigationState.NavigationState.NavigatingRoute).routePolyline
-                } else if (navigationState.state is OnNavigationState.NavigationState.NavigatingToDestination) {
-                    (navigationState.state as OnNavigationState.NavigationState.NavigatingToDestination).polyline
-                } else {
-                    null
+            combine(
+                context.streamSettings(karooSystemServiceProvider.karooSystemService).map { it.indicateSurfaceConditionsOnGraph },
+                karooSystemServiceProvider.stream<OnNavigationState>()
+            ) { isEnabled, state ->
+                Pair(isEnabled, state)
+            }.filter { (isEnabled, state) ->
+                isEnabled
+            }.map { (_, state) ->
+                state
+            }.catch { e ->
+                Log.e(KarooRouteGraphExtension.TAG, "Surface condition processing error: ${e.message}", e)
+            }.collect { navigationState ->
+                val polyline = when (navigationState.state) {
+                    is OnNavigationState.NavigationState.NavigatingRoute -> {
+                        (navigationState.state as OnNavigationState.NavigationState.NavigatingRoute).routePolyline
+                    }
+
+                    is OnNavigationState.NavigationState.NavigatingToDestination -> {
+                        (navigationState.state as OnNavigationState.NavigationState.NavigatingToDestination).polyline
+                    }
+
+                    else -> {
+                        null
+                    }
                 }
 
                 if (polyline == null) return@collect
+                if (polyline == lastKnownPolyline) return@collect
+
+                stateFlow.update { null }
+
+                lastKnownPolyline = polyline
+
+                val startTime: Instant = Instant.now()
 
                 val lineString = LineString.fromPolyline(polyline, 5)
-                val tiles = getTilesIntersectedByPolyline(lineString, zoomLevel = 18)
+
+                val routeDistance = try {
+                    TurfMeasurement.length(lineString, TurfConstants.UNIT_METERS)
+                } catch (t: Throwable) {
+                    Log.e(KarooRouteGraphExtension.TAG, "Error calculating route distance: ${t.message}", t)
+                    return@collect
+                }
+                val samplingIntervalMeters = when (routeDistance) {
+                    in 0.0..100_000.0 -> 80.0
+                    in 100_000.0..200_000.0 -> 100.0
+                    in 200_000.0..500_000.0 -> 150.0
+                    else -> 250.0
+                }
+
+                val routeSampled = buildList {
+                    var distanceMeters = 0.0
+                    while (distanceMeters <= routeDistance) {
+                        val point = TurfMeasurement.along(lineString, distanceMeters, TurfConstants.UNIT_METERS)
+                        add(RouteSamplePoint(
+                            latLong = LatLong(point.latitude(), point.longitude()),
+                            distanceMeters = distanceMeters
+                        ))
+                        distanceMeters += samplingIntervalMeters
+                    }
+                }
+
+                Log.d(KarooRouteGraphExtension.TAG, "Sampled route with ${routeSampled.size} points over $routeDistance meters")
+
+                val zoomLevel = 17
+                val samplesByTile = routeSampled.groupBy { sample ->
+                    val (x, y) = TileUtils.locationToTileXY(sample.latLong.latitude, sample.latLong.longitude, z = zoomLevel)
+                    Tile(x, y, zoomLevel)
+                }
+                val tiles = samplesByTile.keys
 
                 val tilesWithMapfiles = tiles.associateWith { tile ->
-                    knownMapfiles.filter { mapfileInfo ->
+                    knownMapfiles.firstOrNull { mapfileInfo ->
                         val bbox = mapfileInfo.boundingBox
-                        val (tileMinLat, tileMinLon) = TileUtils.tileXYToLatLon(tile.x, tile.y + 1, tile.z)
-                        val (tileMaxLat, tileMaxLon) = TileUtils.tileXYToLatLon(tile.x + 1, tile.y, tile.z)
 
-                        !(tileMaxLat <= bbox.minLatitude ||
-                          tileMinLat >= bbox.maxLatitude ||
-                          tileMaxLon <= bbox.minLongitude ||
-                          tileMinLon >= bbox.maxLongitude)
-                    }.map { it.file }
+                        // Get the bounding box of the tile by converting its corners to lat/lon
+                        val (topLeftLat, topLeftLon) = TileUtils.tileXYToLatLon(
+                            tile.x,
+                            tile.y,
+                            tile.z
+                        )
+                        val (bottomRightLat, bottomRightLon) = TileUtils.tileXYToLatLon(
+                            tile.x + 1,
+                            tile.y + 1,
+                            tile.z
+                        )
+
+                        val tileBbox = BoundingBox(
+                            bottomRightLat,
+                            topLeftLon,
+                            topLeftLat,
+                            bottomRightLon
+                        )
+
+                        // Check if tile bounding box intersects with mapfile bounding box
+                        bbox.intersects(tileBbox)
+                    }?.file
+                }
+                val neededMapfiles = tilesWithMapfiles.values.toSet()
+
+                Log.d(KarooRouteGraphExtension.TAG, "Route intersects ${tiles.size} tiles in ${neededMapfiles.size} mapfiles")
+
+                val tilesWithoutMapfile = tilesWithMapfiles.filter { it.value == null }.keys
+                if (tilesWithoutMapfile.isNotEmpty()) {
+                    Log.w(KarooRouteGraphExtension.TAG, "No mapfile found for ${tilesWithoutMapfile.size} tiles: $tilesWithoutMapfile")
                 }
 
                 val mapfilesToTiles = tilesWithMapfiles.entries
-                    .flatMap { (tile, mapfiles) ->
-                        mapfiles.map { mapfile -> Pair(mapfile, tile) }
+                    .map { (tile, mapfile) ->
+                        Pair(mapfile, MapfileTile(tile, samplesByTile[tile] ?: emptyList()))
                     }
                     .groupBy({ it.first }, { it.second })
 
-                val surfaceConditionSegments = buildSurfaceConditionSegments(lineString, mapfilesToTiles)
+                val surfaceConditionSegments = buildSurfaceConditionSegments(routeDistance,
+                    routeSampled,
+                    mapfilesToTiles)
 
-                Log.d(KarooRouteGraphExtension.TAG, "Found ${surfaceConditionSegments.size} surface condition segments")
-                surfaceConditionSegments.forEach { segment ->
-                    Log.d(KarooRouteGraphExtension.TAG,
-                        "Segment: ${segment.startMeters}m - ${segment.endMeters}m: ${segment.condition}")
+                val totalSegmentLengthByType = surfaceConditionSegments.groupBy { it.condition }.mapValues { entry ->
+                    entry.value.sumOf { it.endMeters - it.startMeters }
+                }
+                Log.d(KarooRouteGraphExtension.TAG, "Found ${surfaceConditionSegments.size} surface condition segments in ${(Instant.now().toEpochMilli() - startTime.toEpochMilli())} ms")
+                totalSegmentLengthByType.forEach { condition, length ->
+                    Log.d(KarooRouteGraphExtension.TAG, " - $condition: $length meters")
+                }
+
+                stateFlow.update {
+                    surfaceConditionSegments
                 }
             }
         }

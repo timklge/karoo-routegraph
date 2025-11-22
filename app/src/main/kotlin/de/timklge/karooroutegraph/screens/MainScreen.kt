@@ -126,29 +126,9 @@ fun MainScreen(onFinish: () -> Unit) {
 
     var hasStoragePermission by remember { mutableStateOf(false) }
 
-    // Storage permission launcher
-    val storagePermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        hasStoragePermission = isGranted
-        if (!isGranted && indicateSurfaceConditionsOnGraph) {
-            Log.w(KarooRouteGraphExtension.TAG, "Storage permission denied")
-        }
-    }
-
     // Function to check storage permission
     fun checkStoragePermission(): Boolean {
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_IMAGES
-        } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
-        }
-        return ContextCompat.checkSelfPermission(ctx, permission) == PackageManager.PERMISSION_GRANTED
-    }
-
-    // Check permission on initialization
-    LaunchedEffect(Unit) {
-        hasStoragePermission = checkStoragePermission()
+        return ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
     }
 
     val userProfile by karooSystem.streamUserProfile().collectAsStateWithLifecycle(null)
@@ -173,6 +153,25 @@ fun MainScreen(onFinish: () -> Unit) {
         )
 
         saveSettings(ctx, newSettings)
+    }
+
+    // Permission launcher for storage permissions
+    val storagePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        hasStoragePermission = permissions.values.all { it }
+        if (!hasStoragePermission) {
+            // If permission is denied, turn off the feature
+            indicateSurfaceConditionsOnGraph = false
+            coroutineScope.launch {
+                updateSettings()
+            }
+        }
+    }
+
+    // Check permission on initialization
+    LaunchedEffect(Unit) {
+        hasStoragePermission = checkStoragePermission()
     }
 
     LaunchedEffect(Unit) {
@@ -257,16 +256,14 @@ fun MainScreen(onFinish: () -> Unit) {
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Switch(checked = indicateSurfaceConditionsOnGraph, onCheckedChange = {
-                                indicateSurfaceConditionsOnGraph = it
-                                if (it && !hasStoragePermission) {
-                                    // Request permission when enabling the feature
-                                    val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                        Manifest.permission.READ_MEDIA_IMAGES
-                                    } else {
-                                        Manifest.permission.READ_EXTERNAL_STORAGE
-                                    }
-                                    storagePermissionLauncher.launch(permission)
+                            Switch(checked = indicateSurfaceConditionsOnGraph, onCheckedChange = { checked ->
+                                indicateSurfaceConditionsOnGraph = checked
+                                if (checked && !hasStoragePermission) {
+                                    val permissions = arrayOf(
+                                            Manifest.permission.READ_EXTERNAL_STORAGE,
+                                            Manifest.permission.WRITE_EXTERNAL_STORAGE)
+
+                                    storagePermissionLauncher.launch(permissions)
                                 }
                                 coroutineScope.launch { updateSettings() }
                             })
@@ -276,32 +273,23 @@ fun MainScreen(onFinish: () -> Unit) {
 
                         // Show warning if surface conditions is enabled but permission is denied
                         if (indicateSurfaceConditionsOnGraph && !hasStoragePermission) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(start = 16.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                            Text(
+                                text = stringResource(R.string.storage_permission_required),
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            FilledTonalButton(
+                                onClick = {
+                                    // Request appropriate permissions based on Android version
+                                    val permissions = arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE,
+                                        Manifest.permission.WRITE_EXTERNAL_STORAGE)
+
+                                    storagePermissionLauncher.launch(permissions)
+                                },
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = stringResource(R.string.storage_permission_required),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                FilledTonalButton(
-                                    onClick = {
-                                        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                            Manifest.permission.READ_MEDIA_IMAGES
-                                        } else {
-                                            Manifest.permission.READ_EXTERNAL_STORAGE
-                                        }
-                                        storagePermissionLauncher.launch(permission)
-                                    }
-                                ) {
-                                    Text(stringResource(R.string.grant_permission))
-                                }
+                                Text(stringResource(R.string.grant_permission))
                             }
                         }
 

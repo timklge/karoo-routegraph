@@ -9,7 +9,7 @@ plugins {
 
 android {
     namespace = "de.timklge.karooroutegraph"
-    compileSdk = 36
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "de.timklge.karooroutegraph"

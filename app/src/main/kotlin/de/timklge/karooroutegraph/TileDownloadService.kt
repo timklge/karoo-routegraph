@@ -103,7 +103,7 @@ class TileDownloadService(
                         if (!inMemoryCache.containsKey(tile)) {
                             gcCache() // Make space if needed before adding
                             inMemoryCache[tile] = CachedTile(Instant.now(), bitmap)
-                            Log.d(KarooRouteGraphExtension.TAG, "Loaded tile ${tile} from file cache into memory")
+                            Log.d(KarooRouteGraphExtension.TAG, "Loaded tile $tile from file cache into memory")
                         } else {
                             // Already in memory, update access time
                             inMemoryCache[tile] = inMemoryCache[tile]!!.copy(lastAccessed = Instant.now())
