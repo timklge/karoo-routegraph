@@ -53,6 +53,6 @@ jobs:
         name: ${{ github.ref_name }}
         prerelease: false
         generateReleaseNotes: true
-        artifacts: app/build/outputs/apk/release/app-release.apk, app/manifest.json, app/karoo-routegraph.png, horizontal_routegraph.png, vertical_routegraph.png, chevrons.png, minimap.png, poinav.png
+        artifacts: app/build/outputs/apk/release/app-release.apk, app/manifest.json, app/karoo-routegraph.png, horizontal_routegraph.png, vertical_routegraph.png, chevrons.png, minimap.png, poinav.png, routegraph_surface_conditions.png
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
