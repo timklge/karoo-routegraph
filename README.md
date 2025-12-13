@@ -58,7 +58,6 @@ Additionally, you can enable chevrons on the map to indicate gradients. The chev
 
 ### Elevation profile datafields
 
-<img width="200" height="333" alt="Vertical Route Graph" src="horizontal_routegraph.png" />
 <img width="200" height="333" alt="Vertical Route Graph" src="vertical_routegraph.png" />
 
 The main data fields provided by this extension are the horizontal and vertical route graph data fields. Both data fields show the elevation profile of the current route, similar to the native elevation profile data field.
