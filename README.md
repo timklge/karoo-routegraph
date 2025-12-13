@@ -52,9 +52,33 @@ By default, route graph datafields also feature a POI button in the top right co
 - Distance to POI: Shows the distance to the next POI along the route. Note that this is the distance along the route and not the straight-line distance.
 - Elevation to POI: Shows the remaining climbing to the next POI along the route. Note that this is the elevation along the route and not the straight-line elevation.
 
-Additionally, you can enable chevrons on the map to indicate gradients. The chevrons are drawn on top of the route (see third screenshot).
+Additionally, you can enable chevrons on the map to indicate gradients. The chevrons are drawn on top of the route (see third screenshot). Find more information below.
 
-## Surface Conditions
+## Features
+
+### Elevation profile datafields
+
+<img width="200" height="333" alt="Vertical Route Graph" src="horizontal_routegraph.png" />
+<img width="200" height="333" alt="Vertical Route Graph" src="vertical_routegraph.png" />
+
+The main data fields provided by this extension are the horizontal and vertical route graph data fields. Both data fields show the elevation profile of the current route, similar to the native elevation profile data field.
+The horizontal route graph shows distance on the horizontal axis and elevation on the vertical axis, while the vertical route graph shows elevation on the horizontal axis and distance on the vertical axis.
+Both data fields show markers for route-specific POIs as well as global POIs and climbs.
+
+By touching the data field, you can cycle between the full route and the upcoming 2km, 20km, 50km and 100km of the route. If you enable surface condition display in the settings menu,
+offroad sections of the route will be highlighted in the route graph (see section below).
+
+For high zoom levels (2 km), instead of climbs, each 100 meter segment of the route will be colored individually, as is done in the Karoo's climber drawer.
+
+### Minimap
+
+<img width="200" height="333" alt="Minimap" src="minimap.png" />
+
+The minimap data field shows a secondary map of the whole route, including climbs and POIs. The current position is indicated by a yellow arrow.
+You can zoom in by touching the data field. The minimap uses OpenStreetMap raster tiles served by https://tile.openstreetmap.org, so it requires an active internet connection to load the map tiles (provided by the companion app).
+Downloaded tiles are cached on the Karoo for offline use.
+
+### Surface Conditions
 
 You can enable surface condition display on the route graph data fields in the settings menu. The extension will then use the maps downloaded on your Karoo to determine the surface type of each route segment
 and highlight offroad segments (e. g. gravel, dirt roads) in the route graph. To do this, the extension will ask for permission to read the map files on your Karoo. Calculating the surface conditions
@@ -64,14 +88,14 @@ can take a few seconds when loading a route.
 
 Gravel sections will be highlighted using a thick line and hatched fill pattern. Offroad sections (e. g. grass) will additionally be highlighted by a red outline.
 
-## Gradient Indicators
+### Gradient Indicators
 
 You can enable gradient indicators (chevrons) on the map in the settings menu. The extension will then draw chevrons on top of the route on the main karoo map to indicate uphill and downhill sections.
 Uphill chevrons use the known color scheme of the karoo (green-yellow-red for increasing gradients), downhill chevrons are shown in blue, with white / light blue for shallow descents and dark blue for steep descents.
 
 ![Chevrons](chevrons.png)
 
-## Adding POIs
+### Adding POIs
 
 During riding, you can open a POI managment menu by clicking the button shown in the top right corner of any routegraph elevation profile datafield. This will open a menu with three pages:
 
@@ -83,7 +107,7 @@ On all pages, you can use the dot menu for each POI to initiate navigation to th
 
 ![POI navigation](poinav.png)
 
-## Experimental: Traffic incidents
+### Experimental: Traffic incidents
 
 You can input a HERE Maps API key in the settings to enable traffic incident reporting. The extension will then
 fetch traffic incidents along the route and display them on the minimap, the route graphs and the main karoo map.
