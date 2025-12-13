@@ -103,7 +103,7 @@ fun calculatePoiDistances(polyline: LineString, pois: List<POI>, maxDistanceToRo
  * @param endPoint The end point of the line segment.
  * @return The nearest point on the line segment to the given point.
  */
-private fun getNearestPointOnLine(poiPoint: Point, startPoint: Point, endPoint: Point): Point {
+fun getNearestPointOnLine(poiPoint: Point, startPoint: Point, endPoint: Point): Point {
     val x1 = startPoint.longitude()
     val y1 = startPoint.latitude()
     val x2 = endPoint.longitude()
@@ -132,6 +132,26 @@ private fun getNearestPointOnLine(poiPoint: Point, startPoint: Point, endPoint: 
     val nearestY = y1 + clampedT * dy
 
     return Point.fromLngLat(nearestX, nearestY)
+}
+
+fun getNearestPointOnLineDistance(point: Point, line: List<Point>): Double? {
+    var nearestPoint: Point? = null
+    var minDistance = Double.MAX_VALUE
+
+    for (i in 1 until line.size) {
+        val startPoint = line[i - 1]
+        val endPoint = line[i]
+
+        val candidatePoint = getNearestPointOnLine(point, startPoint, endPoint)
+        val distance = TurfMeasurement.distance(point, candidatePoint, TurfConstants.UNIT_METERS)
+
+        if (distance < minDistance) {
+            minDistance = distance
+            nearestPoint = candidatePoint
+        }
+    }
+
+    return if (nearestPoint != null) minDistance else null
 }
 
 /**

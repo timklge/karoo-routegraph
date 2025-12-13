@@ -71,13 +71,14 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     private val tileDownloadService: TileDownloadService by inject()
     private val locationViewModelProvider: LocationViewModelProvider by inject()
     private val poiApproachAlertService: PoiApproachAlertService by inject()
+    private val surfaceConditionRetrievalService: SurfaceConditionRetrievalService by inject()
 
     private val extensionScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     override val types by lazy {
         listOf(
-            RouteGraphDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, displayViewModelProvider, applicationContext),
-            VerticalRouteGraphDataType(routeGraphViewModelProvider, displayViewModelProvider, karooSystem, applicationContext),
+            RouteGraphDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, displayViewModelProvider, applicationContext, surfaceConditionRetrievalService),
+            VerticalRouteGraphDataType(routeGraphViewModelProvider, displayViewModelProvider, karooSystem, surfaceConditionRetrievalService, applicationContext),
             DistanceToNextPOIDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, applicationContext),
             ElevationToNextPOIDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, applicationContext),
             MinimapDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, displayViewModelProvider, minimapViewModelProvider, tileDownloadService, locationViewModelProvider, applicationContext),
@@ -794,6 +795,8 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         tileDownloadService.startDownloadJob()
         locationViewModelProvider.startUpdateJob()
         poiApproachAlertService.startAlertJob()
+        surfaceConditionRetrievalService.startMapScanJob()
+        surfaceConditionRetrievalService.startSurfaceConditionUpdateJob()
     }
 
     override fun onDestroy() {

@@ -30,6 +30,9 @@
     <string name="invalid_zoom_level">Please enter a valid zoom level</string>
     <string name="add">Add</string>
     <string name="show_navigate_button">Show navigate button on graphs</string>
+    <string name="indicate_surface_conditions">Indicate surface conditions on graph</string>
+    <string name="storage_permission_required">Storage permission required to read surface condition data</string>
+    <string name="grant_permission">Grant Permission</string>
     <string name="only_highlight_climbs_at_zoom_level">Only highlight climbs at zoom level:</string>
     <string name="never">Never</string>
     <string name="gradient_chevrons">Gradient chevrons</string>

@@ -17,7 +17,7 @@ Compatible with Karoo 2 and Karoo 3 devices.
 ![Minimap](minimap.png)
 ![POI navigation](poinav.png)
 <img width="200" height="333" alt="Vertical Route Graph" src="vertical_routegraph.png" />
-![Chevrons](chevrons.png)
+<img width="200" height="333" alt="Surface conditions" src="routegraph_surface_conditions.png" />
 
 ## Installation
 
@@ -53,6 +53,35 @@ By default, route graph datafields also feature a POI button in the top right co
 - Elevation to POI: Shows the remaining climbing to the next POI along the route. Note that this is the elevation along the route and not the straight-line elevation.
 
 Additionally, you can enable chevrons on the map to indicate gradients. The chevrons are drawn on top of the route (see third screenshot).
+
+## Surface Conditions
+
+You can enable surface condition display on the route graph data fields in the settings menu. The extension will then use the maps downloaded on your Karoo to determine the surface type of each route segment
+and highlight offroad segments (e. g. gravel, dirt roads) in the route graph. To do this, the extension will ask for permission to read the map files on your Karoo. Calculating the surface conditions
+can take a few seconds when loading a route.
+
+<img width="200" height="333" alt="Surface conditions" src="routegraph_surface_conditions.png" />
+
+Gravel sections will be highlighted using a thick line and hatched fill pattern. Offroad sections (e. g. grass) will additionally be highlighted by a red outline.
+
+## Gradient Indicators
+
+You can enable gradient indicators (chevrons) on the map in the settings menu. The extension will then draw chevrons on top of the route on the main karoo map to indicate uphill and downhill sections.
+Uphill chevrons use the known color scheme of the karoo (green-yellow-red for increasing gradients), downhill chevrons are shown in blue, with white / light blue for shallow descents and dark blue for steep descents.
+
+![Chevrons](chevrons.png)
+
+## Adding POIs
+
+During riding, you can open a POI managment menu by clicking the button shown in the top right corner of any routegraph elevation profile datafield. This will open a menu with three pages:
+
+- On the *Custom* page, your global POIs and the POIs of the currently loaded route are shown, including distance to the POI. You can toggle the display to show the remaining distance and remaining elevation climbing along the route instead of straight-line distance.
+- On the *Nearby* page, you can look up new POIs of selected categories near you (e. g. supermarkets, shelters, bike shops). This requires an active internet connection, which is provided by the Karoo companion app on your phone if you are using a Karoo 3.
+- On the *Search* page, you can look up POIs by typing in a search query (e. g. "Brandenburg Gate" or a postal address). This also requires an active internet connection.
+
+On all pages, you can use the dot menu for each POI to initiate navigation to that POI. For POIs looked up on the Nearby or Search pages, you can also choose to add that POI to the elevation profiles (and the main karoo map).
+
+![POI navigation](poinav.png)
 
 ## Experimental: Traffic incidents
 

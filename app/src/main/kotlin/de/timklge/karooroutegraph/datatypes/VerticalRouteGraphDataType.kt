@@ -45,18 +45,19 @@ import de.timklge.karooroutegraph.RouteGraphDisplayViewModelProvider
 import de.timklge.karooroutegraph.RouteGraphViewModel
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.SparseElevationData
+import de.timklge.karooroutegraph.SurfaceConditionRetrievalService
 import de.timklge.karooroutegraph.ZoomLevel
 import de.timklge.karooroutegraph.datatypes.minimap.ChangeVerticalZoomLevelAction
 import de.timklge.karooroutegraph.datatypes.minimap.mapPoiToIcon
 import de.timklge.karooroutegraph.distanceIsZero
 import de.timklge.karooroutegraph.distanceToString
 import de.timklge.karooroutegraph.getInclineIndicatorColor
+import de.timklge.karooroutegraph.getSurfaceConditionPaints
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.streamDatatypeIsVisible
 import de.timklge.karooroutegraph.streamSettings
 import de.timklge.karooroutegraph.streamUserProfile
 import de.timklge.karooroutegraph.throttle
-import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.DataTypeImpl
 import io.hammerhead.karooext.internal.ViewEmitter
 import io.hammerhead.karooext.models.ShowCustomStreamState
@@ -85,6 +86,7 @@ class VerticalRouteGraphDataType(
     private val viewModelProvider: RouteGraphViewModelProvider,
     private val displayViewModelProvider: RouteGraphDisplayViewModelProvider,
     private val karooSystemServiceProvider: KarooSystemServiceProvider,
+    private val surfaceConditionRetrievalService: SurfaceConditionRetrievalService,
     private val applicationContext: Context
 ) : DataTypeImpl("karoo-routegraph", "verticalroutegraph") {
     private val glance = GlanceRemoteViews()
@@ -164,6 +166,7 @@ class VerticalRouteGraphDataType(
 
     data class StreamData(val routeGraphViewModel: RouteGraphViewModel,
                           val routeGraphDisplayViewModel: RouteGraphDisplayViewModel,
+                          val surfaceConditions: List<SurfaceConditionRetrievalService.SurfaceConditionSegment>?,
                           val profile: UserProfile,
                           val settings: RouteGraphSettings,
                           val isVisible: Boolean,
@@ -199,7 +202,8 @@ class VerticalRouteGraphDataType(
                 karooSystemServiceProvider.karooSystemService.streamUserProfile(),
                 context.streamSettings(karooSystemServiceProvider.karooSystemService),
                 karooSystemServiceProvider.karooSystemService.streamDatatypeIsVisible(dataTypeId),
-                karooSystemServiceProvider.streamRadarSwimLaneIsVisible()
+                karooSystemServiceProvider.streamRadarSwimLaneIsVisible(),
+                surfaceConditionRetrievalService.flow
             ) { data ->
                 val viewModel = data[0] as RouteGraphViewModel
                 val displayViewModel = data[1] as RouteGraphDisplayViewModel
@@ -207,13 +211,15 @@ class VerticalRouteGraphDataType(
                 val settings = data[3] as RouteGraphSettings
                 val isVisible = data[4] as Boolean
                 val radarLaneIsVisible = data[5] as Boolean
+                @Suppress("UNCHECKED_CAST")
+                val surfaceConditions = data[6] as List<SurfaceConditionRetrievalService.SurfaceConditionSegment>?
 
-                StreamData(viewModel, displayViewModel, profile, settings, isVisible, radarLaneIsVisible)
+                StreamData(viewModel, displayViewModel, surfaceConditions, profile, settings, isVisible, radarLaneIsVisible)
             }
         }
 
         val viewJob = CoroutineScope(Dispatchers.Default).launch {
-            flow.throttle(1_000L).filter { it.isVisible }.collect { (viewModel, displayViewModel, userProfile, settings, _, radarLaneIsVisibleValue) ->
+            flow.throttle(1_000L).filter { it.isVisible }.collect { (viewModel, displayViewModel, surfaceConditions, userProfile, settings, _, radarLaneIsVisibleValue) ->
                 val bitmap = createBitmap(config.viewSize.first, config.viewSize.second)
 
                 val canvas = Canvas(bitmap)
@@ -320,6 +326,9 @@ class VerticalRouteGraphDataType(
                         style = Paint.Style.FILL
                     }
                 }
+
+                // Surface condition paints with hatched patterns
+                val surfaceConditionFillPaints = getSurfaceConditionPaints(applicationContext)
 
                 val zoomLevel = displayViewModel.verticalZoomLevel
                 val viewDistanceStart = if (zoomLevel == ZoomLevel.CompleteRoute){
@@ -532,6 +541,75 @@ class VerticalRouteGraphDataType(
 
                     // Draw the elevation polyline after all fill operations so it's on top
                     canvas.drawPath(elevationProfilePath, pastLinePaint)
+
+                    if (settings.indicateSurfaceConditionsOnGraph) {
+                        surfaceConditions?.forEach { segment ->
+                            val segmentStartDistance = segment.startMeters.toFloat()
+                            val segmentEndDistance = segment.endMeters.toFloat()
+
+                            // Check if segment is in view range
+                            if (segmentEndDistance >= viewDistanceStart && segmentStartDistance <= viewDistanceEnd) {
+                                var segmentStartProgressPixels = remap(
+                                    segmentStartDistance,
+                                    viewDistanceStart,
+                                    viewDistanceEnd,
+                                    graphBounds.bottom,
+                                    graphBounds.top,
+                                    false
+                                )
+                                var segmentEndProgressPixels = remap(
+                                    segmentEndDistance,
+                                    viewDistanceStart,
+                                    viewDistanceEnd,
+                                    graphBounds.bottom,
+                                    graphBounds.top,
+                                    false
+                                )
+
+                                // Ensure minimum width for visibility
+                                if (abs(segmentStartProgressPixels - segmentEndProgressPixels) < 5) {
+                                    while (abs(segmentStartProgressPixels - segmentEndProgressPixels) < 5) {
+                                        segmentStartProgressPixels -= 1
+                                        segmentEndProgressPixels += 1
+                                    }
+                                }
+
+                                segmentStartProgressPixels = segmentStartProgressPixels.coerceIn(
+                                    graphBounds.top,
+                                    graphBounds.bottom
+                                )
+                                segmentEndProgressPixels = segmentEndProgressPixels.coerceIn(
+                                    graphBounds.top,
+                                    graphBounds.bottom
+                                )
+
+                                val clipRect = RectF(
+                                    graphBounds.left,
+                                    segmentEndProgressPixels,
+                                    graphBounds.right,
+                                    segmentStartProgressPixels
+                                )
+
+                                canvas.withClip(clipRect) {
+                                    canvas.withClip(filledPath) {
+                                        surfaceConditionFillPaints[segment.condition]?.let { paint ->
+                                            canvas.drawRect(clipRect, paint)
+                                        }
+                                    }
+
+                                    canvas.drawPath(elevationProfilePath, Paint().apply {
+                                        color = androidx.core.graphics.ColorUtils.blendARGB(
+                                            applicationContext.getColor(if (isNightMode()) R.color.white else R.color.black),
+                                            Color.RED,
+                                            segment.condition.redColorFactor
+                                        )
+                                        style = Paint.Style.STROKE
+                                        strokeWidth = segment.condition.strokeThickness
+                                    })
+                                }
+                            }
+                        }
+                    }
                 }
 
                 if (viewModel.distanceAlongRoute != null){
@@ -802,7 +880,15 @@ class VerticalRouteGraphDataType(
                 ).toSampledElevationData(100.0f)
             )
             val routeGraphDisplayViewModel = RouteGraphDisplayViewModel()
-            val streamData = StreamData(routeGraphViewModel, routeGraphDisplayViewModel, karooSystemServiceProvider.karooSystemService.streamUserProfile().first(), settings,
+            val surfaceConditions = listOf(
+                SurfaceConditionRetrievalService.SurfaceConditionSegment(5_000.0, 15_000.0, SurfaceConditionRetrievalService.SurfaceCondition.GRAVEL),
+                SurfaceConditionRetrievalService.SurfaceConditionSegment(35_000.0, 45_000.0, SurfaceConditionRetrievalService.SurfaceCondition.LOOSE)
+            )
+            val streamData = StreamData(
+                routeGraphViewModel = routeGraphViewModel,
+                routeGraphDisplayViewModel = routeGraphDisplayViewModel,
+                surfaceConditions = surfaceConditions,
+                profile = karooSystemServiceProvider.karooSystemService.streamUserProfile().first(), settings,
                 isVisible = true,
                 radarLaneIsVisible = false
             )

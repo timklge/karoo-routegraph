@@ -19,7 +19,8 @@ data class RouteGraphSettings(
     val poiApproachAlertReminderIntervalSeconds: Int = 300,
     val elevationProfileZoomLevels: List<Int> = listOf(2, 10, 25, 50),
     val onlyHighlightClimbsAtZoomLevel: Int? = 1, // null means "Never"
-    val shiftForRadarSwimLane: Boolean = true
+    val shiftForRadarSwimLane: Boolean = true,
+    val indicateSurfaceConditionsOnGraph: Boolean = false
 ){
 
     companion object {

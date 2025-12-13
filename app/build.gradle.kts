@@ -14,7 +14,8 @@ android {
     defaultConfig {
         applicationId = "de.timklge.karooroutegraph"
         minSdk = 26
-        targetSdk = 35
+        //noinspection ExpiredTargetSdkVersion
+        targetSdk = 28
         versionCode = 100 + (System.getenv("BUILD_NUMBER")?.toInt() ?: 1)
         versionName = System.getenv("RELEASE_VERSION") ?: "1.0"
     }
@@ -70,13 +71,14 @@ tasks.register("generateManifest") {
             "latestVersionCode" to android.defaultConfig.versionCode,
             "developer" to "github.com/timklge",
             "description" to "Open-source extension that provides an elevation graph datafield depicting the complete current route, including climbs and POIs (e. g. checkpoints and refueling stops)",
-            "releaseNotes" to "* Fix horizontal elevation profile draw order",
+            "releaseNotes" to "* Add option to show surface conditions on the elevation graph",
             "screenshotUrls" to listOf(
+                "https://github.com/timklge/karoo-routegraph/releases/latest/download/horizontal_routegraph.png",
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/minimap.png",
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/poinav.png",
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/vertical_routegraph.png",
+                "https://github.com/timklge/karoo-routegraph/releases/latest/download/routegraph_surface_conditions.png",
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/chevrons.png",
-                "https://github.com/timklge/karoo-routegraph/releases/latest/download/horizontal_routegraph.png",
             ),
         )
 
@@ -104,5 +106,6 @@ dependencies {
     implementation(libs.androidx.glance.preview)
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
+    implementation(libs.mapsforge.map.reader)
     testImplementation(libs.testng)
 }

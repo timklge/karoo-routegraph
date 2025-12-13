@@ -1,7 +1,12 @@
 package de.timklge.karooroutegraph.screens
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -55,6 +60,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mapbox.geojson.Point
 import de.timklge.karooroutegraph.GradientIndicatorFrequency
@@ -103,6 +109,7 @@ fun MainScreen(onFinish: () -> Unit) {
     var showPOIsOnMinimap by remember { mutableStateOf(true) }
     var showNavigateButtonOnGraphs by remember { mutableStateOf(true) }
     var shiftForRadarSwimLane by remember { mutableStateOf(true) }
+    var indicateSurfaceConditionsOnGraph by remember { mutableStateOf(true) }
     var hereMapsApiKey by remember { mutableStateOf("") }
     var enableTrafficIncidentReporting by remember { mutableStateOf(false) }
     var poiDistanceToRouteMaxMeters by remember { mutableDoubleStateOf(1000.0) }
@@ -116,6 +123,13 @@ fun MainScreen(onFinish: () -> Unit) {
     var newZoomLevelText by remember { mutableStateOf("") }
     var zoomLevelError by remember { mutableStateOf("") }
     val hereMapsIncidentProvider = koinInject<HereMapsIncidentProvider>()
+
+    var hasStoragePermission by remember { mutableStateOf(false) }
+
+    // Function to check storage permission
+    fun checkStoragePermission(): Boolean {
+        return ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+    }
 
     val userProfile by karooSystem.streamUserProfile().collectAsStateWithLifecycle(null)
 
@@ -134,10 +148,30 @@ fun MainScreen(onFinish: () -> Unit) {
             poiDistanceToRouteMaxMeters = poiDistanceToRouteMaxMeters,
             poiApproachAlertAtDistance = poiApproachAlertAtDistance,
             elevationProfileZoomLevels = elevationProfileZoomLevels,
-            onlyHighlightClimbsAtZoomLevel = onlyHighlightClimbsAtZoomLevel
+            onlyHighlightClimbsAtZoomLevel = onlyHighlightClimbsAtZoomLevel,
+            indicateSurfaceConditionsOnGraph = indicateSurfaceConditionsOnGraph
         )
 
         saveSettings(ctx, newSettings)
+    }
+
+    // Permission launcher for storage permissions
+    val storagePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        hasStoragePermission = permissions.values.all { it }
+        if (!hasStoragePermission) {
+            // If permission is denied, turn off the feature
+            indicateSurfaceConditionsOnGraph = false
+            coroutineScope.launch {
+                updateSettings()
+            }
+        }
+    }
+
+    // Check permission on initialization
+    LaunchedEffect(Unit) {
+        hasStoragePermission = checkStoragePermission()
     }
 
     LaunchedEffect(Unit) {
@@ -154,6 +188,7 @@ fun MainScreen(onFinish: () -> Unit) {
             poiApproachAlertAtDistance = settings.poiApproachAlertAtDistance ?: 500.0
             elevationProfileZoomLevels = settings.elevationProfileZoomLevels
             onlyHighlightClimbsAtZoomLevel = settings.onlyHighlightClimbsAtZoomLevel
+            indicateSurfaceConditionsOnGraph = settings.indicateSurfaceConditionsOnGraph
         }
     }
 
@@ -218,6 +253,44 @@ fun MainScreen(onFinish: () -> Unit) {
                             })
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(stringResource(R.string.shift_for_radar_swim_lane))
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Switch(checked = indicateSurfaceConditionsOnGraph, onCheckedChange = { checked ->
+                                indicateSurfaceConditionsOnGraph = checked
+                                if (checked && !hasStoragePermission) {
+                                    val permissions = arrayOf(
+                                            Manifest.permission.READ_EXTERNAL_STORAGE,
+                                            Manifest.permission.WRITE_EXTERNAL_STORAGE)
+
+                                    storagePermissionLauncher.launch(permissions)
+                                }
+                                coroutineScope.launch { updateSettings() }
+                            })
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(stringResource(R.string.indicate_surface_conditions))
+                        }
+
+                        // Show warning if surface conditions is enabled but permission is denied
+                        if (indicateSurfaceConditionsOnGraph && !hasStoragePermission) {
+                            Text(
+                                text = stringResource(R.string.storage_permission_required),
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            FilledTonalButton(
+                                onClick = {
+                                    // Request appropriate permissions based on Android version
+                                    val permissions = arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE,
+                                        Manifest.permission.WRITE_EXTERNAL_STORAGE)
+
+                                    storagePermissionLauncher.launch(permissions)
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(stringResource(R.string.grant_permission))
+                            }
                         }
 
                         // Only Highlight Climbs at Zoom Level Slider

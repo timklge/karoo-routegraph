@@ -20,6 +20,7 @@ val appModule = module {
     singleOf(::HereMapsIncidentProvider)
     singleOf(::LocationViewModelProvider)
     singleOf(::PoiApproachAlertService)
+    singleOf(::SurfaceConditionRetrievalService)
 }
 
 class KarooRouteGraphApplication : Application() {
