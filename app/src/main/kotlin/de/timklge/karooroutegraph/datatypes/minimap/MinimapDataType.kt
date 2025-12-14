@@ -37,7 +37,6 @@ import com.mapbox.turf.TurfMeasurement
 import com.mapbox.turf.TurfMisc
 import de.timklge.karooroutegraph.KarooRouteGraphExtension
 import de.timklge.karooroutegraph.SurfaceConditionRetrievalService
-import de.timklge.karooroutegraph.getSurfaceConditionPaints
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.LocationViewModelProvider
 import de.timklge.karooroutegraph.NearestPoint
