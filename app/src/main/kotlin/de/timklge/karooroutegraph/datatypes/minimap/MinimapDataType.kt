@@ -281,7 +281,7 @@ class MinimapDataType(
                 try {
                     val bitmap = createBitmap(width, height)
                     val canvas = Canvas(bitmap)
-                    val nightMode = this@MinimapDataType.isNightMode()
+                    val nightMode = settings.minimapNightMode && this@MinimapDataType.isNightMode()
                     val imperialUnits =
                         userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
                     canvas.drawColor(if (nightMode) Color.BLACK else Color.WHITE)

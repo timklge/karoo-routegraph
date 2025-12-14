@@ -20,7 +20,8 @@ data class RouteGraphSettings(
     val elevationProfileZoomLevels: List<Int> = listOf(2, 10, 25, 50),
     val onlyHighlightClimbsAtZoomLevel: Int? = 1, // null means "Never"
     val shiftForRadarSwimLane: Boolean = true,
-    val indicateSurfaceConditionsOnGraph: Boolean = false
+    val indicateSurfaceConditionsOnGraph: Boolean = false,
+    val minimapNightMode: Boolean = true
 ){
 
     companion object {

@@ -12,6 +12,7 @@
     <string name="elevation_to_poi_description">Höhe zum nächsten POI</string>
     <string name="minimap">Minikarte</string>
     <string name="minimap_description">Sekundäre Kartenanzeige (mit Route und POIs)</string>
+    <string name="minimap_night_mode">Dunkelmodus bei Nacht</string>
     <string name="poi_button">POI-Knopf</string>
     <string name="poi_button_description">Knopf zum schnellen Öffnen der POI-Liste</string>
     <string name="shift_for_radar_swim_lane">Verschiebung für Radar</string>
