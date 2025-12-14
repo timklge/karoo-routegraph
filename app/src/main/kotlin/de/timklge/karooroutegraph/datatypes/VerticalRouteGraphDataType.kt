@@ -182,6 +182,9 @@ class VerticalRouteGraphDataType(
 
     data class TextDrawCommandGroup(val commands: List<TextDrawCommand>)
 
+    // Surface condition paints with hatched patterns
+    val surfaceConditionFillPaints = getSurfaceConditionPaints(applicationContext)
+
     override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
         Log.d(TAG, "Starting route view with $emitter")
 
@@ -326,9 +329,6 @@ class VerticalRouteGraphDataType(
                         style = Paint.Style.FILL
                     }
                 }
-
-                // Surface condition paints with hatched patterns
-                val surfaceConditionFillPaints = getSurfaceConditionPaints(applicationContext)
 
                 val zoomLevel = displayViewModel.verticalZoomLevel
                 val viewDistanceStart = if (zoomLevel == ZoomLevel.CompleteRoute){

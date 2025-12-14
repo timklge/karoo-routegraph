@@ -98,6 +98,8 @@ class RouteGraphDataType(
         return nightModeFlags == Configuration.UI_MODE_NIGHT_YES
     }
 
+    val surfaceConditionFillPaints = getSurfaceConditionPaints(applicationContext)
+
     data class StreamData(val routeGraphViewModel: RouteGraphViewModel, val routeGraphDisplayViewModel: RouteGraphDisplayViewModel,
                           val settings: RouteGraphSettings, val isVisible: Boolean, val surfaceConditions: List<SurfaceConditionRetrievalService.SurfaceConditionSegment>?)
 
@@ -424,8 +426,6 @@ class RouteGraphDataType(
                     canvas.drawLine(distanceAlongRoutePixelsFromLeft, 0f, distanceAlongRoutePixelsFromLeft, graphBounds.bottom, backgroundStrokePaint)
                     canvas.drawLine(distanceAlongRoutePixelsFromLeft, 0f, distanceAlongRoutePixelsFromLeft, graphBounds.bottom, currentLinePaint)
                 }
-
-                val surfaceConditionFillPaints = getSurfaceConditionPaints(applicationContext)
 
                 if (settings.indicateSurfaceConditionsOnGraph) {
                     surfaceConditions?.forEach { segment ->

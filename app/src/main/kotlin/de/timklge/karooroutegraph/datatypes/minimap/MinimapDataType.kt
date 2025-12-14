@@ -131,6 +131,8 @@ class MinimapDataType(
     private val METERS_PER_FOOT = 0.3048
     private val FEET_PER_MILE = 5280.0
 
+    private val surfaceConditionPaints = getSurfaceConditionStrokePaints(applicationContext)
+
     private fun isNightMode(): Boolean {
         val nightModeFlags =
             applicationContext.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
@@ -487,7 +489,7 @@ class MinimapDataType(
                     }
 
                     if (viewModel.knownRoute != null && surfaceConditions != null && settings.indicateSurfaceConditionsOnGraph) {
-                        val surfaceConditionPaints = getSurfaceConditionStrokePaints(applicationContext)
+                        val surfaceConditionPaints =
 
                         surfaceConditions.forEach { segment ->
                             try {
