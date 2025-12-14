@@ -36,17 +36,32 @@ fun isNightMode(applicationContext: Context): Boolean {
 }
 
 // Surface condition paints with hatched patterns
-fun getSurfaceConditionPaints(applicationContext: Context) = mapOf(
+fun getSurfaceConditionPaints(applicationContext: Context, isNightMode: Boolean = isNightMode(applicationContext)) = mapOf(
     SurfaceConditionRetrievalService.SurfaceCondition.GRAVEL to Paint().apply {
         style = Paint.Style.FILL
         alpha = 255 / 2
-        val patternBitmap = BitmapFactory.decodeResource(applicationContext.resources, if (isNightMode(applicationContext)) R.drawable.cross_pattern_white else R.drawable.cross_pattern)
+        val patternBitmap = BitmapFactory.decodeResource(applicationContext.resources, if (isNightMode) R.drawable.cross_pattern_white else R.drawable.cross_pattern)
         shader = android.graphics.BitmapShader(patternBitmap, android.graphics.Shader.TileMode.REPEAT, android.graphics.Shader.TileMode.REPEAT)
     },
     SurfaceConditionRetrievalService.SurfaceCondition.LOOSE to Paint().apply {
         style = Paint.Style.FILL
         alpha = 255 / 2
-        val patternBitmap = BitmapFactory.decodeResource(applicationContext.resources, if (isNightMode(applicationContext)) R.drawable.cross_pattern_white else R.drawable.cross_pattern)
+        val patternBitmap = BitmapFactory.decodeResource(applicationContext.resources, if (isNightMode) R.drawable.cross_pattern_white else R.drawable.cross_pattern)
+        shader = android.graphics.BitmapShader(patternBitmap, android.graphics.Shader.TileMode.REPEAT, android.graphics.Shader.TileMode.REPEAT)
+    }
+)
+
+fun getSurfaceConditionStrokePaints(applicationContext: Context) = mapOf(
+    SurfaceConditionRetrievalService.SurfaceCondition.GRAVEL to Paint().apply {
+        style = Paint.Style.STROKE
+        alpha = 255
+        val patternBitmap = BitmapFactory.decodeResource(applicationContext.resources, R.drawable.cross_pattern_small)
+        shader = android.graphics.BitmapShader(patternBitmap, android.graphics.Shader.TileMode.REPEAT, android.graphics.Shader.TileMode.REPEAT)
+    },
+    SurfaceConditionRetrievalService.SurfaceCondition.LOOSE to Paint().apply {
+        style = Paint.Style.STROKE
+        alpha = 255
+        val patternBitmap = BitmapFactory.decodeResource(applicationContext.resources, R.drawable.cross_pattern_small)
         shader = android.graphics.BitmapShader(patternBitmap, android.graphics.Shader.TileMode.REPEAT, android.graphics.Shader.TileMode.REPEAT)
     }
 )
