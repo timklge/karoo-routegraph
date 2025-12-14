@@ -110,6 +110,7 @@ fun MainScreen(onFinish: () -> Unit) {
     var showNavigateButtonOnGraphs by remember { mutableStateOf(true) }
     var shiftForRadarSwimLane by remember { mutableStateOf(true) }
     var indicateSurfaceConditionsOnGraph by remember { mutableStateOf(true) }
+    var minimapNightMode by remember { mutableStateOf(true) }
     var hereMapsApiKey by remember { mutableStateOf("") }
     var enableTrafficIncidentReporting by remember { mutableStateOf(false) }
     var poiDistanceToRouteMaxMeters by remember { mutableDoubleStateOf(1000.0) }
@@ -149,7 +150,8 @@ fun MainScreen(onFinish: () -> Unit) {
             poiApproachAlertAtDistance = poiApproachAlertAtDistance,
             elevationProfileZoomLevels = elevationProfileZoomLevels,
             onlyHighlightClimbsAtZoomLevel = onlyHighlightClimbsAtZoomLevel,
-            indicateSurfaceConditionsOnGraph = indicateSurfaceConditionsOnGraph
+            indicateSurfaceConditionsOnGraph = indicateSurfaceConditionsOnGraph,
+            minimapNightMode = minimapNightMode
         )
 
         saveSettings(ctx, newSettings)
@@ -189,6 +191,7 @@ fun MainScreen(onFinish: () -> Unit) {
             elevationProfileZoomLevels = settings.elevationProfileZoomLevels
             onlyHighlightClimbsAtZoomLevel = settings.onlyHighlightClimbsAtZoomLevel
             indicateSurfaceConditionsOnGraph = settings.indicateSurfaceConditionsOnGraph
+            minimapNightMode = settings.minimapNightMode
         }
     }
 
@@ -417,6 +420,19 @@ fun MainScreen(onFinish: () -> Unit) {
                                     }
                                 }
                             }
+                        }
+
+                        SectionHeader(stringResource(R.string.minimap))
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Switch(checked = minimapNightMode, onCheckedChange = {
+                                minimapNightMode = it
+                                coroutineScope.launch {
+                                    updateSettings()
+                                }
+                            })
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(stringResource(R.string.minimap_night_mode))
                         }
 
                         SectionHeader(stringResource(R.string.points_of_interest_poi))
