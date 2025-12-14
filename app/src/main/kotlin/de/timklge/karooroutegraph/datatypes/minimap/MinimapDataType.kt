@@ -32,11 +32,11 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
 import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
-import com.mapbox.turf.TurfConstants
 import com.mapbox.turf.TurfConstants.UNIT_METERS
 import com.mapbox.turf.TurfMeasurement
 import com.mapbox.turf.TurfMisc
 import de.timklge.karooroutegraph.KarooRouteGraphExtension
+import de.timklge.karooroutegraph.SurfaceConditionRetrievalService
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.LocationViewModelProvider
 import de.timklge.karooroutegraph.NearestPoint
@@ -48,6 +48,7 @@ import de.timklge.karooroutegraph.RouteGraphDisplayViewModelProvider
 import de.timklge.karooroutegraph.RouteGraphViewModel
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.TileDownloadService
+import de.timklge.karooroutegraph.getSurfaceConditionStrokePaints
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.streamDatatypeIsVisible
 import de.timklge.karooroutegraph.streamSettings
@@ -71,6 +72,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -121,12 +123,15 @@ class MinimapDataType(
     private val minimapViewModelProvider: MinimapViewModelProvider,
     private val tileDownloadService: TileDownloadService,
     private val locationViewModelProvider: LocationViewModelProvider,
-    private val applicationContext: Context
+    private val applicationContext: Context,
+    private val surfaceConditionRetrievalService: SurfaceConditionRetrievalService
 ) : DataTypeImpl("karoo-routegraph", "minimap") {
     private val glance = GlanceRemoteViews()
 
     private val METERS_PER_FOOT = 0.3048
     private val FEET_PER_MILE = 5280.0
+
+    private val surfaceConditionPaints = getSurfaceConditionStrokePaints(applicationContext)
 
     private fun isNightMode(): Boolean {
         val nightModeFlags =
@@ -143,7 +148,8 @@ class MinimapDataType(
         val displayViewModel: RouteGraphDisplayViewModel,
         val settings: RouteGraphSettings,
         val dataPageIsVisible: Boolean,
-        val locationViewModel: Point?
+        val locationViewModel: Point?,
+        val surfaceConditions: List<SurfaceConditionRetrievalService.SurfaceConditionSegment>?
     )
 
     @OptIn(DelicateCoroutinesApi::class)
@@ -190,7 +196,8 @@ class MinimapDataType(
                         displayViewModel = RouteGraphDisplayViewModel(),
                         settings = context.streamSettings(karooSystem).first(),
                         dataPageIsVisible = true,
-                        locationViewModel = Point.fromLngLat(13.3774302, 52.5159305)
+                        locationViewModel = Point.fromLngLat(13.3774302, 52.5159305),
+                        surfaceConditions = null
                     ))
 
                     delay(2_000)
@@ -205,6 +212,7 @@ class MinimapDataType(
                 context.streamSettings(karooSystem),
                 karooSystem.streamDatatypeIsVisible(dataTypeId),
                 locationViewModelProvider.viewModelFlow.throttle(20_000L),
+                surfaceConditionRetrievalService.flow
             ) { data ->
                 val viewModel = data[0] as RouteGraphViewModel
                 val minimapViewModel = data[1] as MinimapViewModel
@@ -213,8 +221,10 @@ class MinimapDataType(
                 val settings = data[4] as RouteGraphSettings
                 val isVisible = data[5] as Boolean
                 val locationViewModel = data[6] as Point?
+                @Suppress("UNCHECKED_CAST")
+                val surfaceConditions = data[7] as List<SurfaceConditionRetrievalService.SurfaceConditionSegment>?
 
-                StreamData(viewModel, minimapViewModel, profile, displayViewModel, settings, isVisible, locationViewModel)
+                StreamData(viewModel, minimapViewModel, profile, displayViewModel, settings, isVisible, locationViewModel, surfaceConditions)
             }
         }
 
@@ -226,7 +236,7 @@ class MinimapDataType(
                 displayViewModel.copy(minimapWidth = width, minimapHeight = height)
             }
 
-            flow.throttle(1_000L).filter { it.dataPageIsVisible }.collect { (viewModel, minimapViewModel, userProfile, displayViewModel, settings, isVisible, locationViewModel) ->
+            flow.throttle(1_000L).filter { it.dataPageIsVisible }.collect { (viewModel, _, userProfile, displayViewModel, settings, _, locationViewModel, surfaceConditions) ->
                 Log.d(TAG, "Redrawing minimap view")
 
                 val width = config.viewSize.first
@@ -425,7 +435,7 @@ class MinimapDataType(
                                     viewModel.knownRoute,
                                     0.0,
                                     startDistance,
-                                    TurfConstants.UNIT_METERS
+                                    UNIT_METERS
                                 )
                             } catch (e: Exception) {
                                 Log.e(TAG, "Error slicing route: ${e.message}")
@@ -477,6 +487,34 @@ class MinimapDataType(
                             }
                         }
                     }
+
+                    if (viewModel.knownRoute != null && surfaceConditions != null && settings.indicateSurfaceConditionsOnGraph) {
+                        val surfaceConditionPaints =
+
+                        surfaceConditions.forEach { segment ->
+                            try {
+                                val polyline = TurfMisc.lineSliceAlong(
+                                    viewModel.knownRoute,
+                                    segment.startMeters,
+                                    segment.endMeters,
+                                    UNIT_METERS
+                                )
+
+                                surfaceConditionPaints[segment.condition]?.let { paint ->
+                                    this@MinimapDataType.drawPolylineWithPaint(
+                                        polyline,
+                                        canvas,
+                                        paint,
+                                        centerPosition,
+                                        zoomLevel
+                                    )
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error drawing surface condition polyline", e)
+                            }
+                        }
+                    }
+
                     if (config.gridSize.first > 15 && config.gridSize.second > 15) {
                         val pois = viewModel.poiDistances?.keys ?: emptySet()
                         pois.forEach { poi ->
@@ -719,6 +757,58 @@ class MinimapDataType(
 
     data class IntRange(val start: Int, val end: Int)
 
+    private fun drawPolylineWithPaint(
+        lineString: LineString,
+        canvas: Canvas,
+        paint: Paint,
+        mapCenter: Point,
+        zoomLevel: Float
+    ) {
+        val strokeWidth = 12f
+
+        val points = lineString.coordinates()
+        if (points.size < 2) {
+            return
+        }
+
+        val linePaint = Paint(paint).apply {
+            this.strokeWidth = strokeWidth
+            style = Paint.Style.STROKE
+            isAntiAlias = true
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+
+        val path = Path()
+
+        val intZoom = floor(zoomLevel).toInt()
+        val centerTileX = lonToTileX(mapCenter.longitude(), intZoom)
+        val centerTileY = latToTileY(mapCenter.latitude(), intZoom)
+        val centerScreenX = canvas.width / 2f
+        val centerScreenY = canvas.height / 2f
+
+        var firstPoint = true
+        for (point in points) {
+            val pointTileX = lonToTileX(point.longitude(), intZoom)
+            val pointTileY = latToTileY(point.latitude(), intZoom)
+
+            val deltaPixelX = (pointTileX - centerTileX) * TARGET_TILE_SIZE
+            val deltaPixelY = (pointTileY - centerTileY) * TARGET_TILE_SIZE
+
+            val screenX = (centerScreenX + deltaPixelX).toFloat()
+            val screenY = (centerScreenY + deltaPixelY).toFloat()
+
+            if (firstPoint) {
+                path.moveTo(screenX, screenY)
+                firstPoint = false
+            } else {
+                path.lineTo(screenX, screenY)
+            }
+        }
+
+        canvas.drawPath(path, linePaint)
+    }
+
     private fun drawPolyline(
         lineString: LineString,
         canvas: Canvas,
@@ -922,7 +1012,7 @@ class MinimapDataType(
                 if (miles == floor(miles)) {
                     "${miles.toInt()} mi"
                 } else {
-                    String.format("%.1f mi", miles)
+                    String.format(Locale.US, "%.1f mi", miles)
                 }
             }
         } else {
