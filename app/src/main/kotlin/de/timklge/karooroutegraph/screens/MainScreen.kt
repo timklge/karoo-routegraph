@@ -28,6 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -68,14 +69,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mapbox.geojson.Point
 import de.timklge.karooroutegraph.GradientIndicatorFrequency
 import de.timklge.karooroutegraph.KarooRouteGraphExtension
+import de.timklge.karooroutegraph.R
+import de.timklge.karooroutegraph.incidents.HereMapsIncidentProvider
 import de.timklge.karooroutegraph.pois.DownloadedPbf
 import de.timklge.karooroutegraph.pois.DownloadedPbfDao
 import de.timklge.karooroutegraph.pois.NearbyPOIPbfDownloadService
 import de.timklge.karooroutegraph.pois.POIActivity
 import de.timklge.karooroutegraph.pois.PbfDownloadStatus
 import de.timklge.karooroutegraph.pois.PbfType
-import de.timklge.karooroutegraph.R
-import de.timklge.karooroutegraph.incidents.HereMapsIncidentProvider
 import de.timklge.karooroutegraph.saveSettings
 import de.timklge.karooroutegraph.streamSettings
 import de.timklge.karooroutegraph.streamUserProfile
@@ -572,10 +573,10 @@ fun MainScreen(onFinish: () -> Unit) {
                                                         if (status == PbfDownloadStatus.DOWNLOAD_FAILED || status == PbfDownloadStatus.PROCESSING_FAILED){
                                                              IconButton(onClick = {
                                                                 coroutineScope.launch {
-                                                                    downloadedPbfDao.delete(key)
+                                                                    downloadedPbfDao.updateDownloadStatus(key, PbfDownloadStatus.PENDING, 0f)
                                                                 }
                                                             }) {
-                                                                Icon(Icons.Filled.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error)
+                                                                Icon(Icons.Filled.Refresh, contentDescription = "Retry", tint = MaterialTheme.colorScheme.primary)
                                                             }
                                                         }
                                                     }
