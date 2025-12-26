@@ -3,7 +3,6 @@ package de.timklge.karooroutegraph.screens
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Build
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,6 +20,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -29,10 +30,12 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -65,7 +68,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mapbox.geojson.Point
 import de.timklge.karooroutegraph.GradientIndicatorFrequency
 import de.timklge.karooroutegraph.KarooRouteGraphExtension
-import de.timklge.karooroutegraph.POIActivity
+import de.timklge.karooroutegraph.pois.DownloadedPbf
+import de.timklge.karooroutegraph.pois.DownloadedPbfDao
+import de.timklge.karooroutegraph.pois.NearbyPOIPbfDownloadService
+import de.timklge.karooroutegraph.pois.POIActivity
+import de.timklge.karooroutegraph.pois.PbfDownloadStatus
+import de.timklge.karooroutegraph.pois.PbfType
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.incidents.HereMapsIncidentProvider
 import de.timklge.karooroutegraph.saveSettings
@@ -124,6 +132,9 @@ fun MainScreen(onFinish: () -> Unit) {
     var newZoomLevelText by remember { mutableStateOf("") }
     var zoomLevelError by remember { mutableStateOf("") }
     val hereMapsIncidentProvider = koinInject<HereMapsIncidentProvider>()
+    val downloadedPbfDao = koinInject<DownloadedPbfDao>()
+    val nearbyPOIPbfDownloadService = koinInject<NearbyPOIPbfDownloadService>()
+    var showDownloadPoisDialog by remember { mutableStateOf(false) }
 
     var hasStoragePermission by remember { mutableStateOf(false) }
 
@@ -467,6 +478,123 @@ fun MainScreen(onFinish: () -> Unit) {
                             Text(stringResource(R.string.manage_pois))
                         }
 
+                        // Offline POIs Button
+                        FilledTonalButton(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(40.dp),
+                            onClick = {
+                                showDownloadPoisDialog = true
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Add,
+                                contentDescription = "Offline POIs",
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Offline POIs")
+                        }
+
+                        if (showDownloadPoisDialog) {
+                            val downloadedPbfs by downloadedPbfDao.getAll().collectAsStateWithLifecycle(initialValue = emptyList())
+                            val countries = remember {
+                                nearbyPOIPbfDownloadService.countriesData?.entries?.sortedBy { it.value.name } ?: emptyList()
+                            }
+
+                            Dialog(onDismissRequest = { showDownloadPoisDialog = false }) {
+                                Surface(
+                                    shape = MaterialTheme.shapes.medium,
+                                    color = MaterialTheme.colorScheme.surface,
+                                    modifier = Modifier.padding(16.dp).fillMaxSize()
+                                ) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        Text(
+                                            text = "Download Offline POIs",
+                                            style = MaterialTheme.typography.titleLarge,
+                                            modifier = Modifier.padding(bottom = 16.dp)
+                                        )
+
+                                        LazyColumn(modifier = Modifier.weight(1f)) {
+                                            items(countries) { entry ->
+                                                val key = entry.key
+                                                val data = entry.value
+                                                val downloadedPbf = downloadedPbfs.find { it.countryKey == key }
+                                                val status = downloadedPbf?.downloadState
+
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(vertical = 8.dp),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text(
+                                                        text = data.name,
+                                                        style = MaterialTheme.typography.bodyLarge,
+                                                        modifier = Modifier.weight(1f)
+                                                    )
+
+                                                    if (downloadedPbf == null) {
+                                                        IconButton(onClick = {
+                                                            coroutineScope.launch {
+                                                                downloadedPbfDao.insert(
+                                                                    DownloadedPbf(
+                                                                        countryKey = key,
+                                                                        countryName = data.name,
+                                                                        pbfType = PbfType.POI,
+                                                                        downloadState = PbfDownloadStatus.PENDING,
+                                                                        progress = 0f
+                                                                    )
+                                                                )
+                                                            }
+                                                        }) {
+                                                            Icon(Icons.Filled.Add, contentDescription = "Download")
+                                                        }
+                                                    } else if (status == PbfDownloadStatus.AVAILABLE) {
+                                                        IconButton(onClick = {
+                                                            coroutineScope.launch {
+                                                                downloadedPbfDao.delete(key)
+                                                            }
+                                                        }) {
+                                                            Icon(Icons.Filled.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error)
+                                                        }
+                                                    } else {
+                                                        // Show status or progress
+                                                        when (status) {
+                                                            PbfDownloadStatus.PENDING -> Text("Pending", style = MaterialTheme.typography.bodySmall)
+                                                            PbfDownloadStatus.PROCESSING -> CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                                            PbfDownloadStatus.DOWNLOAD_FAILED -> Text("Failed", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                                            PbfDownloadStatus.PROCESSING_FAILED -> Text("Failed", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                                            else -> {}
+                                                        }
+
+                                                        if (status == PbfDownloadStatus.DOWNLOAD_FAILED || status == PbfDownloadStatus.PROCESSING_FAILED){
+                                                             IconButton(onClick = {
+                                                                coroutineScope.launch {
+                                                                    downloadedPbfDao.delete(key)
+                                                                }
+                                                            }) {
+                                                                Icon(Icons.Filled.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error)
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                HorizontalDivider()
+                                            }
+                                        }
+
+                                        Button(
+                                            onClick = { showDownloadPoisDialog = false },
+                                            modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
+                                        ) {
+                                            Text("Close")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         // Max POI Distance from Route Slider
                         val poiDistanceOptions = arrayOf(200.0, 500.0, 1_000.0, 2_000.0, 5_000.0)
                         val selectedPoiDistanceIndex = poiDistanceOptions.indexOf(poiDistanceToRouteMaxMeters)
@@ -708,6 +836,8 @@ fun MainScreen(onFinish: () -> Unit) {
                             }
                         }
 
+
+
                         Spacer(modifier = Modifier.padding(30.dp))
                     }
                 }
@@ -752,3 +882,13 @@ fun MainScreen(onFinish: () -> Unit) {
         )
     }
 }
+
+
+
+
+
+
+
+
+
+

@@ -4,7 +4,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
     alias(libs.plugins.compose.compiler)
-    kotlin("plugin.serialization") version "2.0.20"
+    kotlin("plugin.serialization") version "2.0.21"
+    id("com.google.devtools.ksp")
 }
 
 android {
@@ -92,6 +93,8 @@ tasks.named("assemble") {
     dependsOn("generateManifest")
 }
 
+val roomVersion = "2.8.4"
+
 dependencies {
     implementation(libs.mapbox.sdk.turf)
     implementation(libs.hammerhead.karoo.ext)
@@ -107,5 +110,11 @@ dependencies {
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
     implementation(libs.mapsforge.map.reader)
+    implementation(libs.osm4j.core)
+    implementation(libs.osm4j.pbf)
+    implementation(libs.androidx.room.runtime)
+    ksp(libs.androidx.room.compiler)
+    implementation(libs.androidx.room.ktx)
+    implementation(libs.okhttp)
     testImplementation(libs.testng)
 }

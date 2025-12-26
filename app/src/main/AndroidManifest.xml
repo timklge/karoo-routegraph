@@ -23,7 +23,7 @@
         </activity>
 
         <activity
-            android:name=".POIActivity"
+            android:name=".pois.POIActivity"
             android:theme="@style/SplashTheme"
             android:exported="true"
             android:launchMode="singleInstance">

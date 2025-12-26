@@ -17,7 +17,7 @@ import androidx.glance.layout.ContentScale
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.padding
 import de.timklge.karooroutegraph.KarooRouteGraphExtension
-import de.timklge.karooroutegraph.POIActivity
+import de.timklge.karooroutegraph.pois.POIActivity
 import de.timklge.karooroutegraph.R
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.DataTypeImpl

@@ -40,9 +40,9 @@ import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.LocationViewModelProvider
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
-import de.timklge.karooroutegraph.distanceToPoi
-import de.timklge.karooroutegraph.getStartAndEndPoiIfNone
-import de.timklge.karooroutegraph.processPoiName
+import de.timklge.karooroutegraph.pois.distanceToPoi
+import de.timklge.karooroutegraph.pois.getStartAndEndPoiIfNone
+import de.timklge.karooroutegraph.pois.processPoiName
 import io.hammerhead.karooext.models.LaunchPinDrop
 import io.hammerhead.karooext.models.OnGlobalPOIs
 import io.hammerhead.karooext.models.OnNavigationState

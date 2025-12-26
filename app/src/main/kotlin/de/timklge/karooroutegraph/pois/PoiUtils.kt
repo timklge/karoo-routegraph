@@ -1,4 +1,4 @@
-package de.timklge.karooroutegraph
+package de.timklge.karooroutegraph.pois
 
 import android.content.Context
 import android.util.Log
@@ -6,6 +6,10 @@ import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
 import com.mapbox.turf.TurfConstants
 import com.mapbox.turf.TurfMeasurement
+import de.timklge.karooroutegraph.KarooRouteGraphExtension
+import de.timklge.karooroutegraph.R
+import de.timklge.karooroutegraph.SampledElevationData
+import de.timklge.karooroutegraph.distanceToString
 import de.timklge.karooroutegraph.screens.PoiSortOption
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import io.hammerhead.karooext.models.Symbol
@@ -70,7 +74,13 @@ sealed class DistanceToPoiResult : Comparable<DistanceToPoiResult> {
                             de.timklge.karooroutegraph.screens.formatDistance(distanceFromPointOnRoute.absoluteValue, isImperial)))
 
                         if (elevationMetersRemaining != null && elevationMetersRemaining > 0) {
-                            append(" ↗ ${distanceToString(elevationMetersRemaining.toFloat(), isImperial, true)}")
+                            append(" ↗ ${
+                                distanceToString(
+                                    elevationMetersRemaining.toFloat(),
+                                    isImperial,
+                                    true
+                                )
+                            }")
                         }
                     }
                 }
@@ -250,7 +260,7 @@ fun getStartAndEndPoiIfNone(routeLineString: LineString?, pois: List<Symbol.POI>
             try {
                 TurfMeasurement.length(routeLineString, TurfConstants.UNIT_METERS).toFloat()
             } catch(e: Exception) {
-                Log.e(KarooRouteGraphExtension.TAG, "Failed to calculate route length", e)
+                Log.e(KarooRouteGraphExtension.Companion.TAG, "Failed to calculate route length", e)
                 null
             }
         }

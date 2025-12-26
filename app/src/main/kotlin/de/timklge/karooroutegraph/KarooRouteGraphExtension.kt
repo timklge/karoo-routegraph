@@ -18,6 +18,14 @@ import de.timklge.karooroutegraph.datatypes.minimap.MinimapZoomLevel
 import de.timklge.karooroutegraph.incidents.HereMapsIncidentProvider
 import de.timklge.karooroutegraph.incidents.IncidentResult
 import de.timklge.karooroutegraph.incidents.IncidentsResponse
+import de.timklge.karooroutegraph.pois.NearbyPOIPbfDownloadService
+import de.timklge.karooroutegraph.pois.NearestPoint
+import de.timklge.karooroutegraph.pois.POI
+import de.timklge.karooroutegraph.pois.PoiApproachAlertService
+import de.timklge.karooroutegraph.pois.PoiType
+import de.timklge.karooroutegraph.pois.calculatePoiDistances
+import de.timklge.karooroutegraph.pois.getStartAndEndPoiIfNone
+import de.timklge.karooroutegraph.pois.processPoiName
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.screens.RouteGraphTemporaryPOIs
 import io.hammerhead.karooext.extension.KarooExtension
@@ -72,6 +80,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     private val locationViewModelProvider: LocationViewModelProvider by inject()
     private val poiApproachAlertService: PoiApproachAlertService by inject()
     private val surfaceConditionRetrievalService: SurfaceConditionRetrievalService by inject()
+    private val nearbyPoiPbfDownloadService: NearbyPOIPbfDownloadService by inject()
 
     private val extensionScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -706,8 +715,13 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 }
 
                 val tempPoiSymbols = temporaryPOIs.poisByOsmId.map { (_, poi) -> POI(poi) }
-                val localPois = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.pois.orEmpty().map { symbol -> POI(symbol = symbol, type = PoiType.POI) }
-                val globalPois = globalPOIs.pois.map { poi -> 
+                val localPois = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.pois.orEmpty().map { symbol ->
+                    POI(
+                        symbol = symbol,
+                        type = PoiType.POI
+                    )
+                }
+                val globalPois = globalPOIs.pois.map { poi ->
                     POI(poi.copy(name = processPoiName(poi.name)))
                 }
 
@@ -716,7 +730,15 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     addAll(globalPois)
                     addAll(localPois)
 
-                    addAll(getStartAndEndPoiIfNone(routeLineString, map { it.symbol }, settings, applicationContext, isNavigatingToDestination))
+                    addAll(
+                        getStartAndEndPoiIfNone(
+                            routeLineString,
+                            map { it.symbol },
+                            settings,
+                            applicationContext,
+                            isNavigatingToDestination
+                        )
+                    )
 
                     addAll(incidentPois)
                 }
@@ -731,7 +753,11 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     if (routeLineString != null){
                         Log.i(TAG, "Route changed, recalculating POI distances")
 
-                        val updatedPoiDistances = calculatePoiDistances(routeLineString, pois, settings.poiDistanceToRouteMaxMeters)
+                        val updatedPoiDistances = calculatePoiDistances(
+                            routeLineString,
+                            pois,
+                            settings.poiDistanceToRouteMaxMeters
+                        )
                         poiDistances = updatedPoiDistances
 
                         val poiDistancesDebug = updatedPoiDistances.map { (key, value) ->
@@ -797,6 +823,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         poiApproachAlertService.startAlertJob()
         surfaceConditionRetrievalService.startMapScanJob()
         surfaceConditionRetrievalService.startSurfaceConditionUpdateJob()
+        nearbyPoiPbfDownloadService.startDownloadJob()
     }
 
     override fun onDestroy() {

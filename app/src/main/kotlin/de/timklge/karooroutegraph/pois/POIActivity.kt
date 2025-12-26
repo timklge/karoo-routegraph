@@ -1,4 +1,4 @@
-package de.timklge.karooroutegraph
+package de.timklge.karooroutegraph.pois
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity

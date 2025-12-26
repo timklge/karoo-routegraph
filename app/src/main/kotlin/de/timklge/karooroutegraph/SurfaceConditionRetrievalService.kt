@@ -10,6 +10,7 @@ import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
 import com.mapbox.turf.TurfConstants
 import com.mapbox.turf.TurfMeasurement
+import de.timklge.karooroutegraph.pois.getNearestPointOnLineDistance
 import io.hammerhead.karooext.models.OnNavigationState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

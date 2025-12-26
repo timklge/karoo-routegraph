@@ -3,6 +3,8 @@ package de.timklge.karooroutegraph
 import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
 import de.timklge.karooroutegraph.incidents.IncidentsResponse
+import de.timklge.karooroutegraph.pois.NearestPoint
+import de.timklge.karooroutegraph.pois.POI
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update

@@ -55,18 +55,17 @@ import com.mapbox.geojson.Point
 import com.mapbox.turf.TurfConstants
 import com.mapbox.turf.TurfMeasurement
 import com.mapbox.turf.TurfMisc
-import de.timklge.karooroutegraph.Element
 import de.timklge.karooroutegraph.KarooRouteGraphExtension
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.LocationViewModelProvider
-import de.timklge.karooroutegraph.NearestPoint
-import de.timklge.karooroutegraph.OverpassPOIProvider
-import de.timklge.karooroutegraph.OverpassResponse
-import de.timklge.karooroutegraph.POI
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
-import de.timklge.karooroutegraph.calculatePoiDistances
-import de.timklge.karooroutegraph.distanceToPoi
+import de.timklge.karooroutegraph.pois.NearbyPOI
+import de.timklge.karooroutegraph.pois.NearestPoint
+import de.timklge.karooroutegraph.pois.OverpassPOIProvider
+import de.timklge.karooroutegraph.pois.POI
+import de.timklge.karooroutegraph.pois.calculatePoiDistances
+import de.timklge.karooroutegraph.pois.distanceToPoi
 import io.hammerhead.karooext.models.LaunchPinDrop
 import io.hammerhead.karooext.models.Symbol
 import io.hammerhead.karooext.models.UserProfile
@@ -103,7 +102,7 @@ enum class NearbyPoiCategory(val labelRes: Int, val osmTag: Set<String>) {
     TOWN(R.string.category_town, setOf("place=town", "place=city")),
 }
 
-data class NearbyPoi(val element: Element, val poi: Symbol.POI)
+data class NearbyPOISymbol(val element: NearbyPOI, val poi: Symbol.POI)
 
 fun formatDistance(distanceMeters: Double, isImperial: Boolean): String {
     return if (isImperial) {
@@ -156,8 +155,8 @@ fun NearbyPoiListScreen() {
         maxDistanceFromRoute = settings.poiDistanceToRouteMaxMeters
     }
 
-    var pois by remember { mutableStateOf(emptyList<NearbyPoi>()) }
-    var mappedPois by remember { mutableStateOf(emptyList<NearbyPoi>()) }
+    var pois by remember { mutableStateOf(emptyList<NearbyPOISymbol>()) }
+    var mappedPois by remember { mutableStateOf(emptyList<NearbyPOISymbol>()) }
 
     var showOpeningHoursDialog by remember { mutableStateOf(false) }
     var openingHoursText by remember { mutableStateOf("") }
@@ -184,7 +183,7 @@ fun NearbyPoiListScreen() {
         }
     }
 
-    fun linearDistanceToPoi(poi: NearbyPoi): Double? {
+    fun linearDistanceToPoi(poi: NearbyPOISymbol): Double? {
         return currentPosition?.let { currentPosition ->
             TurfMeasurement.distance(
                 Point.fromLngLat(poi.element.lon, poi.element.lat),
@@ -242,7 +241,7 @@ fun NearbyPoiListScreen() {
 
                 val onlyTownOrVillagesSelected = selectedCategories.all { it == NearbyPoiCategory.TOWN || it == NearbyPoiCategory.VILLAGE }
 
-                var overpassResponse: OverpassResponse? = null
+                var overpassResponse: List<NearbyPOI>? = null
 
                 if (selectedSort == PoiSortOption.LINEAR_DISTANCE) {
                     val radiusSteps = if (onlyTownOrVillagesSelected) {
@@ -252,14 +251,14 @@ fun NearbyPoiListScreen() {
                     }
 
                     for (step in radiusSteps) {
-                        overpassResponse = overpassPOIProvider.requestOverpassPOIs(
+                        overpassResponse = overpassPOIProvider.requestNearbyPOIs(
                             selectedCategories.flatMap { it.osmTag }.distinct(),
                             points = listOf(currentPos),
                             radius = step,
                             limit = limit
                         )
 
-                        if (overpassResponse.elements.size >= desiredCount) {
+                        if (overpassResponse.size >= desiredCount) {
                             break // Enough POIs found, exit loop
                         }
                     }
@@ -285,7 +284,7 @@ fun NearbyPoiListScreen() {
 
                     val radius = if (onlyTownOrVillagesSelected) 5_000 else maxDistanceFromRoute.roundToInt()
 
-                    overpassResponse = overpassPOIProvider.requestOverpassPOIs(
+                    overpassResponse = overpassPOIProvider.requestNearbyPOIs(
                         requestedTags = selectedCategories.flatMap { it.osmTag }.distinct(),
                         points = routeAhead.coordinates(),
                         radius = radius,
@@ -293,14 +292,14 @@ fun NearbyPoiListScreen() {
                     )
                 }
 
-                mappedPois = overpassResponse?.elements?.map { element ->
-                    NearbyPoi(
+                mappedPois = overpassResponse?.map { element ->
+                    NearbyPOISymbol(
                         element = element,
                         poi = Symbol.POI(
                             id = "nearby-${element.id}",
                             lat = element.lat,
                             lng = element.lon,
-                            name = element.tags?.get("name") ?: unnamedPoi
+                            name = element.tags["name"] ?: unnamedPoi
                         )
                     )
                 } ?: emptyList()
@@ -541,7 +540,7 @@ fun NearbyPoiListScreen() {
                                 )
                             }
 
-                            if (poi.element.hasAdditionalInfo()) {
+                            if (poi.element.tags.isNotEmpty()) {
                                 val noInfoText = stringResource(R.string.no_info_available)
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.show_info)) },

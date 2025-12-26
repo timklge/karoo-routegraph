@@ -2,7 +2,6 @@ package de.timklge.karooroutegraph.datatypes
 
 import android.content.Context
 import android.content.res.Configuration
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -27,9 +26,9 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
 import de.timklge.karooroutegraph.ClimbCategory
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
-import de.timklge.karooroutegraph.NearestPoint
-import de.timklge.karooroutegraph.POI
-import de.timklge.karooroutegraph.PoiType
+import de.timklge.karooroutegraph.pois.NearestPoint
+import de.timklge.karooroutegraph.pois.POI
+import de.timklge.karooroutegraph.pois.PoiType
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModel
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModelProvider
