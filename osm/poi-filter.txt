@@ -1,0 +1,5 @@
+amenity=drinking_water,fuel,restaurant,cafe,ice_cream,toilets,shower,atm,shelter,waste_basket,bench,pharmacy,hospital
+shop=supermarket,bakery,bicycle
+tourism=camp_site,hotel,attraction,viewpoint
+railway=station
+place=town,city
