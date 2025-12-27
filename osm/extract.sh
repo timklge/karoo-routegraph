@@ -5,6 +5,7 @@ INPUT_PBF="pois.osm.pbf"
 PLANET_PBF="planet-latest.osm.pbf"
 POI_FILTER_FILE="poi-filter.txt"
 OUT_DIR="output"
+export OSMIUM_POOL_THREADS=4
 
 # Check if jq is installed
 if ! command -v jq &> /dev/null; then

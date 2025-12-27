@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -85,32 +86,17 @@ func main() {
 		} else {
 			switch v := v.(type) {
 			case *osmpbf.Node:
-				name := v.Tags["name"]
-				_, err = stmtNode.Exec(v.ID, v.Lat, v.Lon, name)
+				jsonTags, err := json.Marshal(v.Tags)
+				if err != nil {
+					log.Fatalf("Error marshaling tags for node %d: %v", v.ID, err)
+				}
+
+				_, err = stmtNode.Exec(v.ID, v.Lat, v.Lon, jsonTags)
 				if err != nil {
 					log.Fatalf("Error inserting node %d: %v", v.ID, err)
 				}
 
 				count++
-				if count%batchSize == 0 {
-					stmtNode.Close()
-					err = tx.Commit()
-					if err != nil {
-						log.Fatalf("Error committing transaction: %v", err)
-					}
-
-					fmt.Printf("Processed %d nodes...\n", count)
-
-					// Start new transaction
-					tx, err = db.Begin()
-					if err != nil {
-						log.Fatalf("Error beginning transaction: %v", err)
-					}
-					stmtNode, err = tx.Prepare("INSERT INTO nodes(id, lat, lon, tags) VALUES(?, ?, ?, ?)")
-					if err != nil {
-						log.Fatalf("Error preparing node statement: %v", err)
-					}
-				}
 			case *osmpbf.Way:
 				// Ignore ways
 			case *osmpbf.Relation:
