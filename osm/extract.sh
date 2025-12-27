@@ -22,7 +22,7 @@ fi
 mkdir -p "$OUT_DIR/pois"
 
 #pyosmium-up-to-date "$PLANET_PBF"
-#osmium tags-filter "$PLANET_PBF" --expressions="$POI_FILTER_FILE" -o "$INPUT_PBF"
+#osmium tags-filter "$PLANET_PBF" --expressions="$POI_FILTER_FILE" -o "$INPUT_PBF" --overwrite
 
 # Verify files exist
 if [[ ! -f "$JSON_FILE" ]]; then
