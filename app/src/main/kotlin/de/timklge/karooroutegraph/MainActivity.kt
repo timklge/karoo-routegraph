@@ -13,11 +13,6 @@ import androidx.datastore.preferences.preferencesDataStore
 import de.timklge.karooroutegraph.screens.MainScreen
 import de.timklge.karooroutegraph.theme.AppTheme
 
-val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings", corruptionHandler = ReplaceFileCorruptionHandler {
-    Log.w(KarooRouteGraphExtension.TAG, "Error reading settings, using default values")
-    emptyPreferences()
-})
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

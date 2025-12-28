@@ -39,6 +39,10 @@ class PoiApproachAlertService(
     private var alertShowJob: Job? = null
     private var alertChannel: Channel<PoiAlert> = Channel(10)
 
+    init {
+        startAlertJob()
+    }
+
     data class PoiAlert(val message: String)
 
     fun startAlertJob() {

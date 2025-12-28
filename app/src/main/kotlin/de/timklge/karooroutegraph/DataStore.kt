@@ -2,8 +2,15 @@ package de.timklge.karooroutegraph
 
 import android.content.Context
 import android.util.Log
+import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import de.timklge.karooroutegraph.pois.DownloadedPbf
+import de.timklge.karooroutegraph.pois.PbfDownloadStatus
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.models.ActiveRidePage
@@ -20,6 +27,49 @@ import kotlinx.serialization.json.Json
 val jsonWithUnknownKeys = Json { ignoreUnknownKeys = true }
 
 val settingsKey = stringPreferencesKey("settings")
+
+val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings", corruptionHandler = ReplaceFileCorruptionHandler {
+    Log.w(KarooRouteGraphExtension.TAG, "Error reading settings, using default values")
+    emptyPreferences()
+})
+
+val Context.pbfDownloadStore: DataStore<Preferences> by preferencesDataStore(name = "pbf_downloads", corruptionHandler = ReplaceFileCorruptionHandler {
+    Log.w(KarooRouteGraphExtension.TAG, "Error reading PBF download settings, using default values")
+    emptyPreferences()
+})
+
+val pbfDownloadStoreKey = stringPreferencesKey("pbfDownloads")
+
+fun streamPbfDownloadStore(context: Context): Flow<List<DownloadedPbf>> {
+    return context.pbfDownloadStore.data
+        .map { preferences ->
+            preferences[pbfDownloadStoreKey]?.let { value ->
+                jsonWithUnknownKeys.decodeFromString<List<DownloadedPbf>>(value)
+            } ?: emptyList()
+        }
+}
+
+suspend fun updatePbfDownloadStore(context: Context, f: (List<DownloadedPbf>) -> List<DownloadedPbf>) {
+    context.pbfDownloadStore.edit { t ->
+        val currentPbfs = t[pbfDownloadStoreKey]?.let { value ->
+            jsonWithUnknownKeys.decodeFromString<List<DownloadedPbf>>(value)
+        } ?: emptyList()
+        val downloadedPbfs = f(currentPbfs)
+        t[pbfDownloadStoreKey] = jsonWithUnknownKeys.encodeToString(downloadedPbfs)
+    }
+}
+
+suspend fun updatePbfDownloadStoreStatus(context: Context, countryKey: String, status: PbfDownloadStatus, progress: Float = 0f) {
+    updatePbfDownloadStore(context) { currentPbfs ->
+        currentPbfs.map {
+            if (it.countryKey == countryKey){
+                it.copy(downloadState = status, progress = progress)
+            } else {
+                it
+            }
+        }
+    }
+}
 
 suspend fun saveSettings(context: Context, settings: RouteGraphSettings) {
     context.dataStore.edit { t ->

@@ -93,7 +93,7 @@ tasks.named("assemble") {
     dependsOn("generateManifest")
 }
 
-val roomVersion = "2.8.4"
+
 
 dependencies {
     implementation(libs.mapbox.sdk.turf)
@@ -112,9 +112,6 @@ dependencies {
     implementation(libs.mapsforge.map.reader)
     implementation(libs.osm4j.core)
     implementation(libs.osm4j.pbf)
-    implementation(libs.androidx.room.runtime)
-    ksp(libs.androidx.room.compiler)
-    implementation(libs.androidx.room.ktx)
     implementation(libs.okhttp)
     testImplementation(libs.testng)
 }

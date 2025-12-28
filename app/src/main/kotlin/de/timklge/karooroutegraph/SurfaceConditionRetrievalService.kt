@@ -102,9 +102,12 @@ class SurfaceConditionRetrievalService(
     }
 
     private var mapScanJob: Job? = null
-
     private var surfaceConditionUpdateJob: Job? = null
 
+    init {
+        startMapScanJob()
+        startSurfaceConditionUpdateJob()
+    }
 
     fun startMapScanJob() {
         mapScanJob = CoroutineScope(Dispatchers.IO).launch {
@@ -305,7 +308,7 @@ class SurfaceConditionRetrievalService(
                 karooSystemServiceProvider.stream<OnNavigationState>()
             ) { isEnabled, state ->
                 Pair(isEnabled, state)
-            }.filter { (isEnabled, state) ->
+            }.filter { (isEnabled, _) ->
                 isEnabled
             }.map { (_, state) ->
                 state

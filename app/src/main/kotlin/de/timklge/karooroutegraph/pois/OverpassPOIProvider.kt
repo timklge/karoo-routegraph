@@ -53,7 +53,7 @@ class OverpassPOIProvider(
     private val karooSystemServiceProvider: KarooSystemServiceProvider
 ) : NearbyPOIProvider {
     override suspend fun requestNearbyPOIs(
-        requestedTags: List<String>,
+        requestedTags: List<Pair<String, String>>,
         points: List<Point>,
         radius: Int,
         limit: Int
@@ -66,7 +66,7 @@ class OverpassPOIProvider(
 
             val url = "https://overpass-api.de/api/interpreter"
             val requestBodyDataPart = "[out:json];(" +
-                    requestedTags.joinToString("") { tag -> "node[$tag](around:$radius,$polylineString);" } +
+                    requestedTags.joinToString("") { (key, value) -> "node[$key=$value](around:$radius,$polylineString);" } +
                     ");out center $limit;"
 
             @Suppress("BlockingMethodInNonBlockingContext")

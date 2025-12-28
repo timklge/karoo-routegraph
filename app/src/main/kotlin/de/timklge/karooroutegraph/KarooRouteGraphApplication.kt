@@ -5,6 +5,7 @@ import de.timklge.karooroutegraph.datatypes.minimap.MinimapViewModelProvider
 import de.timklge.karooroutegraph.incidents.HereMapsIncidentProvider
 import de.timklge.karooroutegraph.pois.NearbyPOIPbfDownloadService
 import de.timklge.karooroutegraph.pois.NominatimProvider
+import de.timklge.karooroutegraph.pois.OfflineNearbyPOIProvider
 import de.timklge.karooroutegraph.pois.OverpassPOIProvider
 import de.timklge.karooroutegraph.pois.PoiApproachAlertService
 import org.koin.android.ext.koin.androidContext
@@ -26,8 +27,8 @@ val appModule = module {
     singleOf(::PoiApproachAlertService)
     singleOf(::NearbyPOIPbfDownloadService)
     singleOf(::SurfaceConditionRetrievalService)
-    singleOf(::RoutegraphDatabaseProvider)
-    single { get<RoutegraphDatabaseProvider>().db.downloadedPbfDao() }
+    singleOf(::RouteGraphUpdateManager)
+    singleOf(::OfflineNearbyPOIProvider)
 }
 
 class KarooRouteGraphApplication : Application() {

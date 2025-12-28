@@ -1,14 +1,12 @@
 package de.timklge.karooroutegraph.pois
 
-import androidx.room.ColumnInfo
-import androidx.room.Entity
-import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
 
-@Entity(tableName = "downloaded_pbf")
+@Serializable
 data class DownloadedPbf(
-    @PrimaryKey val countryKey: String,
-    @ColumnInfo(name = "country_name") val countryName: String,
-    @ColumnInfo(name = "pbf_type") val pbfType: PbfType,
-    @ColumnInfo(name = "download_status") val downloadState: PbfDownloadStatus,
-    @ColumnInfo(name = "progress") val progress: Float,
+    val countryKey: String,
+    val countryName: String,
+    val pbfType: PbfType,
+    val downloadState: PbfDownloadStatus,
+    val progress: Float,
 )

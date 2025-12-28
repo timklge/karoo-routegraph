@@ -37,6 +37,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -62,6 +63,7 @@ import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.pois.NearbyPOI
 import de.timklge.karooroutegraph.pois.NearestPoint
+import de.timklge.karooroutegraph.pois.OfflineNearbyPOIProvider
 import de.timklge.karooroutegraph.pois.OverpassPOIProvider
 import de.timklge.karooroutegraph.pois.POI
 import de.timklge.karooroutegraph.pois.calculatePoiDistances
@@ -69,6 +71,8 @@ import de.timklge.karooroutegraph.pois.distanceToPoi
 import io.hammerhead.karooext.models.LaunchPinDrop
 import io.hammerhead.karooext.models.Symbol
 import io.hammerhead.karooext.models.UserProfile
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -76,30 +80,30 @@ import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import kotlin.math.roundToInt
 
-enum class NearbyPoiCategory(val labelRes: Int, val osmTag: Set<String>) {
-    DRINKING_WATER(R.string.category_water, setOf("amenity=drinking_water")),
-    GAS_STATIONS(R.string.category_gas_station, setOf("amenity=fuel")),
-    SUPERMARKETS(R.string.category_supermarket, setOf("shop=supermarket")),
-    RESTAURANTS(R.string.category_restaurant, setOf("amenity=restaurant")),
-    CAFES(R.string.category_cafe, setOf("amenity=cafe")),
-    ICE_CREAM(R.string.category_ice_cream, setOf("amenity=ice_cream")),
-    BAKERY(R.string.category_bakery, setOf("shop=bakery")),
-    TOILETS(R.string.category_toilets, setOf("amenity=toilets")),
-    SHOWERS(R.string.category_showers, setOf("amenity=shower")),
-    ATMS(R.string.category_atms, setOf("amenity=atm")),
-    SHELTER(R.string.category_shelter, setOf("amenity=shelter")),
-    CAMPING_SITE(R.string.category_camping_site, setOf("tourism=camp_site")),
-    HOTEL(R.string.category_hotel, setOf("tourism=hotel")),
-    TRAIN_STATION(R.string.category_train_station, setOf("railway=station")),
-    WASTE_BASKET(R.string.category_waste_basket, setOf("amenity=waste_basket")),
-    BENCH(R.string.category_bench, setOf("amenity=bench")),
-    BIKE_SHOP(R.string.category_bike_shop, setOf("shop=bicycle")),
-    TOURISM_ATTRACTION(R.string.category_attraction, setOf("tourism=attraction")),
-    VIEWPOINT(R.string.category_viewpoint, setOf("tourism=viewpoint")),
-    PHARMACY(R.string.category_pharmacy, setOf("amenity=pharmacy")),
-    HOSPITAL(R.string.category_hospital, setOf("amenity=hospital")),
-    VILLAGE(R.string.category_village, setOf("place=village")),
-    TOWN(R.string.category_town, setOf("place=town", "place=city")),
+enum class NearbyPoiCategory(val labelRes: Int, val osmTag: List<Pair<String, String>>) {
+    DRINKING_WATER(R.string.category_water, listOf("amenity" to "drinking_water")),
+    GAS_STATIONS(R.string.category_gas_station, listOf("amenity" to "fuel")),
+    SUPERMARKETS(R.string.category_supermarket, listOf("shop" to "supermarket")),
+    RESTAURANTS(R.string.category_restaurant, listOf("amenity" to "restaurant")),
+    CAFES(R.string.category_cafe, listOf("amenity" to "cafe")),
+    ICE_CREAM(R.string.category_ice_cream, listOf("amenity" to "ice_cream")),
+    BAKERY(R.string.category_bakery, listOf("shop" to "bakery")),
+    TOILETS(R.string.category_toilets, listOf("amenity" to "toilets")),
+    SHOWERS(R.string.category_showers, listOf("amenity" to "shower")),
+    ATMS(R.string.category_atms, listOf("amenity" to "atm")),
+    SHELTER(R.string.category_shelter, listOf("amenity" to "shelter")),
+    CAMPING_SITE(R.string.category_camping_site, listOf("tourism" to "camp_site")),
+    HOTEL(R.string.category_hotel, listOf("tourism" to "hotel")),
+    TRAIN_STATION(R.string.category_train_station, listOf("railway" to "station")),
+    WASTE_BASKET(R.string.category_waste_basket, listOf("amenity" to "waste_basket")),
+    BENCH(R.string.category_bench, listOf("amenity" to "bench")),
+    BIKE_SHOP(R.string.category_bike_shop, listOf("shop" to "bicycle")),
+    TOURISM_ATTRACTION(R.string.category_attraction, listOf("tourism" to "attraction")),
+    VIEWPOINT(R.string.category_viewpoint, listOf("tourism" to "viewpoint")),
+    PHARMACY(R.string.category_pharmacy, listOf("amenity" to "pharmacy")),
+    HOSPITAL(R.string.category_hospital, listOf("amenity" to "hospital")),
+    VILLAGE(R.string.category_village, listOf("place" to "village")),
+    TOWN(R.string.category_town, listOf("place" to "town", "place" to "city")),
 }
 
 data class NearbyPOISymbol(val element: NearbyPOI, val poi: Symbol.POI)
@@ -133,22 +137,18 @@ fun NearbyPoiListScreen() {
     var selectedSort by remember { mutableStateOf(PoiSortOption.LINEAR_DISTANCE) }
 
     val karooSystemServiceProvider = koinInject<KarooSystemServiceProvider>()
-    val overpassPOIProvider = koinInject<OverpassPOIProvider>()
+    val offlineNearbyPOIProvider = koinInject<OfflineNearbyPOIProvider>()
+    val overpassNearbyPOIProvider = koinInject<OverpassPOIProvider>()
     val locationViewModelProvider = koinInject<LocationViewModelProvider>()
     val routeGraphViewModelProvider = koinInject<RouteGraphViewModelProvider>()
 
-    var maxDistanceFromRoute by remember { mutableStateOf(1_000.0) }
+    var maxDistanceFromRoute by remember { mutableDoubleStateOf(1_000.0) }
 
     // Add these for accessing string resources
     val errorNoRoute = stringResource(R.string.error_no_route)
     val errorNoPosition = stringResource(R.string.error_no_position)
     val errorFetchPois = stringResource(R.string.error_fetch_pois)
     val unnamedPoi = stringResource(R.string.unnamed_poi)
-
-    LaunchedEffect(Unit) {
-        val viewSettings = karooSystemServiceProvider.streamViewSettings().first()
-        selectedSort = viewSettings.poiSortOptionForNearbyPois
-    }
 
     LaunchedEffect(Unit) {
         val settings = karooSystemServiceProvider.streamSettings().first()
@@ -241,68 +241,86 @@ fun NearbyPoiListScreen() {
 
                 val onlyTownOrVillagesSelected = selectedCategories.all { it == NearbyPoiCategory.TOWN || it == NearbyPoiCategory.VILLAGE }
 
-                var overpassResponse: List<NearbyPOI>? = null
+                var overpassResponse: Set<NearbyPOI>? = null
 
-                if (selectedSort == PoiSortOption.LINEAR_DISTANCE) {
-                    val radiusSteps = if (onlyTownOrVillagesSelected) {
-                        listOf(5_000, 10_000, 20_000, 50_000)
-                    } else {
-                        listOf(2_000, 5_000, 10_000)
-                    }
+                CoroutineScope(Dispatchers.IO).launch {
+                    val radius = if (onlyTownOrVillagesSelected) 50_000 else 10_000
+                    val hasOfflineFiles = offlineNearbyPOIProvider.getAvailableCountriesInBounds(listOf(currentPos), radius).isNotEmpty()
 
-                    for (step in radiusSteps) {
-                        overpassResponse = overpassPOIProvider.requestNearbyPOIs(
-                            selectedCategories.flatMap { it.osmTag }.distinct(),
-                            points = listOf(currentPos),
-                            radius = step,
-                            limit = limit
-                        )
+                    if (selectedSort == PoiSortOption.LINEAR_DISTANCE) {
+                        if (hasOfflineFiles) {
+                            val offlineResponse = offlineNearbyPOIProvider.requestNearbyPOIs(
+                                selectedCategories.flatMap { it.osmTag }.distinct(),
+                                points = listOf(currentPos),
+                                radius = if (onlyTownOrVillagesSelected) 50_000 else 10_000,
+                                limit = limit
+                            )
 
-                        if (overpassResponse.size >= desiredCount) {
-                            break // Enough POIs found, exit loop
+                            overpassResponse = offlineResponse.toSet()
+                        } else {
+                            val radiusSteps = if (onlyTownOrVillagesSelected) {
+                                listOf(5_000, 10_000, 20_000, 50_000)
+                            } else {
+                                listOf(2_000, 5_000, 10_000)
+                            }
+
+                            for (step in radiusSteps) {
+                                val newResponse = overpassNearbyPOIProvider.requestNearbyPOIs(
+                                    selectedCategories.flatMap { it.osmTag }.distinct(),
+                                    points = listOf(currentPos),
+                                    radius = step,
+                                    limit = limit
+                                )
+                                overpassResponse = newResponse.toSet()
+
+                                if (newResponse.size >= desiredCount) {
+                                    break // Enough POIs found, exit loop
+                                }
+                            }
                         }
+                    } else {
+                        val route = viewModel?.knownRoute
+
+                        if (route == null) {
+                            lastErrorMessage = errorNoRoute
+                            delay(1_000)
+                            isRefreshing = false
+                            return@launch
+                        }
+
+                        val routeAhead = try {
+                            val routeLength = viewModel?.routeDistance?.toDouble() ?: TurfMeasurement.length(route, TurfConstants.UNIT_METERS)
+                            val startDistance = ((viewModel?.distanceAlongRoute?.toDouble() ?: 0.0) - 2_000).coerceAtLeast(0.0) // 2 km behind
+                            val endDistance = (startDistance + 50_000).coerceAtMost(routeLength) // 50 km ahead
+                            TurfMisc.lineSliceAlong(route, startDistance, endDistance, TurfConstants.UNIT_METERS)
+                        } catch(e: Exception) {
+                            Log.e(KarooRouteGraphExtension.TAG, "Failed to slice route ahead", e)
+                            route
+                        }
+
+                        val radius = if (onlyTownOrVillagesSelected) 5_000 else maxDistanceFromRoute.roundToInt()
+
+                        val nearbyPoiProvider = if (hasOfflineFiles) offlineNearbyPOIProvider else overpassNearbyPOIProvider
+                        overpassResponse = nearbyPoiProvider.requestNearbyPOIs(
+                            requestedTags = selectedCategories.flatMap { it.osmTag }.distinct(),
+                            points = routeAhead.coordinates(),
+                            radius = radius,
+                            limit = 100
+                        ).toSet()
                     }
-                } else {
-                    val route = viewModel?.knownRoute
 
-                    if (route == null) {
-                        lastErrorMessage = errorNoRoute
-                        delay(1_000)
-                        isRefreshing = false
-                        return@launch
-                    }
-
-                    val routeAhead = try {
-                        val routeLength = viewModel?.routeDistance?.toDouble() ?: TurfMeasurement.length(route, TurfConstants.UNIT_METERS)
-                        val startDistance = ((viewModel?.distanceAlongRoute?.toDouble() ?: 0.0) - 2_000).coerceAtLeast(0.0) // 2 km behind
-                        val endDistance = (startDistance + 50_000).coerceAtMost(routeLength) // 50 km ahead
-                        TurfMisc.lineSliceAlong(route, startDistance, endDistance, TurfConstants.UNIT_METERS)
-                    } catch(e: Exception) {
-                        Log.e(KarooRouteGraphExtension.TAG, "Failed to slice route ahead", e)
-                        route
-                    }
-
-                    val radius = if (onlyTownOrVillagesSelected) 5_000 else maxDistanceFromRoute.roundToInt()
-
-                    overpassResponse = overpassPOIProvider.requestNearbyPOIs(
-                        requestedTags = selectedCategories.flatMap { it.osmTag }.distinct(),
-                        points = routeAhead.coordinates(),
-                        radius = radius,
-                        limit = 100
-                    )
-                }
-
-                mappedPois = overpassResponse?.map { element ->
-                    NearbyPOISymbol(
-                        element = element,
-                        poi = Symbol.POI(
-                            id = "nearby-${element.id}",
-                            lat = element.lat,
-                            lng = element.lon,
-                            name = element.tags["name"] ?: unnamedPoi
+                    mappedPois = overpassResponse?.map { element ->
+                        NearbyPOISymbol(
+                            element = element,
+                            poi = Symbol.POI(
+                                id = "nearby-${element.id}",
+                                lat = element.lat,
+                                lng = element.lon,
+                                name = element.tags["name"] ?: unnamedPoi
+                            )
                         )
-                    )
-                } ?: emptyList()
+                    } ?: emptyList()
+                }.join()
             } catch(e: Exception){
                 lastErrorMessage = String.format(errorFetchPois, e.message ?: "")
                 delay(1_000)
@@ -311,6 +329,16 @@ fun NearbyPoiListScreen() {
             }
 
             isRefreshing = false
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        val viewSettings = karooSystemServiceProvider.streamViewSettings().first()
+        selectedSort = viewSettings.poiSortOptionForNearbyPois
+        selectedCategories = viewSettings.poiCategoriesForNearbyPois
+
+        if (selectedCategories.isNotEmpty()) {
+            onRefresh()
         }
     }
 
@@ -380,6 +408,7 @@ fun NearbyPoiListScreen() {
                     val categoriesText = if (selectedCategories.isEmpty()) {
                         selectText
                     } else {
+                        @Suppress("SimplifiableCallChain")
                         selectedCategories.map { stringResource(it.labelRes) }.joinToString()
                     }
 
@@ -430,132 +459,132 @@ fun NearbyPoiListScreen() {
                         color = MaterialTheme.colorScheme.error
                     )
                 }
-            }
+            } else {
+                items(pois) { poi ->
+                    var showContextMenu by remember { mutableStateOf(false) }
 
-            items(pois) { poi ->
-                var showContextMenu by remember { mutableStateOf(false) }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = poi.element.tags["name"] ?: stringResource(R.string.unnamed_poi),
+                                style = MaterialTheme.typography.bodyLarge,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = poi.element.tags?.get("name") ?: stringResource(R.string.unnamed_poi),
-                            style = MaterialTheme.typography.bodyLarge,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                            val distanceLabel = currentPosition?.let {
+                                if (selectedSort == PoiSortOption.LINEAR_DISTANCE) {
+                                    val distanceMeters = linearDistanceToPoi(poi)
 
-                        val distanceLabel = currentPosition?.let {
-                            if (selectedSort == PoiSortOption.LINEAR_DISTANCE) {
-                                val distanceMeters = linearDistanceToPoi(poi)
+                                    distanceMeters?.let { distance -> formatDistance(distance, isImperial) }
+                                } else {
+                                    val result = distanceToPoi(poi.poi, viewModel?.sampledElevationData,
+                                        nearestPointsOnRouteToFoundPois, currentPosition, selectedSort, viewModel?.distanceAlongRoute)
 
-                                distanceMeters?.let { distance -> formatDistance(distance, isImperial) }
-                            } else {
-                                val result = distanceToPoi(poi.poi, viewModel?.sampledElevationData,
-                                    nearestPointsOnRouteToFoundPois, currentPosition, selectedSort, viewModel?.distanceAlongRoute)
+                                    result?.formatDistance(LocalContext.current, isImperial)
+                                }
+                            }
 
-                                result?.formatDistance(LocalContext.current, isImperial)
+                            if (distanceLabel != null){
+                                Text(
+                                    text = distanceLabel,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                                )
                             }
                         }
 
-                        if (distanceLabel != null){
-                            Text(
-                                text = distanceLabel,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
-                            )
-                        }
-                    }
+                        Box {
+                            IconButton(
+                                onClick = { showContextMenu = true }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = "More options"
+                                )
+                            }
 
-                    Box {
-                        IconButton(
-                            onClick = { showContextMenu = true }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.MoreVert,
-                                contentDescription = "More options"
-                            )
-                        }
+                            DropdownMenu(
+                                expanded = showContextMenu,
+                                onDismissRequest = { showContextMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.navigate)) },
+                                    onClick = {
+                                        showContextMenu = false
+                                        karooSystemServiceProvider.karooSystemService.dispatch(LaunchPinDrop(poi.poi))
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.bxmap),
+                                            contentDescription = stringResource(R.string.navigate)
+                                        )
+                                    }
+                                )
 
-                        DropdownMenu(
-                            expanded = showContextMenu,
-                            onDismissRequest = { showContextMenu = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.navigate)) },
-                                onClick = {
-                                    showContextMenu = false
-                                    karooSystemServiceProvider.karooSystemService.dispatch(LaunchPinDrop(poi.poi))
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.bxmap),
-                                        contentDescription = stringResource(R.string.navigate)
+                                if (!temporaryPois.poisByOsmId.contains(poi.element.id)) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.add_to_map)) },
+                                        onClick = {
+                                            showContextMenu = false
+
+                                            coroutineScope.launch {
+                                                delay(100) // fixme delay to ensure the menu closes before saving
+
+                                                karooSystemServiceProvider.saveTemporaryPOIs {
+                                                    it.copy(poisByOsmId = it.poisByOsmId + (poi.element.id to poi.poi))
+                                                }
+                                            }
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                painter = painterResource(id = R.drawable.bx_info_circle),
+                                                contentDescription = stringResource(R.string.add_to_map)
+                                            )
+                                        }
+                                    )
+                                } else {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.remove_from_map)) },
+                                        onClick = {
+                                            showContextMenu = false
+                                            coroutineScope.launch {
+                                                karooSystemServiceProvider.saveTemporaryPOIs {
+                                                    it.copy(poisByOsmId = it.poisByOsmId - poi.element.id)
+                                                }
+                                            }
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                painter = painterResource(id = R.drawable.bx_info_circle),
+                                                contentDescription = stringResource(R.string.remove_from_map)
+                                            )
+                                        }
                                     )
                                 }
-                            )
 
-                            if (!temporaryPois.poisByOsmId.contains(poi.element.id)) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.add_to_map)) },
-                                    onClick = {
-                                        showContextMenu = false
-
-                                        coroutineScope.launch {
-                                            delay(100) // fixme delay to ensure the menu closes before saving
-
-                                            karooSystemServiceProvider.saveTemporaryPOIs {
-                                                it.copy(poisByOsmId = it.poisByOsmId + (poi.element.id to poi.poi))
-                                            }
+                                if (poi.element.tags.isNotEmpty()) {
+                                    val noInfoText = stringResource(R.string.no_info_available)
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.show_info)) },
+                                        onClick = {
+                                            showContextMenu = false
+                                            openingHoursText = poi.element.tags?.map { (k, v) -> "$k=$v" }?.joinToString("\r\n") ?: noInfoText
+                                            showOpeningHoursDialog = true
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                painter = painterResource(id = R.drawable.bx_info_circle),
+                                                contentDescription = stringResource(R.string.show_info)
+                                            )
                                         }
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            painter = painterResource(id = R.drawable.bx_info_circle),
-                                            contentDescription = stringResource(R.string.add_to_map)
-                                        )
-                                    }
-                                )
-                            } else {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.remove_from_map)) },
-                                    onClick = {
-                                        showContextMenu = false
-                                        coroutineScope.launch {
-                                            karooSystemServiceProvider.saveTemporaryPOIs {
-                                                it.copy(poisByOsmId = it.poisByOsmId - poi.element.id)
-                                            }
-                                        }
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            painter = painterResource(id = R.drawable.bx_info_circle),
-                                            contentDescription = stringResource(R.string.remove_from_map)
-                                        )
-                                    }
-                                )
-                            }
-
-                            if (poi.element.tags.isNotEmpty()) {
-                                val noInfoText = stringResource(R.string.no_info_available)
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.show_info)) },
-                                    onClick = {
-                                        showContextMenu = false
-                                        openingHoursText = poi.element.tags?.map { (k, v) -> "$k=$v" }?.joinToString("\r\n") ?: noInfoText
-                                        showOpeningHoursDialog = true
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            painter = painterResource(id = R.drawable.bx_info_circle),
-                                            contentDescription = stringResource(R.string.show_info)
-                                        )
-                                    }
-                                )
+                                    )
+                                }
                             }
                         }
                     }
@@ -614,7 +643,13 @@ fun NearbyPoiListScreen() {
                         Button(onClick = {
                             selectedCategories = tempSelectedCategories
                             showDialog = false
-                            onRefresh()
+
+                            coroutineScope.launch {
+                                karooSystemServiceProvider.saveViewSettings { settings ->
+                                    settings.copy(poiCategoriesForNearbyPois = selectedCategories)
+                                }
+                                onRefresh()
+                            }
                         }) {
                             Text(stringResource(R.string.ok))
                         }

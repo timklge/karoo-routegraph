@@ -28,7 +28,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -72,14 +75,16 @@ import de.timklge.karooroutegraph.KarooRouteGraphExtension
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.incidents.HereMapsIncidentProvider
 import de.timklge.karooroutegraph.pois.DownloadedPbf
-import de.timklge.karooroutegraph.pois.DownloadedPbfDao
 import de.timklge.karooroutegraph.pois.NearbyPOIPbfDownloadService
 import de.timklge.karooroutegraph.pois.POIActivity
 import de.timklge.karooroutegraph.pois.PbfDownloadStatus
 import de.timklge.karooroutegraph.pois.PbfType
 import de.timklge.karooroutegraph.saveSettings
+import de.timklge.karooroutegraph.streamPbfDownloadStore
 import de.timklge.karooroutegraph.streamSettings
 import de.timklge.karooroutegraph.streamUserProfile
+import de.timklge.karooroutegraph.updatePbfDownloadStore
+import de.timklge.karooroutegraph.updatePbfDownloadStoreStatus
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.models.UserProfile
 import kotlinx.coroutines.delay
@@ -133,7 +138,6 @@ fun MainScreen(onFinish: () -> Unit) {
     var newZoomLevelText by remember { mutableStateOf("") }
     var zoomLevelError by remember { mutableStateOf("") }
     val hereMapsIncidentProvider = koinInject<HereMapsIncidentProvider>()
-    val downloadedPbfDao = koinInject<DownloadedPbfDao>()
     val nearbyPOIPbfDownloadService = koinInject<NearbyPOIPbfDownloadService>()
     var showDownloadPoisDialog by remember { mutableStateOf(false) }
 
@@ -231,7 +235,7 @@ fun MainScreen(onFinish: () -> Unit) {
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = {Text("RouteGraph")}) },
+        topBar = { TopAppBar(title = {Text(stringResource(R.string.app_name))}) },
         content = {
             Box(Modifier.fillMaxSize()) {
                 Column(
@@ -490,18 +494,21 @@ fun MainScreen(onFinish: () -> Unit) {
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Add,
-                                contentDescription = "Offline POIs",
+                                contentDescription = stringResource(R.string.offline_pois),
                                 modifier = Modifier.size(24.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Offline POIs")
+                            Text(stringResource(R.string.offline_pois))
                         }
 
                         if (showDownloadPoisDialog) {
-                            val downloadedPbfs by downloadedPbfDao.getAll().collectAsStateWithLifecycle(initialValue = emptyList())
-                            val countries = remember {
-                                nearbyPOIPbfDownloadService.countriesData?.entries?.sortedBy { it.value.name } ?: emptyList()
+                            val downloadedPbfs by streamPbfDownloadStore(ctx).collectAsStateWithLifecycle(listOf())
+                            val countriesByContinent = remember {
+                                nearbyPOIPbfDownloadService.countriesData.entries
+                                    .groupBy { it.value.continent }
+                                    .toSortedMap()
                             }
+                            var expandedContinents by remember { mutableStateOf(setOf<String>()) }
 
                             Dialog(onDismissRequest = { showDownloadPoisDialog = false }) {
                                 Surface(
@@ -511,77 +518,124 @@ fun MainScreen(onFinish: () -> Unit) {
                                 ) {
                                     Column(modifier = Modifier.padding(16.dp)) {
                                         Text(
-                                            text = "Download Offline POIs",
+                                            text = stringResource(R.string.download_pois),
                                             style = MaterialTheme.typography.titleLarge,
                                             modifier = Modifier.padding(bottom = 16.dp)
                                         )
 
                                         LazyColumn(modifier = Modifier.weight(1f)) {
-                                            items(countries) { entry ->
-                                                val key = entry.key
-                                                val data = entry.value
-                                                val downloadedPbf = downloadedPbfs.find { it.countryKey == key }
-                                                val status = downloadedPbf?.downloadState
-
-                                                Row(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(vertical = 8.dp),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Text(
-                                                        text = data.name,
-                                                        style = MaterialTheme.typography.bodyLarge,
-                                                        modifier = Modifier.weight(1f)
-                                                    )
-
-                                                    if (downloadedPbf == null) {
-                                                        IconButton(onClick = {
-                                                            coroutineScope.launch {
-                                                                downloadedPbfDao.insert(
-                                                                    DownloadedPbf(
-                                                                        countryKey = key,
-                                                                        countryName = data.name,
-                                                                        pbfType = PbfType.POI,
-                                                                        downloadState = PbfDownloadStatus.PENDING,
-                                                                        progress = 0f
-                                                                    )
-                                                                )
-                                                            }
-                                                        }) {
-                                                            Icon(Icons.Filled.Add, contentDescription = "Download")
-                                                        }
-                                                    } else if (status == PbfDownloadStatus.AVAILABLE) {
-                                                        IconButton(onClick = {
-                                                            coroutineScope.launch {
-                                                                downloadedPbfDao.delete(key)
-                                                            }
-                                                        }) {
-                                                            Icon(Icons.Filled.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error)
-                                                        }
-                                                    } else {
-                                                        // Show status or progress
-                                                        when (status) {
-                                                            PbfDownloadStatus.PENDING -> Text("Pending", style = MaterialTheme.typography.bodySmall)
-                                                            PbfDownloadStatus.PROCESSING -> CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                                                            PbfDownloadStatus.DOWNLOAD_FAILED -> Text("Failed", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                                                            PbfDownloadStatus.PROCESSING_FAILED -> Text("Failed", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                                                            else -> {}
-                                                        }
-
-                                                        if (status == PbfDownloadStatus.DOWNLOAD_FAILED || status == PbfDownloadStatus.PROCESSING_FAILED){
-                                                             IconButton(onClick = {
-                                                                coroutineScope.launch {
-                                                                    downloadedPbfDao.updateDownloadStatus(key, PbfDownloadStatus.PENDING, 0f)
+                                            countriesByContinent.forEach { (continent, countries) ->
+                                                item {
+                                                    val isExpanded = expandedContinents.contains(continent)
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .clickable {
+                                                                expandedContinents = if (isExpanded) {
+                                                                    expandedContinents - continent
+                                                                } else {
+                                                                    expandedContinents + continent
                                                                 }
-                                                            }) {
-                                                                Icon(Icons.Filled.Refresh, contentDescription = "Retry", tint = MaterialTheme.colorScheme.primary)
+                                                            }
+                                                            .padding(vertical = 12.dp),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text(
+                                                            text = getContinentString(continent),
+                                                            style = MaterialTheme.typography.titleMedium,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                        Icon(
+                                                            imageVector = if (isExpanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                                                            contentDescription = if (isExpanded) stringResource(R.string.collapse) else stringResource(R.string.expand)
+                                                        )
+                                                    }
+                                                    HorizontalDivider()
+                                                }
+
+                                                if (expandedContinents.contains(continent)) {
+                                                    items(countries.sortedBy { country -> country.value.name }) { entry ->
+                                                        val key = entry.key
+                                                        val data = entry.value
+                                                        val downloadedPbf = downloadedPbfs.find { it.countryKey == key }
+                                                        val status = downloadedPbf?.downloadState
+
+                                                        Row(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .padding(vertical = 8.dp, horizontal = 16.dp), // Indent countries
+                                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Text(
+                                                                text = getCountryString(key, data.name),
+                                                                style = MaterialTheme.typography.bodyLarge,
+                                                                modifier = Modifier.weight(1f)
+                                                            )
+
+                                                            if (downloadedPbf == null) {
+                                                                IconButton(onClick = {
+                                                                    coroutineScope.launch {
+                                                                        updatePbfDownloadStore(ctx) { currentPbfs ->
+                                                                            val pbfs = currentPbfs.filterNot { it.countryKey == key } + listOf(
+                                                                                DownloadedPbf(
+                                                                                    countryKey = key,
+                                                                                    countryName = data.name,
+                                                                                    pbfType = PbfType.POI,
+                                                                                    downloadState = PbfDownloadStatus.PENDING,
+                                                                                    progress = 0f
+                                                                                )
+                                                                            )
+
+                                                                            pbfs
+                                                                        }
+                                                                    }
+                                                                }) {
+                                                                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.download))
+                                                                }
+                                                            } else if (status == PbfDownloadStatus.AVAILABLE) {
+                                                                IconButton(onClick = {
+                                                                    coroutineScope.launch {
+                                                                        try {
+                                                                            nearbyPOIPbfDownloadService.getPoiFile(key).delete()
+                                                                        } catch(t: Throwable) {
+                                                                            Log.e(KarooRouteGraphExtension.TAG, "Failed to delete PBF file for $key", t)
+                                                                        }
+
+                                                                        updatePbfDownloadStore(ctx) { currentPbfs ->
+                                                                            currentPbfs.filterNot { pbf -> pbf.countryKey == key }
+                                                                        }
+                                                                    }
+                                                                }) {
+                                                                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.remove), tint = MaterialTheme.colorScheme.error)
+                                                                }
+                                                            } else {
+                                                                // Show status or progress
+                                                                when (status) {
+                                                                    PbfDownloadStatus.PENDING -> if (downloadedPbf.progress in 0.01f..0.99f) {
+                                                                        CircularProgressIndicator(modifier = Modifier.size(48.dp), progress = { downloadedPbf.progress })
+                                                                    } else {
+                                                                        CircularProgressIndicator(modifier = Modifier.size(48.dp))
+                                                                    }
+                                                                    PbfDownloadStatus.DOWNLOAD_FAILED -> Icon(Icons.Filled.Warning, contentDescription = stringResource(R.string.failed), tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(48.dp))
+                                                                    else -> {}
+                                                                }
+
+                                                                if (status == PbfDownloadStatus.DOWNLOAD_FAILED){
+                                                                     IconButton(onClick = {
+                                                                        coroutineScope.launch {
+                                                                            updatePbfDownloadStoreStatus(ctx, key, PbfDownloadStatus.PENDING)
+                                                                        }
+                                                                    }) {
+                                                                        Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.retry), tint = MaterialTheme.colorScheme.primary)
+                                                                    }
+                                                                }
                                                             }
                                                         }
+                                                        HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
                                                     }
                                                 }
-                                                HorizontalDivider()
                                             }
                                         }
 
@@ -589,7 +643,7 @@ fun MainScreen(onFinish: () -> Unit) {
                                             onClick = { showDownloadPoisDialog = false },
                                             modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
                                         ) {
-                                            Text("Close")
+                                            Text(stringResource(R.string.close))
                                         }
                                     }
                                 }
@@ -884,12 +938,23 @@ fun MainScreen(onFinish: () -> Unit) {
     }
 }
 
+@Composable
+fun getContinentString(continent: String): String {
+    val context = LocalContext.current
+    val resourceName = "continent_" + continent.lowercase().replace(" ", "_")
+    val resId = remember(continent) {
+        context.resources.getIdentifier(resourceName, "string", context.packageName)
+    }
+    return if (resId != 0) stringResource(resId) else continent
+}
 
-
-
-
-
-
-
-
+@Composable
+fun getCountryString(countryCode: String, defaultName: String): String {
+    val context = LocalContext.current
+    val resourceName = "country_" + countryCode.lowercase()
+    val resId = remember(countryCode) {
+        context.resources.getIdentifier(resourceName, "string", context.packageName)
+    }
+    return if (resId != 0) stringResource(resId) else defaultName
+}
 

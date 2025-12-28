@@ -138,4 +138,15 @@
     <string name="kilometers">km</string>
     <string name="miles">mi</string>
     <string name="shift_for_radar_swim_lane">Shift for radar swim lane</string>
+
+    <!-- Offline POIs -->
+    <string name="offline_pois">Offline POIs</string>
+    <string name="download_pois">Download POIs</string>
+    <string name="collapse">Collapse</string>
+    <string name="expand">Expand</string>
+    <string name="download">Download</string>
+    <string name="remove">Remove</string>
+    <string name="failed">Failed</string>
+    <string name="retry">Retry</string>
+    <string name="close">Close</string>
 </resources>
