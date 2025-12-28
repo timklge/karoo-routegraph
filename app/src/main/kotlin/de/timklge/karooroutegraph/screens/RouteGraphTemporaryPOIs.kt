@@ -7,7 +7,7 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 data class RouteGraphTemporaryPOIs(
-    val poisByOsmId: Map<Long, Symbol.POI> = emptyMap()
+    val poisByOsmId: Map<Long, Symbol.POI> = emptyMap(),
 ) {
     companion object {
         val defaultSettings = Json.encodeToString(RouteGraphTemporaryPOIs())

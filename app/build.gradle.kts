@@ -72,7 +72,7 @@ tasks.register("generateManifest") {
             "latestVersionCode" to android.defaultConfig.versionCode,
             "developer" to "github.com/timklge",
             "description" to "Open-source extension that provides an elevation graph datafield depicting the complete current route, including climbs and POIs (e. g. checkpoints and refueling stops)",
-            "releaseNotes" to "* Add option to disable minimap dark mode\n* Add option to show surface conditions on the elevation graph and minimap",
+            "releaseNotes" to "* Add option to download POIs of certain categories for offline use\n* Add option to automatically add POIs of selected categories to the route\n* Use icons for POIs that were added based on category",
             "screenshotUrls" to listOf(
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/horizontal_routegraph.png",
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/minimap.png",

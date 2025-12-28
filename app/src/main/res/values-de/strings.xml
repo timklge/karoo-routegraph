@@ -150,4 +150,7 @@
     <string name="failed">Fehlgeschlagen</string>
     <string name="retry">Wiederholen</string>
     <string name="close">Schließen</string>
+    <string name="enable_offline_poi_storage">Offline-POI-Speicher aktivieren</string>
+    <string name="auto_add_pois_to_map">POIs automatisch zur Karte hinzufügen</string>
+    <string name="select_categories">Kategorien auswählen</string>
 </resources>

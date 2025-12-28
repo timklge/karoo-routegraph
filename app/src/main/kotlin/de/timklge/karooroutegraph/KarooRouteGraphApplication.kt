@@ -29,6 +29,7 @@ val appModule = module {
     singleOf(::SurfaceConditionRetrievalService)
     singleOf(::RouteGraphUpdateManager)
     singleOf(::OfflineNearbyPOIProvider)
+    singleOf(::AutoAddedPOIsViewModelProvider)
 }
 
 class KarooRouteGraphApplication : Application() {

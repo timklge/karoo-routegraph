@@ -72,6 +72,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mapbox.geojson.Point
 import de.timklge.karooroutegraph.GradientIndicatorFrequency
 import de.timklge.karooroutegraph.KarooRouteGraphExtension
+import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.incidents.HereMapsIncidentProvider
 import de.timklge.karooroutegraph.pois.DownloadedPbf
@@ -139,7 +140,12 @@ fun MainScreen(onFinish: () -> Unit) {
     var zoomLevelError by remember { mutableStateOf("") }
     val hereMapsIncidentProvider = koinInject<HereMapsIncidentProvider>()
     val nearbyPOIPbfDownloadService = koinInject<NearbyPOIPbfDownloadService>()
+    val karooSystemServiceProvider = koinInject<KarooSystemServiceProvider>()
     var showDownloadPoisDialog by remember { mutableStateOf(false) }
+    var enableOfflinePoiStorage by remember { mutableStateOf(false) }
+    var autoAddPoisToMap by remember { mutableStateOf(false) }
+    var autoAddPoiCategories by remember { mutableStateOf(emptySet<NearbyPoiCategory>()) }
+    var showAutoAddPoiCategoriesDialog by remember { mutableStateOf(false) }
 
     var hasStoragePermission by remember { mutableStateOf(false) }
 
@@ -171,6 +177,16 @@ fun MainScreen(onFinish: () -> Unit) {
         )
 
         saveSettings(ctx, newSettings)
+    }
+
+    suspend fun updatePoiSettings() {
+        karooSystemServiceProvider.saveViewSettings { settings ->
+            settings.copy(
+                enableOfflinePoiStorage = enableOfflinePoiStorage,
+                autoAddPoisToMap = autoAddPoisToMap,
+                autoAddPoiCategories = autoAddPoiCategories
+            )
+        }
     }
 
     // Permission launcher for storage permissions
@@ -208,6 +224,14 @@ fun MainScreen(onFinish: () -> Unit) {
             onlyHighlightClimbsAtZoomLevel = settings.onlyHighlightClimbsAtZoomLevel
             indicateSurfaceConditionsOnGraph = settings.indicateSurfaceConditionsOnGraph
             minimapNightMode = settings.minimapNightMode
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        karooSystemServiceProvider.streamViewSettings().collect { settings ->
+            enableOfflinePoiStorage = settings.enableOfflinePoiStorage
+            autoAddPoisToMap = settings.autoAddPoisToMap
+            autoAddPoiCategories = settings.autoAddPoiCategories
         }
     }
 
@@ -483,22 +507,79 @@ fun MainScreen(onFinish: () -> Unit) {
                             Text(stringResource(R.string.manage_pois))
                         }
 
-                        // Offline POIs Button
-                        FilledTonalButton(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(40.dp),
-                            onClick = {
-                                showDownloadPoisDialog = true
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Switch(checked = enableOfflinePoiStorage, onCheckedChange = {
+                                enableOfflinePoiStorage = it
+                                coroutineScope.launch {
+                                    updatePoiSettings()
+                                }
+                            })
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(stringResource(R.string.enable_offline_poi_storage))
+                        }
+
+                        if (enableOfflinePoiStorage) {
+                            // Offline POIs Button
+                            FilledTonalButton(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(40.dp),
+                                onClick = {
+                                    showDownloadPoisDialog = true
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Add,
+                                    contentDescription = stringResource(R.string.offline_pois),
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(stringResource(R.string.offline_pois))
                             }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Add,
-                                contentDescription = stringResource(R.string.offline_pois),
-                                modifier = Modifier.size(24.dp)
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Switch(checked = autoAddPoisToMap, onCheckedChange = {
+                                    autoAddPoisToMap = it
+                                    coroutineScope.launch {
+                                        updatePoiSettings()
+                                    }
+                                })
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(stringResource(R.string.auto_add_pois_to_map))
+                            }
+
+                            if (autoAddPoisToMap) {
+                                FilledTonalButton(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(40.dp),
+                                    onClick = {
+                                        showAutoAddPoiCategoriesDialog = true
+                                    }
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.bx_info_circle),
+                                        contentDescription = stringResource(R.string.select_categories),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(R.string.select_categories))
+                                }
+                            }
+                        }
+
+                        if (showAutoAddPoiCategoriesDialog) {
+                            CategorySelectionDialog(
+                                initialCategories = autoAddPoiCategories,
+                                onDismiss = { showAutoAddPoiCategoriesDialog = false },
+                                onConfirm = { newCategories ->
+                                    autoAddPoiCategories = newCategories
+                                    showAutoAddPoiCategoriesDialog = false
+                                    coroutineScope.launch {
+                                        updatePoiSettings()
+                                    }
+                                }
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource(R.string.offline_pois))
                         }
 
                         if (showDownloadPoisDialog) {

@@ -68,10 +68,11 @@ import de.timklge.karooroutegraph.pois.OverpassPOIProvider
 import de.timklge.karooroutegraph.pois.POI
 import de.timklge.karooroutegraph.pois.calculatePoiDistances
 import de.timklge.karooroutegraph.pois.distanceToPoi
+import de.timklge.karooroutegraph.pois.formatDistance
 import io.hammerhead.karooext.models.LaunchPinDrop
 import io.hammerhead.karooext.models.Symbol
 import io.hammerhead.karooext.models.UserProfile
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -79,51 +80,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import kotlin.math.roundToInt
-
-enum class NearbyPoiCategory(val labelRes: Int, val osmTag: List<Pair<String, String>>) {
-    DRINKING_WATER(R.string.category_water, listOf("amenity" to "drinking_water")),
-    GAS_STATIONS(R.string.category_gas_station, listOf("amenity" to "fuel")),
-    SUPERMARKETS(R.string.category_supermarket, listOf("shop" to "supermarket")),
-    RESTAURANTS(R.string.category_restaurant, listOf("amenity" to "restaurant")),
-    CAFES(R.string.category_cafe, listOf("amenity" to "cafe")),
-    ICE_CREAM(R.string.category_ice_cream, listOf("amenity" to "ice_cream")),
-    BAKERY(R.string.category_bakery, listOf("shop" to "bakery")),
-    TOILETS(R.string.category_toilets, listOf("amenity" to "toilets")),
-    SHOWERS(R.string.category_showers, listOf("amenity" to "shower")),
-    ATMS(R.string.category_atms, listOf("amenity" to "atm")),
-    SHELTER(R.string.category_shelter, listOf("amenity" to "shelter")),
-    CAMPING_SITE(R.string.category_camping_site, listOf("tourism" to "camp_site")),
-    HOTEL(R.string.category_hotel, listOf("tourism" to "hotel")),
-    TRAIN_STATION(R.string.category_train_station, listOf("railway" to "station")),
-    WASTE_BASKET(R.string.category_waste_basket, listOf("amenity" to "waste_basket")),
-    BENCH(R.string.category_bench, listOf("amenity" to "bench")),
-    BIKE_SHOP(R.string.category_bike_shop, listOf("shop" to "bicycle")),
-    TOURISM_ATTRACTION(R.string.category_attraction, listOf("tourism" to "attraction")),
-    VIEWPOINT(R.string.category_viewpoint, listOf("tourism" to "viewpoint")),
-    PHARMACY(R.string.category_pharmacy, listOf("amenity" to "pharmacy")),
-    HOSPITAL(R.string.category_hospital, listOf("amenity" to "hospital")),
-    VILLAGE(R.string.category_village, listOf("place" to "village")),
-    TOWN(R.string.category_town, listOf("place" to "town", "place" to "city")),
-}
-
-data class NearbyPOISymbol(val element: NearbyPOI, val poi: Symbol.POI)
-
-fun formatDistance(distanceMeters: Double, isImperial: Boolean): String {
-    return if (isImperial) {
-        val distanceFeet = distanceMeters * 3.28084
-        if (distanceFeet < 5280) { // Less than 1 mile
-            String.format(java.util.Locale.getDefault(), "%.0f ft", distanceFeet)
-        } else {
-            String.format(java.util.Locale.getDefault(), "%.1f mi", distanceMeters * 0.000621371)
-        }
-    } else {
-        if (distanceMeters < 1000) { // Less than 1 km
-            String.format(java.util.Locale.getDefault(), "%.0f m", distanceMeters)
-        } else {
-            String.format(java.util.Locale.getDefault(), "%.1f km", distanceMeters / 1000)
-        }
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -239,13 +195,25 @@ fun NearbyPoiListScreen() {
                 val desiredCount = 20 // Desired number of POIs to fetch
                 val limit = 30
 
-                val onlyTownOrVillagesSelected = selectedCategories.all { it == NearbyPoiCategory.TOWN || it == NearbyPoiCategory.VILLAGE }
+                val onlyTownOrVillagesSelected =
+                    selectedCategories.all { it == NearbyPoiCategory.TOWN || it == NearbyPoiCategory.VILLAGE }
+
+                val route = viewModel?.knownRoute
+                if (selectedSort != PoiSortOption.LINEAR_DISTANCE && route == null) {
+                    lastErrorMessage = errorNoRoute
+                    delay(1_000)
+                    isRefreshing = false
+                    return@launch
+                }
 
                 var overpassResponse: Set<NearbyPOI>? = null
 
-                CoroutineScope(Dispatchers.IO).launch {
+                kotlinx.coroutines.withContext(Dispatchers.IO) {
                     val radius = if (onlyTownOrVillagesSelected) 50_000 else 10_000
-                    val hasOfflineFiles = offlineNearbyPOIProvider.getAvailableCountriesInBounds(listOf(currentPos), radius).isNotEmpty()
+                    val hasOfflineFiles = offlineNearbyPOIProvider.getAvailableCountriesInBounds(
+                        listOf(currentPos),
+                        radius
+                    ).isNotEmpty()
 
                     if (selectedSort == PoiSortOption.LINEAR_DISTANCE) {
                         if (hasOfflineFiles) {
@@ -279,33 +247,33 @@ fun NearbyPoiListScreen() {
                             }
                         }
                     } else {
-                        val route = viewModel?.knownRoute
+                        val route = route ?: return@withContext
 
-                        if (route == null) {
-                            lastErrorMessage = errorNoRoute
-                            delay(1_000)
-                            isRefreshing = false
-                            return@launch
-                        }
+                        val routeLength = viewModel?.routeDistance?.toDouble() ?: TurfMeasurement.length(route, TurfConstants.UNIT_METERS)
+                        val radius = if (onlyTownOrVillagesSelected) 5_000 else maxDistanceFromRoute.roundToInt()
+                        val nearbyPoiProvider = if (hasOfflineFiles) offlineNearbyPOIProvider else overpassNearbyPOIProvider
+                        val lookaheadDistance = if (hasOfflineFiles) routeLength else 50_000.0
 
                         val routeAhead = try {
-                            val routeLength = viewModel?.routeDistance?.toDouble() ?: TurfMeasurement.length(route, TurfConstants.UNIT_METERS)
-                            val startDistance = ((viewModel?.distanceAlongRoute?.toDouble() ?: 0.0) - 2_000).coerceAtLeast(0.0) // 2 km behind
-                            val endDistance = (startDistance + 50_000).coerceAtMost(routeLength) // 50 km ahead
-                            TurfMisc.lineSliceAlong(route, startDistance, endDistance, TurfConstants.UNIT_METERS)
-                        } catch(e: Exception) {
+                            val startDistance = ((viewModel?.distanceAlongRoute?.toDouble()
+                                ?: 0.0) - 2_000).coerceAtLeast(0.0) // 2 km behind
+                            val endDistance = (startDistance + lookaheadDistance).coerceAtMost(routeLength) // 50 km ahead
+                            TurfMisc.lineSliceAlong(
+                                route,
+                                startDistance,
+                                endDistance,
+                                TurfConstants.UNIT_METERS
+                            )
+                        } catch (e: Exception) {
                             Log.e(KarooRouteGraphExtension.TAG, "Failed to slice route ahead", e)
                             route
                         }
 
-                        val radius = if (onlyTownOrVillagesSelected) 5_000 else maxDistanceFromRoute.roundToInt()
-
-                        val nearbyPoiProvider = if (hasOfflineFiles) offlineNearbyPOIProvider else overpassNearbyPOIProvider
                         overpassResponse = nearbyPoiProvider.requestNearbyPOIs(
                             requestedTags = selectedCategories.flatMap { it.osmTag }.distinct(),
                             points = routeAhead.coordinates(),
                             radius = radius,
-                            limit = 100
+                            limit = if (hasOfflineFiles) 200 else 100
                         ).toSet()
                     }
 
@@ -316,12 +284,15 @@ fun NearbyPoiListScreen() {
                                 id = "nearby-${element.id}",
                                 lat = element.lat,
                                 lng = element.lon,
-                                name = element.tags["name"] ?: unnamedPoi
+                                name = element.tags["name"] ?: unnamedPoi,
+                                type = NearbyPoiCategory.fromTag(element.tags)?.hhType ?: Symbol.POI.Types.GENERIC,
                             )
                         )
                     } ?: emptyList()
-                }.join()
-            } catch(e: Exception){
+                }
+            } catch (e: CancellationException) {
+                throw e // Rethrow cancellation exceptions
+            } catch(e: Throwable){
                 lastErrorMessage = String.format(errorFetchPois, e.message ?: "")
                 delay(1_000)
                 isRefreshing = false
@@ -481,7 +452,12 @@ fun NearbyPoiListScreen() {
                                 if (selectedSort == PoiSortOption.LINEAR_DISTANCE) {
                                     val distanceMeters = linearDistanceToPoi(poi)
 
-                                    distanceMeters?.let { distance -> formatDistance(distance, isImperial) }
+                                    distanceMeters?.let { distance ->
+                                        formatDistance(
+                                            distance,
+                                            isImperial
+                                        )
+                                    }
                                 } else {
                                     val result = distanceToPoi(poi.poi, viewModel?.sampledElevationData,
                                         nearestPointsOnRouteToFoundPois, currentPosition, selectedSort, viewModel?.distanceAlongRoute)
@@ -569,12 +545,11 @@ fun NearbyPoiListScreen() {
                                 }
 
                                 if (poi.element.tags.isNotEmpty()) {
-                                    val noInfoText = stringResource(R.string.no_info_available)
                                     DropdownMenuItem(
                                         text = { Text(stringResource(R.string.show_info)) },
                                         onClick = {
                                             showContextMenu = false
-                                            openingHoursText = poi.element.tags?.map { (k, v) -> "$k=$v" }?.joinToString("\r\n") ?: noInfoText
+                                            openingHoursText = poi.element.tags.map { (k, v) -> "$k=$v" }.joinToString("\r\n")
                                             showOpeningHoursDialog = true
                                         },
                                         leadingIcon = {
@@ -594,69 +569,21 @@ fun NearbyPoiListScreen() {
     }
 
     if (showDialog) {
-        Dialog(
-            onDismissRequest = { showDialog = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
-        ) {
-            var tempSelectedCategories by remember { mutableStateOf(selectedCategories) }
+        CategorySelectionDialog(
+            initialCategories = selectedCategories,
+            onDismiss = { showDialog = false },
+            onConfirm = { newCategories ->
+                selectedCategories = newCategories
+                showDialog = false
 
-            Card(modifier = Modifier.padding(16.dp)) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    LazyColumn(modifier = Modifier.weight(1f)) {
-                        items(NearbyPoiCategory.entries) { category ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        tempSelectedCategories =
-                                            if (tempSelectedCategories.contains(category)) {
-                                                tempSelectedCategories - category
-                                            } else {
-                                                tempSelectedCategories + category
-                                            }
-                                    }
-                            ) {
-                                Checkbox(
-                                    checked = tempSelectedCategories.contains(category),
-                                    onCheckedChange = {
-                                        tempSelectedCategories = if (tempSelectedCategories.contains(category)) {
-                                            tempSelectedCategories - category
-                                        } else {
-                                            tempSelectedCategories + category
-                                        }
-                                    }
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(stringResource(category.labelRes))
-                            }
-                        }
+                coroutineScope.launch {
+                    karooSystemServiceProvider.saveViewSettings { settings ->
+                        settings.copy(poiCategoriesForNearbyPois = selectedCategories)
                     }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        TextButton(onClick = { showDialog = false }) {
-                            Text(stringResource(R.string.cancel))
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(onClick = {
-                            selectedCategories = tempSelectedCategories
-                            showDialog = false
-
-                            coroutineScope.launch {
-                                karooSystemServiceProvider.saveViewSettings { settings ->
-                                    settings.copy(poiCategoriesForNearbyPois = selectedCategories)
-                                }
-                                onRefresh()
-                            }
-                        }) {
-                            Text(stringResource(R.string.ok))
-                        }
-                    }
+                    onRefresh()
                 }
             }
-        }
+        )
     }
 
     if (showOpeningHoursDialog) {
@@ -669,6 +596,69 @@ fun NearbyPoiListScreen() {
                     Text(text = openingHoursText, style = MaterialTheme.typography.bodyMedium)
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(onClick = { showOpeningHoursDialog = false }) {
+                        Text(stringResource(R.string.ok))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CategorySelectionDialog(
+    initialCategories: Set<NearbyPoiCategory>,
+    onDismiss: () -> Unit,
+    onConfirm: (Set<NearbyPoiCategory>) -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        var tempSelectedCategories by remember { mutableStateOf(initialCategories) }
+
+        Card(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                LazyColumn(modifier = Modifier.weight(1f)) {
+                    items(NearbyPoiCategory.entries) { category ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    tempSelectedCategories =
+                                        if (tempSelectedCategories.contains(category)) {
+                                            tempSelectedCategories - category
+                                        } else {
+                                            tempSelectedCategories + category
+                                        }
+                                }
+                        ) {
+                            Checkbox(
+                                checked = tempSelectedCategories.contains(category),
+                                onCheckedChange = {
+                                    tempSelectedCategories = if (tempSelectedCategories.contains(category)) {
+                                        tempSelectedCategories - category
+                                    } else {
+                                        tempSelectedCategories + category
+                                    }
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(category.labelRes))
+                        }
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(onClick = {
+                        onConfirm(tempSelectedCategories)
+                    }) {
                         Text(stringResource(R.string.ok))
                     }
                 }

@@ -98,6 +98,8 @@ class OfflineNearbyPOIProvider(val context: Context, val downloadService: Nearby
 
         val availableCountriesInBounds = getAvailableCountriesInBounds(points, radius)
 
+        Log.i(KarooRouteGraphExtension.TAG, "Searching offline POIs in countries: $availableCountriesInBounds")
+
         val jobs = availableCountriesInBounds.map { countryKey ->
             CoroutineScope(Dispatchers.IO).async {
                 buildList {

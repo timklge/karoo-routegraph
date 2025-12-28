@@ -35,6 +35,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import kotlin.math.pow
@@ -57,6 +58,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     @Suppress("unused")
     private val nearbyPoiPbfDownloadService: NearbyPOIPbfDownloadService by inject()
     private val routeGraphUpdateManager: RouteGraphUpdateManager by inject()
+    private val autoAddedPOIsViewModelProvider: AutoAddedPOIsViewModelProvider by inject()
 
 
     override val types by lazy {
@@ -115,13 +117,17 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         lastDrawnGradientIndicators = mutableSetOf()
 
         mapScope.launch {
-            karooSystem.streamTemporaryPOIs().collect { temporaryPOIs ->
-                Log.d(TAG, "Temporary POIs: ${temporaryPOIs.poisByOsmId.size}")
+            combine(karooSystem.streamTemporaryPOIs(), autoAddedPOIsViewModelProvider.viewModelFlow) { temporaryPois, autoAddedPois ->
+                Pair(temporaryPois, autoAddedPois)
+            }.distinctUntilChanged().collect { (temporaryPOIs, autoAddedPois) ->
+                Log.d(TAG, "Temporary POIs: ${temporaryPOIs.poisByOsmId.size}, Auto-added POIs: ${autoAddedPois.autoAddedPoisByOsmId.size}")
 
                 emitter.onNext(HideSymbols(lastDrawnTemporaryPOIs.map { it.id }))
                 lastDrawnTemporaryPOIs.clear()
 
-                emitter.onNext(ShowSymbols(temporaryPOIs.poisByOsmId.values.toList()))
+                val newSymbols = (temporaryPOIs.poisByOsmId + autoAddedPois.autoAddedPoisByOsmId).values.toList()
+                lastDrawnTemporaryPOIs += newSymbols
+                emitter.onNext(ShowSymbols(newSymbols))
             }
         }
 

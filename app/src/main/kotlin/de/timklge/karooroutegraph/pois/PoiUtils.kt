@@ -13,6 +13,7 @@ import de.timklge.karooroutegraph.distanceToString
 import de.timklge.karooroutegraph.screens.PoiSortOption
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import io.hammerhead.karooext.models.Symbol
+import java.util.Locale
 import kotlin.math.absoluteValue
 
 data class NearestPoint(val pointOnRoute: Point?, val distanceFromPointOnRoute: Float, val distanceFromRouteStart: Float, val target: Point?)
@@ -60,18 +61,19 @@ sealed class DistanceToPoiResult : Comparable<DistanceToPoiResult> {
 
     fun formatDistance(context: Context, isImperial: Boolean, flat: Boolean = false): String {
         return when (this){
-            is LinearDistance -> de.timklge.karooroutegraph.screens.formatDistance(
+            is LinearDistance -> formatDistance(
                 distance,
                 isImperial
             )
             is AheadOnRouteDistance -> {
                 if (flat){
-                    de.timklge.karooroutegraph.screens.formatDistance (distanceOnRoute + distanceFromPointOnRoute, isImperial)
+                    formatDistance(distanceOnRoute + distanceFromPointOnRoute, isImperial)
                 } else {
                     buildString {
                         append(context.getString(if (distanceOnRoute >= 0.0) R.string.distance_ahead else R.string.distance_behind,
-                            de.timklge.karooroutegraph.screens.formatDistance(distanceOnRoute.absoluteValue, isImperial),
-                            de.timklge.karooroutegraph.screens.formatDistance(distanceFromPointOnRoute.absoluteValue, isImperial)))
+                            formatDistance(distanceOnRoute.absoluteValue, isImperial),
+                            formatDistance(distanceFromPointOnRoute.absoluteValue, isImperial)
+                        ))
 
                         if (elevationMetersRemaining != null && elevationMetersRemaining > 0) {
                             append(" ↗ ${
@@ -314,5 +316,22 @@ fun processPoiName(name: String?): String? {
     return when (name) {
         "Startseite" -> "Zu Hause"
         else -> name
+    }
+}
+
+fun formatDistance(distanceMeters: Double, isImperial: Boolean): String {
+    return if (isImperial) {
+        val distanceFeet = distanceMeters * 3.28084
+        if (distanceFeet < 5280) { // Less than 1 mile
+            String.format(Locale.getDefault(), "%.0f ft", distanceFeet)
+        } else {
+            String.format(Locale.getDefault(), "%.1f mi", distanceMeters * 0.000621371)
+        }
+    } else {
+        if (distanceMeters < 1000) { // Less than 1 km
+            String.format(Locale.getDefault(), "%.0f m", distanceMeters)
+        } else {
+            String.format(Locale.getDefault(), "%.1f km", distanceMeters / 1000)
+        }
     }
 }

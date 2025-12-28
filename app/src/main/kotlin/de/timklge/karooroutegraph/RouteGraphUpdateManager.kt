@@ -12,11 +12,14 @@ import de.timklge.karooroutegraph.incidents.HereMapsIncidentProvider
 import de.timklge.karooroutegraph.incidents.IncidentResult
 import de.timklge.karooroutegraph.incidents.IncidentsResponse
 import de.timklge.karooroutegraph.pois.NearestPoint
+import de.timklge.karooroutegraph.pois.OfflineNearbyPOIProvider
 import de.timklge.karooroutegraph.pois.POI
 import de.timklge.karooroutegraph.pois.PoiType
 import de.timklge.karooroutegraph.pois.calculatePoiDistances
 import de.timklge.karooroutegraph.pois.getStartAndEndPoiIfNone
 import de.timklge.karooroutegraph.pois.processPoiName
+import de.timklge.karooroutegraph.screens.NearbyPoiCategory
+import de.timklge.karooroutegraph.screens.RouteGraphPoiSettings
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.screens.RouteGraphTemporaryPOIs
 import io.hammerhead.karooext.models.DataType
@@ -50,7 +53,9 @@ class RouteGraphUpdateManager(
     private val routeGraphViewModelProvider: RouteGraphViewModelProvider,
     private val displayViewModelProvider: RouteGraphDisplayViewModelProvider,
     private val incidentProvider: HereMapsIncidentProvider,
-    private val context: Context
+    private val context: Context,
+    private val offlineNearbyPOIProvider: OfflineNearbyPOIProvider,
+    private val autoAddedPOIsViewModelProvider: AutoAddedPOIsViewModelProvider
 ) {
     companion object {
         const val TAG = "karoo-routegraph"
@@ -80,13 +85,16 @@ class RouteGraphUpdateManager(
         return if (!avgLat.isNaN() && !avgLng.isNaN()) Pair(avgLat, avgLng) else null
     }
 
-    data class NavigationStreamState(val settings: RouteGraphSettings,
-                                     val state: OnNavigationState.NavigationState,
-                                     val userProfile: UserProfile,
-                                     val pois: OnGlobalPOIs,
-                                     val locationAndRemainingRouteDistance: LocationAndRemainingRouteDistance,
-                                     val temporaryPOIs: RouteGraphTemporaryPOIs,
-                                     val onRoute: Boolean)
+    data class NavigationStreamState(
+        val settings: RouteGraphSettings,
+        val state: OnNavigationState.NavigationState,
+        val userProfile: UserProfile,
+        val pois: OnGlobalPOIs,
+        val locationAndRemainingRouteDistance: LocationAndRemainingRouteDistance,
+        val temporaryPOIs: RouteGraphTemporaryPOIs,
+        val onRoute: Boolean,
+        val poiSettings: RouteGraphPoiSettings
+    )
 
     data class LocationAndRemainingRouteDistance(val lat: Double?, val lon: Double?, val bearing: Double?, val remainingRouteDistance: Double?)
 
@@ -125,6 +133,9 @@ class RouteGraphUpdateManager(
         var knownIncidentWarningShown = false
         var poiDistances: Map<POI, List<NearestPoint>>? = null
         var lastKnownPositionAlongRoute: Double? = null
+        var lastAutoAddedPoisByOsmId: Map<Long, Symbol.POI> = emptyMap()
+        var lastAutoAddedPoisRequestedAtPosition: Point? = null
+        var lastAutoAddedPoisCategories: Set<NearbyPoiCategory> = emptySet()
 
         scope.launch {
             combine(
@@ -134,7 +145,8 @@ class RouteGraphUpdateManager(
                 streamLocationAndRemainingRouteDistance(),
                 karooSystem.stream<OnGlobalPOIs>(),
                 karooSystem.streamTemporaryPOIs(),
-                karooSystem.streamDataFlow(DataType.Type.DISTANCE_TO_DESTINATION)
+                karooSystem.streamDataFlow(DataType.Type.DISTANCE_TO_DESTINATION),
+                karooSystem.streamViewSettings()
             ) { data ->
                 val settings = data[0] as RouteGraphSettings
                 val navigationState = data[1] as OnNavigationState
@@ -143,8 +155,9 @@ class RouteGraphUpdateManager(
                 val pois = data[4] as OnGlobalPOIs
                 val temporaryPOIs = data[5] as RouteGraphTemporaryPOIs
                 val onRoute = (data[6] as? StreamState.Streaming)?.dataPoint?.values?.get(DataType.Field.ON_ROUTE) == 0.0
+                val viewSettings = data[7] as RouteGraphPoiSettings
 
-                NavigationStreamState(settings, navigationState.state, userProfile, pois, locationAndRemainingRouteDistance, temporaryPOIs, onRoute)
+                NavigationStreamState(settings, navigationState.state, userProfile, pois, locationAndRemainingRouteDistance, temporaryPOIs, onRoute, viewSettings)
             }.distinctUntilChanged().transformLatest { value ->
                 while(true){
                     emit(value)
@@ -152,7 +165,7 @@ class RouteGraphUpdateManager(
                 }
             }
             .throttle(5_000L)
-            .collect { (settings, navigationStateEvent: OnNavigationState.NavigationState, userProfile, globalPOIs, locationAndRemainingRouteDistance, temporaryPOIs: RouteGraphTemporaryPOIs, onRoute: Boolean) ->
+            .collect { (settings, navigationStateEvent: OnNavigationState.NavigationState, userProfile, globalPOIs, locationAndRemainingRouteDistance, temporaryPOIs: RouteGraphTemporaryPOIs, onRoute, poiSettings) ->
                 val isImperial = userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
                 val navigatingToDestinationPolyline = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingToDestination)?.polyline?.let { LineString.fromPolyline(it, 5) }
                 val elevationPolyline: LineString? = when (navigationStateEvent) {
@@ -436,7 +449,77 @@ class RouteGraphUpdateManager(
                     }
                 }
 
-                val tempPoiSymbols = temporaryPOIs.poisByOsmId.map { (_, poi) -> POI(poi) }
+                val lastKnownAutoAddedPoisRequestedAtPosition = lastAutoAddedPoisRequestedAtPosition
+                val refreshAutoAddedPois = routeChanged || lastKnownAutoAddedPoisRequestedAtPosition == null || (
+                        locationAndRemainingRouteDistance.lat != null && locationAndRemainingRouteDistance.lon != null && TurfMeasurement.distance(
+                            Point.fromLngLat(locationAndRemainingRouteDistance.lon, locationAndRemainingRouteDistance.lat),
+                            lastKnownAutoAddedPoisRequestedAtPosition,
+                            TurfConstants.UNIT_METERS
+                        ) > 1_500
+                ) || lastAutoAddedPoisCategories != poiSettings.autoAddPoiCategories
+
+                if (refreshAutoAddedPois && poiSettings.autoAddPoiCategories.isNotEmpty()) {
+                    Log.i(TAG, "Route changed, updating auto added POIs")
+
+                    val currentLocation = if (locationAndRemainingRouteDistance.lat != null && locationAndRemainingRouteDistance.lon != null) {
+                        Point.fromLngLat(locationAndRemainingRouteDistance.lon, locationAndRemainingRouteDistance.lat)
+                    } else {
+                        null
+                    }
+
+                    val newAutoAddedPois = buildMap {
+                        if (routeLineString != null){
+                            // Request POIs along the route
+                            offlineNearbyPOIProvider.requestNearbyPOIs(
+                                poiSettings.autoAddPoiCategories.map { it.osmTag }.flatten(),
+                                routeLineString.coordinates(),
+                                settings.poiDistanceToRouteMaxMeters.toInt(),
+                                200
+                            ).forEach { poi ->
+                                val symbol = Symbol.POI(
+                                    id = "autoadded-${poi.id}",
+                                    lat = poi.lat,
+                                    lng = poi.lon,
+                                    name = processPoiName(poi.tags["name"]),
+                                    type = NearbyPoiCategory.fromTag(poi.tags)?.hhType ?: Symbol.POI.Types.GENERIC,
+                                )
+
+                                put(poi.id, symbol)
+                            }
+                        } else if (currentLocation != null) {
+                            // Request POIs around the current location
+                            offlineNearbyPOIProvider.requestNearbyPOIs(
+                                poiSettings.autoAddPoiCategories.map { it.osmTag }.flatten(),
+                                listOf(currentLocation),
+                                2_000,
+                                200
+                            ).forEach { poi ->
+                                val symbol = Symbol.POI(
+                                    id = "autoadded-${poi.id}",
+                                    lat = poi.lat,
+                                    lng = poi.lon,
+                                    name = processPoiName(poi.tags["name"]),
+                                    type = NearbyPoiCategory.fromTag(poi.tags)?.hhType
+                                        ?: Symbol.POI.Types.GENERIC,
+                                )
+
+                                put(poi.id, symbol)
+                            }
+                        }
+                    }
+
+                    lastAutoAddedPoisByOsmId = newAutoAddedPois
+                    lastAutoAddedPoisRequestedAtPosition = currentLocation
+                    lastAutoAddedPoisCategories = poiSettings.autoAddPoiCategories
+
+                    autoAddedPOIsViewModelProvider.update {
+                        it.copy(autoAddedPoisByOsmId = newAutoAddedPois)
+                    }
+
+                    Log.i(TAG, "Auto added POIs: ${newAutoAddedPois.values.map { it.name }}")
+                }
+
+                val tempPoiSymbols = (temporaryPOIs.poisByOsmId + lastAutoAddedPoisByOsmId).map { (_, poi) -> POI(poi) }
                 val localPois = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.pois.orEmpty().map { symbol ->
                     POI(
                         symbol = symbol,
@@ -469,7 +552,7 @@ class RouteGraphUpdateManager(
                 knownPois = pois.toSet()
 
                 Log.d(TAG, "Received navigation state: $navigationStateEvent")
-                Log.d(TAG, "Current known climbs: ${knownClimbs}")
+                Log.d(TAG, "Current known climbs: $knownClimbs")
 
                 if (routeChanged || poisChanged) {
                     if (routeLineString != null){

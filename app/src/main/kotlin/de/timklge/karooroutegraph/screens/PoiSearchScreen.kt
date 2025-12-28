@@ -61,6 +61,7 @@ import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.pois.calculatePoiDistances
 import de.timklge.karooroutegraph.pois.distanceToPoi
+import de.timklge.karooroutegraph.pois.formatDistance
 import io.hammerhead.karooext.models.LaunchPinDrop
 import io.hammerhead.karooext.models.Symbol
 import io.hammerhead.karooext.models.UserProfile
