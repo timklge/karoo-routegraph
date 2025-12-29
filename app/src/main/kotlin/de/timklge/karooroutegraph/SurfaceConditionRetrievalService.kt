@@ -70,6 +70,7 @@ fun getSurfaceConditionStrokePaints(applicationContext: Context) = mapOf(
 class SurfaceConditionRetrievalService(
     private val context: Context,
     private val karooSystemServiceProvider: KarooSystemServiceProvider,
+    private val surfaceConditionViewModelProvider: SurfaceConditionViewModelProvider
 ) {
     companion object {
         const val MAPFILE_SCAN_INTERVAL_MS = 60_000L * 5 // 5 minutes
@@ -89,6 +90,7 @@ class SurfaceConditionRetrievalService(
         val startMeters: Double,
         val endMeters: Double,
         val condition: SurfaceCondition,
+        val samples: Int
     )
 
     private var knownMapfiles = setOf<MapFileInfo>()
@@ -152,6 +154,10 @@ class SurfaceConditionRetrievalService(
                     }.toSet()
 
                     Log.d(KarooRouteGraphExtension.TAG, "Found ${knownMapfiles.size} mapfiles in ${(Instant.now().toEpochMilli() - startTime.toEpochMilli())} ms")
+
+                    surfaceConditionViewModelProvider.update { state ->
+                        state.copy(knownFiles = knownMapfiles.size)
+                    }
 
                     delay(MAPFILE_SCAN_INTERVAL_MS)
                 } while(true)
@@ -255,6 +261,7 @@ class SurfaceConditionRetrievalService(
         // Map each sample point to its surface condition
         var currentSurfaceCondition: SurfaceCondition? = null
         var currentSurfaceConditionStartedAt: Double? = null
+        var currentSurfaceConditionSampleCount = 0
         val surfaceConditions = mutableListOf<SurfaceConditionSegment>()
 
         fun finishCurrentSurfaceConditionSegment(currentDistance: Double) {
@@ -265,11 +272,13 @@ class SurfaceConditionRetrievalService(
                 surfaceConditions.add(SurfaceConditionSegment(
                     startMeters = startedAt,
                     endMeters = currentDistance,
-                    condition = condition
+                    condition = condition,
+                    samples = currentSurfaceConditionSampleCount
                 ))
 
                 currentSurfaceCondition = null
                 currentSurfaceConditionStartedAt = null
+                currentSurfaceConditionSampleCount = 0
             }
         }
 
@@ -285,6 +294,8 @@ class SurfaceConditionRetrievalService(
                     currentSurfaceCondition = matchingCondition
                     currentSurfaceConditionStartedAt = sample.distanceMeters
                 }
+
+                currentSurfaceConditionSampleCount++
             } else {
                 // No matching condition, finish any ongoing segment
                 finishCurrentSurfaceConditionSegment(sample.distanceMeters)
@@ -430,6 +441,16 @@ class SurfaceConditionRetrievalService(
 
                 stateFlow.update {
                     surfaceConditionSegments
+                }
+
+                surfaceConditionViewModelProvider.update {
+                    SurfaceConditionViewModel(
+                        knownFiles = knownMapfiles.size,
+                        osmTiles = tilesWithMapfiles.size,
+                        tilesWithoutMapfile = tilesWithoutMapfile.size,
+                        samples = routeSampled.size,
+                        gravelSamples = surfaceConditionSegments.sumOf { it.samples }
+                    )
                 }
             }
         }

@@ -26,9 +26,6 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
 import de.timklge.karooroutegraph.ClimbCategory
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
-import de.timklge.karooroutegraph.pois.NearestPoint
-import de.timklge.karooroutegraph.pois.POI
-import de.timklge.karooroutegraph.pois.PoiType
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModel
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModelProvider
@@ -41,6 +38,9 @@ import de.timklge.karooroutegraph.datatypes.minimap.ChangeZoomLevelAction
 import de.timklge.karooroutegraph.datatypes.minimap.mapPoiToIcon
 import de.timklge.karooroutegraph.getInclineIndicatorColor
 import de.timklge.karooroutegraph.getSurfaceConditionPaints
+import de.timklge.karooroutegraph.pois.NearestPoint
+import de.timklge.karooroutegraph.pois.POI
+import de.timklge.karooroutegraph.pois.PoiType
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.streamDatatypeIsVisible
 import de.timklge.karooroutegraph.streamSettings
@@ -677,8 +677,8 @@ class RouteGraphDataType(
             )
             val routeGraphDisplayViewModel = RouteGraphDisplayViewModel()
             val surfaceConditions = listOf(
-                SurfaceConditionRetrievalService.SurfaceConditionSegment(5_000.0, 15_000.0, SurfaceConditionRetrievalService.SurfaceCondition.GRAVEL),
-                SurfaceConditionRetrievalService.SurfaceConditionSegment(35_000.0, 45_000.0, SurfaceConditionRetrievalService.SurfaceCondition.LOOSE)
+                SurfaceConditionRetrievalService.SurfaceConditionSegment(5_000.0, 15_000.0, SurfaceConditionRetrievalService.SurfaceCondition.GRAVEL, 0),
+                SurfaceConditionRetrievalService.SurfaceConditionSegment(35_000.0, 45_000.0, SurfaceConditionRetrievalService.SurfaceCondition.LOOSE, 0)
             )
             val streamData = StreamData(
                 routeGraphViewModel = routeGraphViewModel,

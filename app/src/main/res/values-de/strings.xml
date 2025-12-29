@@ -36,6 +36,8 @@
     <string name="indicate_surface_conditions">Oberflächen im Graphen anzeigen</string>
     <string name="storage_permission_required">Speicherberechtigung erforderlich, um Oberflächendaten zu lesen</string>
     <string name="grant_permission">Berechtigung erteilen</string>
+    <string name="map_files_found">%1$d Kartendateien gefunden.</string>
+    <string name="tiles_on_route">%1$d Kacheln auf aktueller Route (%2$d unbekannt), %3$d Routenproben (%4$d Schotter).</string>
     <string name="only_highlight_climbs_at_zoom_level">Nur Anstiege hervorheben ab Zoomstufe:</string>
     <string name="never">Nie</string>
     <string name="gradient_chevrons">Steigungsindikatoren</string>
