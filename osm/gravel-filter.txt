@@ -1,0 +1,2 @@
+surface=unpaved,dirt,ground,gravel,fine_gravel,compacted,pebblestone,cobblestone,grass,sand,mud
+tracktype=grade2,grade3,grade4,grade5

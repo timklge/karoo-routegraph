@@ -35,10 +35,10 @@ import androidx.glance.layout.size
 import de.timklge.karooroutegraph.ClimbCategory
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
-import de.timklge.karooroutegraph.NearestPoint
-import de.timklge.karooroutegraph.POI
-import de.timklge.karooroutegraph.POIActivity
-import de.timklge.karooroutegraph.PoiType
+import de.timklge.karooroutegraph.pois.NearestPoint
+import de.timklge.karooroutegraph.pois.POI
+import de.timklge.karooroutegraph.pois.POIActivity
+import de.timklge.karooroutegraph.pois.PoiType
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModel
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModelProvider
@@ -676,18 +676,24 @@ class VerticalRouteGraphDataType(
                 val textHeight = 40f
                 val groupSpacing = 5f // Minimum spacing between groups
 
-                // Process groups in original order to maintain label sequence
+                // Calculate total heights for each group (needed for positioning)
+                fun calculateGroupHeight(group: TextGroup): Float {
+                    var totalGroupHeight = 0f
+                    group.commands.forEach { cmd ->
+                        val availableWidth = cmd.maxWidth ?: (config.viewSize.first.toFloat() - cmd.x - 20f)
+                        val wrappedLines = wrapText(cmd.text, cmd.paint, availableWidth)
+                        totalGroupHeight += (wrappedLines.size * textHeight)
+                    }
+                    return totalGroupHeight
+                }
+
+                // Process groups from bottom to top (higher Y values first, since Y increases downward)
+                // This ensures labels that appear later on screen can push earlier labels upward
                 textGroups
                     .filter { group -> group.commands.any { it.y >= 0 && it.y < config.viewSize.second } }
-                    .sortedBy { it.originalIndex } // Maintain original order
+                    .sortedByDescending { it.originalY } // Process from bottom to top
                     .forEach { group ->
-                        // Calculate the total height needed for this group considering text wrapping
-                        var totalGroupHeight = 0f
-                        group.commands.forEach { cmd ->
-                            val availableWidth = cmd.maxWidth ?: (config.viewSize.first.toFloat() - cmd.x - 20f)
-                            val wrappedLines = wrapText(cmd.text, cmd.paint, availableWidth)
-                            totalGroupHeight += (wrappedLines.size * textHeight)
-                        }
+                        val totalGroupHeight = calculateGroupHeight(group)
 
                         // Try different positions starting from the original position
                         var bestY = group.originalY
@@ -700,12 +706,14 @@ class VerticalRouteGraphDataType(
                             foundPosition = true
                         } else {
                             // Try moving up in small steps to find a free position
+                            // Labels can only be moved upward, not downward
                             var testY = group.originalY
                             val step = textHeight / 2f // Move in smaller steps
-                            var attempts = 0
-                            val maxAttempts = ((group.originalY + totalGroupHeight) / step).toInt()
+                            // Search upward all the way to the top of the screen
+                            val maxUpwardAttempts = ((group.originalY) / step).toInt() + 1
 
-                            while (attempts < maxAttempts && !foundPosition) {
+                            var attempts = 0
+                            while (attempts < maxUpwardAttempts && !foundPosition) {
                                 testY -= step
                                 val testRange = testY..(testY + totalGroupHeight)
 
@@ -717,26 +725,7 @@ class VerticalRouteGraphDataType(
                                 }
                                 attempts++
                             }
-
-                            // If moving up didn't work, try moving down
-                            if (!foundPosition) {
-                                testY = group.originalY
-                                attempts = 0
-                                val maxDownwardAttempts = ((config.viewSize.second - group.originalY) / step).toInt()
-
-                                while (attempts < maxDownwardAttempts && !foundPosition) {
-                                    testY += step
-                                    val testRange = testY..(testY + totalGroupHeight)
-
-                                    // Check if this position is valid (within bounds and no conflicts)
-                                    if (testRange.start >= 0 && testRange.endInclusive <= config.viewSize.second &&
-                                        !occupiedRanges.any { it.overlaps(testRange) }) {
-                                        bestY = testY
-                                        foundPosition = true
-                                    }
-                                    attempts++
-                                }
-                            }
+                            // If no position found at or above original position, label will not be shown
                         }
 
                         // Additional check for climb labels vs POI lines (existing logic)

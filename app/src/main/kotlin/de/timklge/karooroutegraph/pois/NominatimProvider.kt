@@ -1,6 +1,9 @@
-package de.timklge.karooroutegraph
+package de.timklge.karooroutegraph.pois
 
 import android.util.Log
+import de.timklge.karooroutegraph.KarooRouteGraphExtension
+import de.timklge.karooroutegraph.KarooSystemServiceProvider
+import de.timklge.karooroutegraph.jsonWithUnknownKeys
 import io.hammerhead.karooext.models.HttpResponseState
 import io.hammerhead.karooext.models.OnHttpResponse
 import kotlinx.coroutines.channels.awaitClose
@@ -10,6 +13,7 @@ import kotlinx.coroutines.flow.single
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
+import java.io.ByteArrayInputStream
 import java.net.URLEncoder
 import java.util.zip.GZIPInputStream
 
@@ -48,59 +52,59 @@ class NominatimProvider(
             val url = "https://nominatim.openstreetmap.org/search?q=$query&limit=$limit&format=json"
 
 
-            Log.d(KarooRouteGraphExtension.TAG, "Http request to ${url}...")
+            Log.d(KarooRouteGraphExtension.Companion.TAG, "Http request to ${url}...")
 
             val listenerId = karooSystemServiceProvider.karooSystemService.addConsumer(
                 OnHttpResponse.MakeHttpRequest(
                     "GET",
                     url,
                     waitForConnection = false,
-                    headers = mapOf("User-Agent" to KarooRouteGraphExtension.TAG, "Accept-Encoding" to "gzip"),
+                    headers = mapOf("User-Agent" to KarooRouteGraphExtension.Companion.TAG, "Accept-Encoding" to "gzip"),
                 ),
                 onError = { err ->
-                    Log.e(KarooRouteGraphExtension.TAG, "Failed to send request: $err")
+                    Log.e(KarooRouteGraphExtension.Companion.TAG, "Failed to send request: $err")
                     close(Exception(err))
                 }) { event: OnHttpResponse ->
                 if (event.state is HttpResponseState.Complete){
                     val completeEvent = (event.state as HttpResponseState.Complete)
 
                     try {
-                        val inputStream = java.io.ByteArrayInputStream(completeEvent.body ?: ByteArray(0))
+                        val inputStream = ByteArrayInputStream(completeEvent.body ?: ByteArray(0))
                         val lowercaseHeaders = completeEvent.headers.map { (k: String, v: String) -> k.lowercase() to v.lowercase() }.toMap()
                         val isGzippedResponse = lowercaseHeaders["content-encoding"]?.contains("gzip") == true
                         val responseString = if(isGzippedResponse){
                             try {
                                 val gzipStream = GZIPInputStream(inputStream)
                                 val response = gzipStream.use { stream -> String(stream.readBytes()) }
-                                Log.d(KarooRouteGraphExtension.TAG, "Http response event; size ${completeEvent.body?.size} gzip decompressed to ${response.length} bytes")
+                                Log.d(KarooRouteGraphExtension.Companion.TAG, "Http response event; size ${completeEvent.body?.size} gzip decompressed to ${response.length} bytes")
                                 response
                             } catch(e: Exception) {
-                                Log.e(KarooRouteGraphExtension.TAG, "Failed to decompress gzip response", e)
+                                Log.e(KarooRouteGraphExtension.Companion.TAG, "Failed to decompress gzip response", e)
                                 String(completeEvent.body ?: ByteArray(0))
                             }
                         } else {
                             val response = inputStream.use { stream -> String(stream.readBytes()) }
-                            Log.d(KarooRouteGraphExtension.TAG, "Http response event; size ${completeEvent.body?.size} bytes")
+                            Log.d(KarooRouteGraphExtension.Companion.TAG, "Http response event; size ${completeEvent.body?.size} bytes")
                             response
                         }
 
                         if (completeEvent.error != null) {
-                            Log.e(KarooRouteGraphExtension.TAG, "Http response event; error ${completeEvent.error}")
+                            Log.e(KarooRouteGraphExtension.Companion.TAG, "Http response event; error ${completeEvent.error}")
                             error(completeEvent.error ?: "Unknown error")
                         }
 
                         val response = try {
                             jsonWithUnknownKeys.decodeFromString(ListSerializer(OsmPlace.serializer()), responseString)
                         } catch (e: Exception) {
-                            Log.e(KarooRouteGraphExtension.TAG, "Failed to parse response: ${completeEvent.body}", e)
+                            Log.e(KarooRouteGraphExtension.Companion.TAG, "Failed to parse response: ${completeEvent.body}", e)
                             throw e
                         }
 
-                        Log.d(KarooRouteGraphExtension.TAG, "Parsed nominatim response with ${response.size} elements")
+                        Log.d(KarooRouteGraphExtension.Companion.TAG, "Parsed nominatim response with ${response.size} elements")
 
                         trySendBlocking(response)
                     } catch(e: Throwable){
-                        Log.e(KarooRouteGraphExtension.TAG, "Failed to process response", e)
+                        Log.e(KarooRouteGraphExtension.Companion.TAG, "Failed to process response", e)
                         close(e)
                     }
 

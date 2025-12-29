@@ -39,12 +39,13 @@ import de.timklge.karooroutegraph.KarooRouteGraphExtension
 import de.timklge.karooroutegraph.SurfaceConditionRetrievalService
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.LocationViewModelProvider
-import de.timklge.karooroutegraph.NearestPoint
-import de.timklge.karooroutegraph.POI
-import de.timklge.karooroutegraph.PoiType
+import de.timklge.karooroutegraph.pois.NearestPoint
+import de.timklge.karooroutegraph.pois.POI
+import de.timklge.karooroutegraph.pois.PoiType
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModel
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModelProvider
+import de.timklge.karooroutegraph.RouteGraphUpdateManager
 import de.timklge.karooroutegraph.RouteGraphViewModel
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.TileDownloadService
@@ -172,7 +173,7 @@ class MinimapDataType(
                 while(true){
                     emit(StreamData(
                         RouteGraphViewModel(routeDistance = polylineLength, distanceAlongRoute = 13_000f, knownRoute = polyline,
-                            locationAndRemainingRouteDistance = KarooRouteGraphExtension.LocationAndRemainingRouteDistance(positionAlongRoute.latitude(), positionAlongRoute.longitude(), bearing, polylineLength.toDouble() - 3_000),
+                            locationAndRemainingRouteDistance = RouteGraphUpdateManager.LocationAndRemainingRouteDistance(positionAlongRoute.latitude(), positionAlongRoute.longitude(), bearing, polylineLength.toDouble() - 3_000),
                             poiDistances = mapOf(
                                 POI(Symbol.POI("gate", 52.5159305, 13.3774302, name = "Gate")) to listOf(
                                     NearestPoint(null, 0.0f, 0.0f, null)

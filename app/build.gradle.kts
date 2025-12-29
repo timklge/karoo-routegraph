@@ -4,7 +4,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
     alias(libs.plugins.compose.compiler)
-    kotlin("plugin.serialization") version "2.0.20"
+    kotlin("plugin.serialization") version "2.0.21"
+    id("com.google.devtools.ksp")
 }
 
 android {
@@ -71,7 +72,7 @@ tasks.register("generateManifest") {
             "latestVersionCode" to android.defaultConfig.versionCode,
             "developer" to "github.com/timklge",
             "description" to "Open-source extension that provides an elevation graph datafield depicting the complete current route, including climbs and POIs (e. g. checkpoints and refueling stops)",
-            "releaseNotes" to "* Add option to disable minimap dark mode\n* Add option to show surface conditions on the elevation graph and minimap",
+            "releaseNotes" to "* Add option to download POIs of certain categories for offline use\n* Add option to automatically add POIs of selected categories to the route\n* Use icons for POIs that were added based on category",
             "screenshotUrls" to listOf(
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/horizontal_routegraph.png",
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/minimap.png",
@@ -92,6 +93,8 @@ tasks.named("assemble") {
     dependsOn("generateManifest")
 }
 
+
+
 dependencies {
     implementation(libs.mapbox.sdk.turf)
     implementation(libs.hammerhead.karoo.ext)
@@ -107,5 +110,8 @@ dependencies {
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
     implementation(libs.mapsforge.map.reader)
+    implementation(libs.osm4j.core)
+    implementation(libs.osm4j.pbf)
+    implementation(libs.okhttp)
     testImplementation(libs.testng)
 }

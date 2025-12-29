@@ -3,6 +3,11 @@ package de.timklge.karooroutegraph
 import android.app.Application
 import de.timklge.karooroutegraph.datatypes.minimap.MinimapViewModelProvider
 import de.timklge.karooroutegraph.incidents.HereMapsIncidentProvider
+import de.timklge.karooroutegraph.pois.NearbyPOIPbfDownloadService
+import de.timklge.karooroutegraph.pois.NominatimProvider
+import de.timklge.karooroutegraph.pois.OfflineNearbyPOIProvider
+import de.timklge.karooroutegraph.pois.OverpassPOIProvider
+import de.timklge.karooroutegraph.pois.PoiApproachAlertService
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
@@ -20,7 +25,11 @@ val appModule = module {
     singleOf(::HereMapsIncidentProvider)
     singleOf(::LocationViewModelProvider)
     singleOf(::PoiApproachAlertService)
+    singleOf(::NearbyPOIPbfDownloadService)
     singleOf(::SurfaceConditionRetrievalService)
+    singleOf(::RouteGraphUpdateManager)
+    singleOf(::OfflineNearbyPOIProvider)
+    singleOf(::AutoAddedPOIsViewModelProvider)
 }
 
 class KarooRouteGraphApplication : Application() {

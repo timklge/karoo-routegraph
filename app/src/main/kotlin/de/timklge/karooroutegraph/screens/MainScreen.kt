@@ -3,7 +3,6 @@ package de.timklge.karooroutegraph.screens
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Build
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,18 +20,26 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -65,12 +72,20 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mapbox.geojson.Point
 import de.timklge.karooroutegraph.GradientIndicatorFrequency
 import de.timklge.karooroutegraph.KarooRouteGraphExtension
-import de.timklge.karooroutegraph.POIActivity
+import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.incidents.HereMapsIncidentProvider
+import de.timklge.karooroutegraph.pois.DownloadedPbf
+import de.timklge.karooroutegraph.pois.NearbyPOIPbfDownloadService
+import de.timklge.karooroutegraph.pois.POIActivity
+import de.timklge.karooroutegraph.pois.PbfDownloadStatus
+import de.timklge.karooroutegraph.pois.PbfType
 import de.timklge.karooroutegraph.saveSettings
+import de.timklge.karooroutegraph.streamPbfDownloadStore
 import de.timklge.karooroutegraph.streamSettings
 import de.timklge.karooroutegraph.streamUserProfile
+import de.timklge.karooroutegraph.updatePbfDownloadStore
+import de.timklge.karooroutegraph.updatePbfDownloadStoreStatus
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.models.UserProfile
 import kotlinx.coroutines.delay
@@ -124,6 +139,13 @@ fun MainScreen(onFinish: () -> Unit) {
     var newZoomLevelText by remember { mutableStateOf("") }
     var zoomLevelError by remember { mutableStateOf("") }
     val hereMapsIncidentProvider = koinInject<HereMapsIncidentProvider>()
+    val nearbyPOIPbfDownloadService = koinInject<NearbyPOIPbfDownloadService>()
+    val karooSystemServiceProvider = koinInject<KarooSystemServiceProvider>()
+    var showDownloadPoisDialog by remember { mutableStateOf(false) }
+    var enableOfflinePoiStorage by remember { mutableStateOf(false) }
+    var autoAddPoisToMap by remember { mutableStateOf(false) }
+    var autoAddPoiCategories by remember { mutableStateOf(emptySet<NearbyPoiCategory>()) }
+    var showAutoAddPoiCategoriesDialog by remember { mutableStateOf(false) }
 
     var hasStoragePermission by remember { mutableStateOf(false) }
 
@@ -155,6 +177,16 @@ fun MainScreen(onFinish: () -> Unit) {
         )
 
         saveSettings(ctx, newSettings)
+    }
+
+    suspend fun updatePoiSettings() {
+        karooSystemServiceProvider.saveViewSettings { settings ->
+            settings.copy(
+                enableOfflinePoiStorage = enableOfflinePoiStorage,
+                autoAddPoisToMap = autoAddPoisToMap,
+                autoAddPoiCategories = autoAddPoiCategories
+            )
+        }
     }
 
     // Permission launcher for storage permissions
@@ -196,6 +228,14 @@ fun MainScreen(onFinish: () -> Unit) {
     }
 
     LaunchedEffect(Unit) {
+        karooSystemServiceProvider.streamViewSettings().collect { settings ->
+            enableOfflinePoiStorage = settings.enableOfflinePoiStorage
+            autoAddPoisToMap = settings.autoAddPoisToMap
+            autoAddPoiCategories = settings.autoAddPoiCategories
+        }
+    }
+
+    LaunchedEffect(Unit) {
         karooSystem.connect { connected ->
             karooConnected = connected
         }
@@ -219,7 +259,7 @@ fun MainScreen(onFinish: () -> Unit) {
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = {Text("RouteGraph")}) },
+        topBar = { TopAppBar(title = {Text(stringResource(R.string.app_name))}) },
         content = {
             Box(Modifier.fillMaxSize()) {
                 Column(
@@ -467,6 +507,230 @@ fun MainScreen(onFinish: () -> Unit) {
                             Text(stringResource(R.string.manage_pois))
                         }
 
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Switch(checked = enableOfflinePoiStorage, onCheckedChange = {
+                                enableOfflinePoiStorage = it
+                                coroutineScope.launch {
+                                    updatePoiSettings()
+                                }
+                            })
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(stringResource(R.string.enable_offline_poi_storage))
+                        }
+
+                        if (enableOfflinePoiStorage) {
+                            // Offline POIs Button
+                            FilledTonalButton(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(40.dp),
+                                onClick = {
+                                    showDownloadPoisDialog = true
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Add,
+                                    contentDescription = stringResource(R.string.offline_pois),
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(stringResource(R.string.offline_pois))
+                            }
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Switch(checked = autoAddPoisToMap, onCheckedChange = {
+                                    autoAddPoisToMap = it
+                                    coroutineScope.launch {
+                                        updatePoiSettings()
+                                    }
+                                })
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(stringResource(R.string.auto_add_pois_to_map))
+                            }
+
+                            if (autoAddPoisToMap) {
+                                FilledTonalButton(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(40.dp),
+                                    onClick = {
+                                        showAutoAddPoiCategoriesDialog = true
+                                    }
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.bx_info_circle),
+                                        contentDescription = stringResource(R.string.select_categories),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(R.string.select_categories))
+                                }
+                            }
+                        }
+
+                        if (showAutoAddPoiCategoriesDialog) {
+                            CategorySelectionDialog(
+                                initialCategories = autoAddPoiCategories,
+                                onDismiss = { showAutoAddPoiCategoriesDialog = false },
+                                onConfirm = { newCategories ->
+                                    autoAddPoiCategories = newCategories
+                                    showAutoAddPoiCategoriesDialog = false
+                                    coroutineScope.launch {
+                                        updatePoiSettings()
+                                    }
+                                }
+                            )
+                        }
+
+                        if (showDownloadPoisDialog) {
+                            val downloadedPbfs by streamPbfDownloadStore(ctx).collectAsStateWithLifecycle(listOf())
+                            val countriesByContinent = remember {
+                                nearbyPOIPbfDownloadService.countriesData.entries
+                                    .groupBy { it.value.continent }
+                                    .toSortedMap()
+                            }
+                            var expandedContinents by remember { mutableStateOf(setOf<String>()) }
+
+                            Dialog(onDismissRequest = { showDownloadPoisDialog = false }) {
+                                Surface(
+                                    shape = MaterialTheme.shapes.medium,
+                                    color = MaterialTheme.colorScheme.surface,
+                                    modifier = Modifier.padding(16.dp).fillMaxSize()
+                                ) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        Text(
+                                            text = stringResource(R.string.download_pois),
+                                            style = MaterialTheme.typography.titleLarge,
+                                            modifier = Modifier.padding(bottom = 16.dp)
+                                        )
+
+                                        LazyColumn(modifier = Modifier.weight(1f)) {
+                                            countriesByContinent.forEach { (continent, countries) ->
+                                                item {
+                                                    val isExpanded = expandedContinents.contains(continent)
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .clickable {
+                                                                expandedContinents = if (isExpanded) {
+                                                                    expandedContinents - continent
+                                                                } else {
+                                                                    expandedContinents + continent
+                                                                }
+                                                            }
+                                                            .padding(vertical = 12.dp),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text(
+                                                            text = getContinentString(continent),
+                                                            style = MaterialTheme.typography.titleMedium,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                        Icon(
+                                                            imageVector = if (isExpanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                                                            contentDescription = if (isExpanded) stringResource(R.string.collapse) else stringResource(R.string.expand)
+                                                        )
+                                                    }
+                                                    HorizontalDivider()
+                                                }
+
+                                                if (expandedContinents.contains(continent)) {
+                                                    items(countries.sortedBy { country -> country.value.name }) { entry ->
+                                                        val key = entry.key
+                                                        val data = entry.value
+                                                        val downloadedPbf = downloadedPbfs.find { it.countryKey == key }
+                                                        val status = downloadedPbf?.downloadState
+
+                                                        Row(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .padding(vertical = 8.dp, horizontal = 16.dp), // Indent countries
+                                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Text(
+                                                                text = getCountryString(key, data.name),
+                                                                style = MaterialTheme.typography.bodyLarge,
+                                                                modifier = Modifier.weight(1f)
+                                                            )
+
+                                                            if (downloadedPbf == null) {
+                                                                IconButton(onClick = {
+                                                                    coroutineScope.launch {
+                                                                        updatePbfDownloadStore(ctx) { currentPbfs ->
+                                                                            val pbfs = currentPbfs.filterNot { it.countryKey == key } + listOf(
+                                                                                DownloadedPbf(
+                                                                                    countryKey = key,
+                                                                                    countryName = data.name,
+                                                                                    pbfType = PbfType.POI,
+                                                                                    downloadState = PbfDownloadStatus.PENDING,
+                                                                                    progress = 0f
+                                                                                )
+                                                                            )
+
+                                                                            pbfs
+                                                                        }
+                                                                    }
+                                                                }) {
+                                                                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.download))
+                                                                }
+                                                            } else if (status == PbfDownloadStatus.AVAILABLE) {
+                                                                IconButton(onClick = {
+                                                                    coroutineScope.launch {
+                                                                        try {
+                                                                            nearbyPOIPbfDownloadService.getPoiFile(key).delete()
+                                                                        } catch(t: Throwable) {
+                                                                            Log.e(KarooRouteGraphExtension.TAG, "Failed to delete PBF file for $key", t)
+                                                                        }
+
+                                                                        updatePbfDownloadStore(ctx) { currentPbfs ->
+                                                                            currentPbfs.filterNot { pbf -> pbf.countryKey == key }
+                                                                        }
+                                                                    }
+                                                                }) {
+                                                                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.remove), tint = MaterialTheme.colorScheme.error)
+                                                                }
+                                                            } else {
+                                                                // Show status or progress
+                                                                when (status) {
+                                                                    PbfDownloadStatus.PENDING -> if (downloadedPbf.progress in 0.01f..0.99f) {
+                                                                        CircularProgressIndicator(modifier = Modifier.size(48.dp), progress = { downloadedPbf.progress })
+                                                                    } else {
+                                                                        CircularProgressIndicator(modifier = Modifier.size(48.dp))
+                                                                    }
+                                                                    PbfDownloadStatus.DOWNLOAD_FAILED -> Icon(Icons.Filled.Warning, contentDescription = stringResource(R.string.failed), tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(48.dp))
+                                                                    else -> {}
+                                                                }
+
+                                                                if (status == PbfDownloadStatus.DOWNLOAD_FAILED){
+                                                                     IconButton(onClick = {
+                                                                        coroutineScope.launch {
+                                                                            updatePbfDownloadStoreStatus(ctx, key, PbfDownloadStatus.PENDING)
+                                                                        }
+                                                                    }) {
+                                                                        Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.retry), tint = MaterialTheme.colorScheme.primary)
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                        HorizontalDivider(modifier = Modifier.padding(start = 16.dp))
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Button(
+                                            onClick = { showDownloadPoisDialog = false },
+                                            modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
+                                        ) {
+                                            Text(stringResource(R.string.close))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         // Max POI Distance from Route Slider
                         val poiDistanceOptions = arrayOf(200.0, 500.0, 1_000.0, 2_000.0, 5_000.0)
                         val selectedPoiDistanceIndex = poiDistanceOptions.indexOf(poiDistanceToRouteMaxMeters)
@@ -708,6 +972,8 @@ fun MainScreen(onFinish: () -> Unit) {
                             }
                         }
 
+
+
                         Spacer(modifier = Modifier.padding(30.dp))
                     }
                 }
@@ -752,3 +1018,24 @@ fun MainScreen(onFinish: () -> Unit) {
         )
     }
 }
+
+@Composable
+fun getContinentString(continent: String): String {
+    val context = LocalContext.current
+    val resourceName = "continent_" + continent.lowercase().replace(" ", "_")
+    val resId = remember(continent) {
+        context.resources.getIdentifier(resourceName, "string", context.packageName)
+    }
+    return if (resId != 0) stringResource(resId) else continent
+}
+
+@Composable
+fun getCountryString(countryCode: String, defaultName: String): String {
+    val context = LocalContext.current
+    val resourceName = "country_" + countryCode.lowercase()
+    val resId = remember(countryCode) {
+        context.resources.getIdentifier(resourceName, "string", context.packageName)
+    }
+    return if (resId != 0) stringResource(resId) else defaultName
+}
+

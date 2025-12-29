@@ -17,6 +17,10 @@ class LocationViewModelProvider(private val karooSystemServiceProvider: KarooSys
     private val observableStateFlow = MutableStateFlow<Point?>(null)
     val viewModelFlow = observableStateFlow.asStateFlow()
 
+    init {
+        startUpdateJob()
+    }
+
     fun update(action: (Point?) -> Point?){
         observableStateFlow.update(action)
     }

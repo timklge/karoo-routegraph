@@ -28,7 +28,7 @@ import java.time.Instant
 class TileDownloadService(
     private val karooSystemServiceProvider: KarooSystemServiceProvider,
     private val minimapViewModelProvider: MinimapViewModelProvider,
-    private val context: Context,
+    context: Context,
 ) {
     data class CachedTile(val lastAccessed: Instant, val bitmap: Bitmap)
 
@@ -38,14 +38,16 @@ class TileDownloadService(
     private val maxCacheSize = 50
     private val maxCacheAge = Duration.ofMinutes(30)
 
+    private val downloadQueue: Channel<Tile> = Channel(Channel.UNLIMITED)
+
     init {
         if (!cacheDir.exists()) {
             cacheDir.mkdirs()
         }
+        startDownloadJob()
     }
 
     private var downloadJob: Job? = null
-    private var downloadQueue: Channel<Tile> = Channel(Channel.UNLIMITED)
 
     fun startDownloadJob() {
         downloadJob = CoroutineScope(Dispatchers.IO).launch {

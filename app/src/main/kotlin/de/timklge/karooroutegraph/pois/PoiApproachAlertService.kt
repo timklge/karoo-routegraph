@@ -1,12 +1,16 @@
-package de.timklge.karooroutegraph
+package de.timklge.karooroutegraph.pois
 
 import android.content.Context
 import android.content.Intent
 import com.mapbox.geojson.Point
-import com.mapbox.turf.TurfConstants
-import com.mapbox.turf.TurfMeasurement
+import de.timklge.karooroutegraph.KarooSystemServiceProvider
+import de.timklge.karooroutegraph.LocationViewModelProvider
+import de.timklge.karooroutegraph.R
+import de.timklge.karooroutegraph.RouteGraphViewModel
+import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.screens.PoiSortOption
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
+import de.timklge.karooroutegraph.throttle
 import io.hammerhead.karooext.models.HardwareType
 import io.hammerhead.karooext.models.InRideAlert
 import io.hammerhead.karooext.models.PlayBeepPattern
@@ -22,6 +26,8 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import kotlin.collections.filter
+import kotlin.collections.forEach
 
 class PoiApproachAlertService(
     private val karooSystemServiceProvider: KarooSystemServiceProvider,
@@ -32,6 +38,10 @@ class PoiApproachAlertService(
     private var alertScheduleJob: Job? = null
     private var alertShowJob: Job? = null
     private var alertChannel: Channel<PoiAlert> = Channel(10)
+
+    init {
+        startAlertJob()
+    }
 
     data class PoiAlert(val message: String)
 

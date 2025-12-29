@@ -39,6 +39,16 @@ dependencyResolutionManagement {
         maven {
             url = uri("https://api.mapbox.com/downloads/v2/releases/maven")
         }
+
+        // topobyte
+        maven {
+            url = uri("https://mvn.topobyte.de/")
+        }
+
+        // slimjars
+        maven {
+            url = uri("https://mvn.slimjars.com")
+        }
     }
 }
 

@@ -3,6 +3,8 @@ package de.timklge.karooroutegraph
 import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
 import de.timklge.karooroutegraph.incidents.IncidentsResponse
+import de.timklge.karooroutegraph.pois.NearestPoint
+import de.timklge.karooroutegraph.pois.POI
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -19,7 +21,7 @@ data class RouteGraphViewModel(val routeDistance: Float? = null,
                                val climbs: List<Climb>? = null,
                                val rejoin: LineString? = null,
                                val navigatingToDestination: Boolean = false,
-                               val locationAndRemainingRouteDistance: KarooRouteGraphExtension.LocationAndRemainingRouteDistance? = null
+                               val locationAndRemainingRouteDistance: RouteGraphUpdateManager.LocationAndRemainingRouteDistance? = null
 )
 
 class RouteGraphViewModelProvider {
@@ -30,4 +32,3 @@ class RouteGraphViewModelProvider {
         observableStateFlow.update(action)
     }
 }
-
