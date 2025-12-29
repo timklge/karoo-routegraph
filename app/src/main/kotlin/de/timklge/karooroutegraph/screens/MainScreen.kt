@@ -1,7 +1,6 @@
 package de.timklge.karooroutegraph.screens
 
 import android.Manifest
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -77,7 +76,6 @@ import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.incidents.HereMapsIncidentProvider
 import de.timklge.karooroutegraph.pois.DownloadedPbf
 import de.timklge.karooroutegraph.pois.NearbyPOIPbfDownloadService
-import de.timklge.karooroutegraph.pois.POIActivity
 import de.timklge.karooroutegraph.pois.PbfDownloadStatus
 import de.timklge.karooroutegraph.pois.PbfType
 import de.timklge.karooroutegraph.saveSettings
@@ -486,25 +484,6 @@ fun MainScreen(onFinish: () -> Unit) {
                             })
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(stringResource(R.string.show_poi_labels))
-                        }
-
-                        // POI Management Button
-                        FilledTonalButton(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(40.dp),
-                            onClick = {
-                                val intent = Intent(ctx, POIActivity::class.java)
-                                ctx.startActivity(intent)
-                            }
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.bxmap),
-                                contentDescription = stringResource(R.string.manage_pois_description),
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource(R.string.manage_pois))
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
