@@ -57,7 +57,7 @@ fun mapPoiToIcon(poiType: String): Int {
         "trailhead" -> R.drawable.trip
         "transit_center" -> R.drawable.bx_train
         "viewpoint" -> R.drawable.bxs_tree
-        "water" -> R.drawable.bx_swim
+        "water" -> R.drawable.bx_water
         "winery" -> R.drawable.bxs_wine
         else -> R.drawable.bxmap // Default icon
     }
