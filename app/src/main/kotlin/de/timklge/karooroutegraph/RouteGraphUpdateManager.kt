@@ -3,6 +3,7 @@ package de.timklge.karooroutegraph
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import androidx.compose.ui.res.stringResource
 import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
 import com.mapbox.turf.TurfConstants
@@ -63,6 +64,8 @@ class RouteGraphUpdateManager(
     }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    private val unnamedPoi = context.getString(R.string.unnamed_poi)
 
     private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
         val point1 = Point.fromLngLat(lon1, lat1)
@@ -480,7 +483,7 @@ class RouteGraphUpdateManager(
                                     id = "autoadded-${poi.id}",
                                     lat = poi.lat,
                                     lng = poi.lon,
-                                    name = processPoiName(poi.tags["name"]),
+                                    name = processPoiName(poi.tags["name"] ?: unnamedPoi),
                                     type = NearbyPoiCategory.fromTag(poi.tags)?.hhType ?: Symbol.POI.Types.GENERIC,
                                 )
 
@@ -498,7 +501,7 @@ class RouteGraphUpdateManager(
                                     id = "autoadded-${poi.id}",
                                     lat = poi.lat,
                                     lng = poi.lon,
-                                    name = processPoiName(poi.tags["name"]),
+                                    name = processPoiName(poi.tags["name"] ?: unnamedPoi),
                                     type = NearbyPoiCategory.fromTag(poi.tags)?.hhType
                                         ?: Symbol.POI.Types.GENERIC,
                                 )
