@@ -50,6 +50,7 @@ import de.timklge.karooroutegraph.RouteGraphViewModel
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.TileDownloadService
 import de.timklge.karooroutegraph.getSurfaceConditionStrokePaints
+import de.timklge.karooroutegraph.screens.NearbyPoiCategory
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.streamDatatypeIsVisible
 import de.timklge.karooroutegraph.streamSettings
@@ -604,6 +605,15 @@ class MinimapDataType(
         }
     }
 
+    private val _poiBitmapCache = mutableMapOf<Int, Bitmap?>()
+    private fun getPoiBitmap(poiIconRes: Int, size: Int): Bitmap? {
+        val cacheKey = poiIconRes * 10000 + size
+        return _poiBitmapCache.getOrPut(cacheKey) {
+            val drawable = AppCompatResources.getDrawable(applicationContext, poiIconRes)
+            drawable?.toBitmap(size, size)
+        }
+    }
+
     // --- Draw POI ---
     private fun drawPoi(
         canvas: Canvas,
@@ -613,6 +623,7 @@ class MinimapDataType(
         showPOILabelsOnMinimap: Boolean,
         isIncident: Boolean
     ) {
+        val poiIconRes = mapPoiToIcon(poi.type)
         val poiPoint = Point.fromLngLat(poi.lng, poi.lat)
 
         val intZoom = floor(zoomLevel).toInt()
@@ -630,34 +641,47 @@ class MinimapDataType(
         val screenX = (canvas.width / 2f + deltaPixelX).toFloat()
         val screenY = (canvas.height / 2f + deltaPixelY).toFloat()
 
-        val xSize = 15f // Half the size of the X
-        val xStrokeWidth = 5f
-        val outlineStrokeWidth = xStrokeWidth + 4f // Outline slightly thicker
+        val iconSize = 40
+        val outlineWidth = 4f
 
-        val xPaintWhite = Paint().apply {
-            color = if (isIncident) Color.RED else Color.WHITE
-            strokeWidth = xStrokeWidth
-            style = Paint.Style.STROKE
-            isAntiAlias = true
-            strokeCap = Paint.Cap.ROUND
+        val poiBitmap = getPoiBitmap(poiIconRes, iconSize)
+        if (poiBitmap != null) {
+            val paint = Paint().apply {
+                isAntiAlias = true
+                isFilterBitmap = true
+                if (isIncident) {
+                    colorFilter = ColorMatrixColorFilter(ColorMatrix().apply {
+                        // Tint to red for incidents
+                        setScale(1f, 0.3f, 0.3f, 1f)
+                    })
+                }
+            }
+
+            // Draw background circle with outline
+            val circlePaint = Paint().apply {
+                color = Color.WHITE
+                style = Paint.Style.FILL
+                isAntiAlias = true
+            }
+            val outlinePaint = Paint().apply {
+                color = Color.BLACK
+                style = Paint.Style.STROKE
+                strokeWidth = outlineWidth
+                isAntiAlias = true
+            }
+
+            val circleRadius = iconSize / 2f + 6f
+            canvas.drawCircle(screenX, screenY, circleRadius, circlePaint)
+            canvas.drawCircle(screenX, screenY, circleRadius, outlinePaint)
+
+            // Draw the icon centered at the POI location
+            canvas.drawBitmap(
+                poiBitmap,
+                screenX - poiBitmap.width / 2f,
+                screenY - poiBitmap.height / 2f,
+                paint
+            )
         }
-
-        val xPaintBlackOutline = Paint().apply {
-            color = Color.BLACK
-            strokeWidth = outlineStrokeWidth
-            style = Paint.Style.STROKE
-            isAntiAlias = true
-            strokeCap = Paint.Cap.ROUND
-        }
-
-        // Draw outline first
-        canvas.drawLine(screenX - xSize, screenY - xSize, screenX + xSize, screenY + xSize, xPaintBlackOutline) // Top-left to bottom-right
-        canvas.drawLine(screenX - xSize, screenY + xSize, screenX + xSize, screenY - xSize, xPaintBlackOutline) // Bottom-left to top-right
-
-        // Draw white X on top
-        canvas.drawLine(screenX - xSize, screenY - xSize, screenX + xSize, screenY + xSize, xPaintWhite) // Top-left to bottom-right
-        canvas.drawLine(screenX - xSize, screenY + xSize, screenX + xSize, screenY - xSize, xPaintWhite) // Bottom-left to top-right
-
 
         if (showPOILabelsOnMinimap) {
             val textPaint = Paint().apply {
@@ -681,7 +705,7 @@ class MinimapDataType(
             textPaint.getTextBounds(text, 0, text.length, textBounds)
 
             val padding = 5f // Padding around the text
-            val labelOffsetY = -xSize - 5f
+            val labelOffsetY = -(iconSize / 2f + 6f) - 5f // Offset based on circle radius
             val rectLeft = screenX - textBounds.width() / 2f - padding
             val rectTop =
                 screenY + labelOffsetY - textBounds.height() - padding

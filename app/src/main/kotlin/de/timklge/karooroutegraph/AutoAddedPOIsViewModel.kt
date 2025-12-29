@@ -1,6 +1,5 @@
 package de.timklge.karooroutegraph
 
-import de.timklge.karooroutegraph.pois.POI
 import io.hammerhead.karooext.models.Symbol
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
