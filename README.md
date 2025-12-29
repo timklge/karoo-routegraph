@@ -47,7 +47,7 @@ between the full route and the upcoming 2km, 20km, 50km and 100km of the route.
 - Vertical Route Graph (see third screenshot): Similar to the route graph, but flipped so that the vertical axis depicts the route distance. The name of POIs, the remaining distance and elevation
 to them as well as climb lengths and total climb elevations are shown next to the elevation profile.
 - POI Button: Shows a single button that opens a dialog with a list of all POIs along the route. You can tap on each POI to start navigation to it. In addition to the route-specific and global POIs set up on the Karoo, 
-you can also look for nearby POIs of certain categories (e. g. cafes, restaurants etc.) using the Overpass API, or search for POIs by name using the Nominatim geocoding API.
+you can also look for nearby POIs of certain categories (e. g. cafes, restaurants etc.) using the Overpass API and downloaded POIs, or search for POIs by name using the Nominatim geocoding API.
 By default, route graph datafields also feature a POI button in the top right corner.
 - Distance to POI: Shows the distance to the next POI along the route. Note that this is the distance along the route and not the straight-line distance.
 - Elevation to POI: Shows the remaining climbing to the next POI along the route. Note that this is the elevation along the route and not the straight-line elevation.
@@ -99,10 +99,12 @@ Uphill chevrons use the known color scheme of the karoo (green-yellow-red for in
 During riding, you can open a POI managment menu by clicking the button shown in the top right corner of any routegraph elevation profile datafield. This will open a menu with three pages:
 
 - On the *Custom* page, your global POIs and the POIs of the currently loaded route are shown, including distance to the POI. You can toggle the display to show the remaining distance and remaining elevation climbing along the route instead of straight-line distance.
-- On the *Nearby* page, you can look up new POIs of selected categories near you (e. g. supermarkets, shelters, bike shops). This requires an active internet connection, which is provided by the Karoo companion app on your phone if you are using a Karoo 3.
-- On the *Search* page, you can look up POIs by typing in a search query (e. g. "Brandenburg Gate" or a postal address). This also requires an active internet connection.
+- On the *Nearby* page, you can look up new POIs of selected categories near you (e. g. supermarkets, shelters, bike shops). You can download POIs for regions in the settings menu, so that you can look up POIs without an active internet connection during riding.
+- On the *Search* page, you can look up POIs by typing in a search query (e. g. "Brandenburg Gate" or a postal address). This requires an active internet connection.
 
 On all pages, you can use the dot menu for each POI to initiate navigation to that POI. For POIs looked up on the Nearby or Search pages, you can also choose to add that POI to the elevation profiles (and the main karoo map).
+
+In the settings menu, you can also choose to automatically select POI categories that should automatically be added to the map and elevation profiles when loading up a route.
 
 ![POI navigation](poinav.png)
 
