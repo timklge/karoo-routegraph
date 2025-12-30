@@ -522,7 +522,13 @@ class RouteGraphUpdateManager(
                     Log.i(TAG, "Auto added POIs: ${newAutoAddedPois.values.map { it.name }}")
                 }
 
-                val tempPoiSymbols = (temporaryPOIs.poisByOsmId + lastAutoAddedPoisByOsmId).map { (_, poi) -> POI(poi) }
+                val autoAddToElevationProfileAndMinimap = poiSettings.autoAddToElevationProfileAndMinimap
+                val poiSum = if (autoAddToElevationProfileAndMinimap) {
+                    temporaryPOIs.poisByOsmId + lastAutoAddedPoisByOsmId
+                } else {
+                    temporaryPOIs.poisByOsmId
+                }
+                val tempPoiSymbols = poiSum.map { (_, poi) -> POI(poi) }
                 val localPois = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.pois.orEmpty().map { symbol ->
                     POI(
                         symbol = symbol,

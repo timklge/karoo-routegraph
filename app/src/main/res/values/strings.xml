@@ -153,5 +153,6 @@
     <string name="close">Close</string>
     <string name="enable_offline_poi_storage">Enable offline POI storage</string>
     <string name="auto_add_pois_to_map">Automatically add POIs to map</string>
+    <string name="auto_add_to_elevation_profile_and_minimap">Automatically add POIs to elevation profile and minimap</string>
     <string name="select_categories">Select categories</string>
 </resources>
