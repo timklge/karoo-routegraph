@@ -142,6 +142,7 @@ fun MainScreen(onFinish: () -> Unit) {
     var showDownloadPoisDialog by remember { mutableStateOf(false) }
     var enableOfflinePoiStorage by remember { mutableStateOf(false) }
     var autoAddPoisToMap by remember { mutableStateOf(false) }
+    var autoAddToElevationProfileAndMinimap by remember { mutableStateOf(false) }
     var autoAddPoiCategories by remember { mutableStateOf(emptySet<NearbyPoiCategory>()) }
     var showAutoAddPoiCategoriesDialog by remember { mutableStateOf(false) }
 
@@ -182,7 +183,8 @@ fun MainScreen(onFinish: () -> Unit) {
             settings.copy(
                 enableOfflinePoiStorage = enableOfflinePoiStorage,
                 autoAddPoisToMap = autoAddPoisToMap,
-                autoAddPoiCategories = autoAddPoiCategories
+                autoAddPoiCategories = autoAddPoiCategories,
+                autoAddToElevationProfileAndMinimap = autoAddToElevationProfileAndMinimap
             )
         }
     }
@@ -230,6 +232,7 @@ fun MainScreen(onFinish: () -> Unit) {
             enableOfflinePoiStorage = settings.enableOfflinePoiStorage
             autoAddPoisToMap = settings.autoAddPoisToMap
             autoAddPoiCategories = settings.autoAddPoiCategories
+            autoAddToElevationProfileAndMinimap = settings.autoAddToElevationProfileAndMinimap
         }
     }
 
@@ -525,6 +528,17 @@ fun MainScreen(onFinish: () -> Unit) {
                                 })
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text(stringResource(R.string.auto_add_pois_to_map))
+                            }
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Switch(checked = autoAddToElevationProfileAndMinimap, onCheckedChange = {
+                                    autoAddToElevationProfileAndMinimap = it
+                                    coroutineScope.launch {
+                                        updatePoiSettings()
+                                    }
+                                })
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(stringResource(R.string.auto_add_to_elevation_profile_and_minimap))
                             }
 
                             if (autoAddPoisToMap) {
