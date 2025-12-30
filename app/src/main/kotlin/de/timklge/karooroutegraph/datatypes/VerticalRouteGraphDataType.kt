@@ -870,8 +870,8 @@ class VerticalRouteGraphDataType(
             )
             val routeGraphDisplayViewModel = RouteGraphDisplayViewModel()
             val surfaceConditions = listOf(
-                SurfaceConditionRetrievalService.SurfaceConditionSegment(5_000.0, 15_000.0, SurfaceConditionRetrievalService.SurfaceCondition.GRAVEL),
-                SurfaceConditionRetrievalService.SurfaceConditionSegment(35_000.0, 45_000.0, SurfaceConditionRetrievalService.SurfaceCondition.LOOSE)
+                SurfaceConditionRetrievalService.SurfaceConditionSegment(5_000.0, 15_000.0, SurfaceConditionRetrievalService.SurfaceCondition.GRAVEL, 0),
+                SurfaceConditionRetrievalService.SurfaceConditionSegment(35_000.0, 45_000.0, SurfaceConditionRetrievalService.SurfaceCondition.LOOSE, 0)
             )
             val streamData = StreamData(
                 routeGraphViewModel = routeGraphViewModel,

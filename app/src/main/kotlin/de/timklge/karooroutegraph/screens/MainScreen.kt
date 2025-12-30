@@ -73,6 +73,8 @@ import de.timklge.karooroutegraph.GradientIndicatorFrequency
 import de.timklge.karooroutegraph.KarooRouteGraphExtension
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.R
+import de.timklge.karooroutegraph.SurfaceConditionViewModel
+import de.timklge.karooroutegraph.SurfaceConditionViewModelProvider
 import de.timklge.karooroutegraph.incidents.HereMapsIncidentProvider
 import de.timklge.karooroutegraph.pois.DownloadedPbf
 import de.timklge.karooroutegraph.pois.NearbyPOIPbfDownloadService
@@ -139,6 +141,7 @@ fun MainScreen(onFinish: () -> Unit) {
     val hereMapsIncidentProvider = koinInject<HereMapsIncidentProvider>()
     val nearbyPOIPbfDownloadService = koinInject<NearbyPOIPbfDownloadService>()
     val karooSystemServiceProvider = koinInject<KarooSystemServiceProvider>()
+    val surfaceConditionViewModelProvider = koinInject<SurfaceConditionViewModelProvider>()
     var showDownloadPoisDialog by remember { mutableStateOf(false) }
     var enableOfflinePoiStorage by remember { mutableStateOf(false) }
     var autoAddPoisToMap by remember { mutableStateOf(false) }
@@ -153,6 +156,7 @@ fun MainScreen(onFinish: () -> Unit) {
     }
 
     val userProfile by karooSystem.streamUserProfile().collectAsStateWithLifecycle(null)
+    val surfaceConditionViewModel by surfaceConditionViewModelProvider.viewModelFlow.collectAsStateWithLifecycle(SurfaceConditionViewModel())
 
     suspend fun updateSettings(){
         Log.d(KarooRouteGraphExtension.TAG, "Updating settings")
@@ -332,6 +336,22 @@ fun MainScreen(onFinish: () -> Unit) {
                             ) {
                                 Text(stringResource(R.string.grant_permission))
                             }
+                        }
+
+                        if (indicateSurfaceConditionsOnGraph && hasStoragePermission) {
+                            val s = buildString {
+                                append(stringResource(R.string.map_files_found, surfaceConditionViewModel.knownFiles))
+
+                                if (surfaceConditionViewModel.osmTiles > 0) {
+                                    append(" ")
+                                    append(stringResource(R.string.tiles_on_route,
+                                        surfaceConditionViewModel.osmTiles,
+                                        surfaceConditionViewModel.tilesWithoutMapfile,
+                                        surfaceConditionViewModel.samples,
+                                        surfaceConditionViewModel.gravelSamples))
+                                }
+                            }
+                            Text(s)
                         }
 
                         // Only Highlight Climbs at Zoom Level Slider
