@@ -8,7 +8,7 @@ import kotlinx.serialization.json.Json
 @Serializable
 data class RouteGraphSettings(
     val showGradientIndicatorsOnMap: Boolean = false,
-    val showPOILabelsOnMinimap: Boolean = true,
+    val showPOILabelsOnMinimap: Boolean = false,
     val welcomeDialogAccepted: Boolean = false,
     val enableTrafficIncidentReporting: Boolean = false,
     val showNavigateButtonOnGraphs: Boolean = true,
