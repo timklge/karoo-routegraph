@@ -453,73 +453,91 @@ class RouteGraphUpdateManager(
                 }
 
                 val lastKnownAutoAddedPoisRequestedAtPosition = lastAutoAddedPoisRequestedAtPosition
-                val refreshAutoAddedPois = routeChanged || lastKnownAutoAddedPoisRequestedAtPosition == null || (
+                val autoAddPoisEnabled = poiSettings.autoAddPoisToMap || poiSettings.autoAddToElevationProfileAndMinimap
+                val refreshAutoAddedPois = (routeChanged || lastKnownAutoAddedPoisRequestedAtPosition == null || (
                         locationAndRemainingRouteDistance.lat != null && locationAndRemainingRouteDistance.lon != null && TurfMeasurement.distance(
                             Point.fromLngLat(locationAndRemainingRouteDistance.lon, locationAndRemainingRouteDistance.lat),
                             lastKnownAutoAddedPoisRequestedAtPosition,
                             TurfConstants.UNIT_METERS
                         ) > 1_500
-                ) || lastAutoAddedPoisCategories != poiSettings.autoAddPoiCategories
+                ) || lastAutoAddedPoisCategories != poiSettings.autoAddPoiCategories) && autoAddPoisEnabled
 
-                if (refreshAutoAddedPois && poiSettings.autoAddPoiCategories.isNotEmpty()) {
-                    Log.i(TAG, "Route changed, updating auto added POIs")
+                if (refreshAutoAddedPois) {
+                    if (poiSettings.autoAddPoiCategories.isNotEmpty()) {
+                        Log.i(TAG, "Route changed, updating auto added POIs")
 
-                    val currentLocation = if (locationAndRemainingRouteDistance.lat != null && locationAndRemainingRouteDistance.lon != null) {
-                        Point.fromLngLat(locationAndRemainingRouteDistance.lon, locationAndRemainingRouteDistance.lat)
-                    } else {
-                        null
-                    }
-
-                    val newAutoAddedPois = buildMap {
-                        if (routeLineString != null){
-                            // Request POIs along the route
-                            offlineNearbyPOIProvider.requestNearbyPOIs(
-                                poiSettings.autoAddPoiCategories.map { it.osmTag }.flatten(),
-                                routeLineString.coordinates(),
-                                settings.poiDistanceToRouteMaxMeters.toInt(),
-                                200
-                            ).forEach { poi ->
-                                val symbol = Symbol.POI(
-                                    id = "autoadded-${poi.id}",
-                                    lat = poi.lat,
-                                    lng = poi.lon,
-                                    name = processPoiName(poi.tags["name"] ?: unnamedPoi),
-                                    type = NearbyPoiCategory.fromTag(poi.tags)?.hhType ?: Symbol.POI.Types.GENERIC,
+                        val currentLocation =
+                            if (locationAndRemainingRouteDistance.lat != null && locationAndRemainingRouteDistance.lon != null) {
+                                Point.fromLngLat(
+                                    locationAndRemainingRouteDistance.lon,
+                                    locationAndRemainingRouteDistance.lat
                                 )
-
-                                put(poi.id, symbol)
+                            } else {
+                                null
                             }
-                        } else if (currentLocation != null) {
-                            // Request POIs around the current location
-                            offlineNearbyPOIProvider.requestNearbyPOIs(
-                                poiSettings.autoAddPoiCategories.map { it.osmTag }.flatten(),
-                                listOf(currentLocation),
-                                2_000,
-                                200
-                            ).forEach { poi ->
-                                val symbol = Symbol.POI(
-                                    id = "autoadded-${poi.id}",
-                                    lat = poi.lat,
-                                    lng = poi.lon,
-                                    name = processPoiName(poi.tags["name"] ?: unnamedPoi),
-                                    type = NearbyPoiCategory.fromTag(poi.tags)?.hhType
-                                        ?: Symbol.POI.Types.GENERIC,
-                                )
 
-                                put(poi.id, symbol)
+                        val newAutoAddedPois = buildMap {
+                            if (routeLineString != null) {
+                                // Request POIs along the route
+                                offlineNearbyPOIProvider.requestNearbyPOIs(
+                                    poiSettings.autoAddPoiCategories.map { it.osmTag }.flatten(),
+                                    routeLineString.coordinates(),
+                                    settings.poiDistanceToRouteMaxMeters.toInt(),
+                                    200
+                                ).forEach { poi ->
+                                    val symbol = Symbol.POI(
+                                        id = "autoadded-${poi.id}",
+                                        lat = poi.lat,
+                                        lng = poi.lon,
+                                        name = processPoiName(poi.tags["name"] ?: unnamedPoi),
+                                        type = NearbyPoiCategory.fromTag(poi.tags)?.hhType
+                                            ?: Symbol.POI.Types.GENERIC,
+                                    )
+
+                                    put(poi.id, symbol)
+                                }
+                            } else if (currentLocation != null) {
+                                // Request POIs around the current location
+                                offlineNearbyPOIProvider.requestNearbyPOIs(
+                                    poiSettings.autoAddPoiCategories.map { it.osmTag }.flatten(),
+                                    listOf(currentLocation),
+                                    2_000,
+                                    200
+                                ).forEach { poi ->
+                                    val symbol = Symbol.POI(
+                                        id = "autoadded-${poi.id}",
+                                        lat = poi.lat,
+                                        lng = poi.lon,
+                                        name = processPoiName(poi.tags["name"] ?: unnamedPoi),
+                                        type = NearbyPoiCategory.fromTag(poi.tags)?.hhType
+                                            ?: Symbol.POI.Types.GENERIC,
+                                    )
+
+                                    put(poi.id, symbol)
+                                }
                             }
                         }
+
+                        lastAutoAddedPoisByOsmId = newAutoAddedPois
+                        lastAutoAddedPoisRequestedAtPosition = currentLocation
+                        lastAutoAddedPoisCategories = poiSettings.autoAddPoiCategories
+
+                        autoAddedPOIsViewModelProvider.update {
+                            it.copy(autoAddedPoisByOsmId = newAutoAddedPois)
+                        }
+
+                        Log.i(TAG, "Auto added POIs: ${newAutoAddedPois.values.map { it.name }}")
+                    } else {
+                        lastAutoAddedPoisByOsmId = emptyMap()
+                        lastAutoAddedPoisRequestedAtPosition = null
+                        lastAutoAddedPoisCategories = emptySet()
+
+                        autoAddedPOIsViewModelProvider.update {
+                            it.copy(autoAddedPoisByOsmId = emptyMap())
+                        }
+
+                        Log.i(TAG, "Auto add POIs disabled, clearing auto added POIs")
                     }
-
-                    lastAutoAddedPoisByOsmId = newAutoAddedPois
-                    lastAutoAddedPoisRequestedAtPosition = currentLocation
-                    lastAutoAddedPoisCategories = poiSettings.autoAddPoiCategories
-
-                    autoAddedPOIsViewModelProvider.update {
-                        it.copy(autoAddedPoisByOsmId = newAutoAddedPois)
-                    }
-
-                    Log.i(TAG, "Auto added POIs: ${newAutoAddedPois.values.map { it.name }}")
                 }
 
                 val autoAddToElevationProfileAndMinimap = poiSettings.autoAddToElevationProfileAndMinimap

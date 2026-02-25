@@ -16,7 +16,9 @@ import de.timklge.karooroutegraph.datatypes.minimap.MinimapViewModelProvider
 import de.timklge.karooroutegraph.incidents.IncidentsResponse
 import de.timklge.karooroutegraph.pois.NearbyPOIPbfDownloadService
 import de.timklge.karooroutegraph.pois.PoiApproachAlertService
+import de.timklge.karooroutegraph.screens.RouteGraphPoiSettings
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
+import de.timklge.karooroutegraph.screens.RouteGraphTemporaryPOIs
 import io.hammerhead.karooext.extension.KarooExtension
 import io.hammerhead.karooext.internal.Emitter
 import io.hammerhead.karooext.models.DataType
@@ -91,7 +93,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     private var lastDrawnGradientIndicators = mutableSetOf<GradientIndicator>()
     private var lastDrawnIncidentSymbols = mutableSetOf<Symbol>()
     private var lastDrawnIncidentPolylines = mutableSetOf<String>()
-    private var lastDrawnTemporaryPOIs = mutableSetOf<Symbol>()
+    private var lastDrawnTemporaryPOIs = setOf<Symbol.POI>()
 
     override fun startMap(emitter: Emitter<MapEffect>) {
         var currentSymbols: MutableSet<GradientIndicator>
@@ -106,7 +108,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         lastDrawnIncidentSymbols.clear()
 
         emitter.onNext(HideSymbols(lastDrawnTemporaryPOIs.map { it.id }))
-        lastDrawnTemporaryPOIs.clear()
+        lastDrawnTemporaryPOIs = setOf()
 
         lastDrawnIncidentPolylines.forEach {
             emitter.onNext(HidePolyline(it))
@@ -117,17 +119,36 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         lastDrawnGradientIndicators = mutableSetOf()
 
         mapScope.launch {
-            combine(karooSystem.streamTemporaryPOIs(), autoAddedPOIsViewModelProvider.viewModelFlow) { temporaryPois, autoAddedPois ->
-                Pair(temporaryPois, autoAddedPois)
-            }.distinctUntilChanged().collect { (temporaryPOIs, autoAddedPois) ->
+            data class TemporaryAndAutoAddedPOIs(
+                val temporaryPois: RouteGraphTemporaryPOIs,
+                val autoAddedPois: AutoAddedPOIsViewModel,
+                val settings: RouteGraphPoiSettings
+            )
+
+            combine(karooSystem.streamTemporaryPOIs(), autoAddedPOIsViewModelProvider.viewModelFlow, karooSystem.streamViewSettings()) { temporaryPois, autoAddedPois, settings ->
+                TemporaryAndAutoAddedPOIs(
+                    temporaryPois,
+                    autoAddedPois,
+                    settings
+                )
+            }.distinctUntilChanged().collect { (temporaryPOIs, autoAddedPois, settings) ->
                 Log.d(TAG, "Temporary POIs: ${temporaryPOIs.poisByOsmId.size}, Auto-added POIs: ${autoAddedPois.autoAddedPoisByOsmId.size}")
 
-                emitter.onNext(HideSymbols(lastDrawnTemporaryPOIs.map { it.id }))
-                lastDrawnTemporaryPOIs.clear()
+                val newSymbols = buildSet {
+                    addAll(temporaryPOIs.poisByOsmId.values)
+                    if (settings.autoAddPoisToMap) addAll(autoAddedPois.autoAddedPoisByOsmId.values)
+                }
 
-                val newSymbols = (temporaryPOIs.poisByOsmId + autoAddedPois.autoAddedPoisByOsmId).values.toList()
-                lastDrawnTemporaryPOIs += newSymbols
-                emitter.onNext(ShowSymbols(newSymbols))
+                val removedSymbosl = lastDrawnTemporaryPOIs - newSymbols
+                if (removedSymbosl.isNotEmpty()) {
+                    Log.d(TAG, "Removing temporary/auto-added POI symbols: $removedSymbosl")
+                    emitter.onNext(HideSymbols(removedSymbosl.map { it.id }))
+                }
+
+                emitter.onNext(ShowSymbols(newSymbols.toList()))
+
+                lastDrawnTemporaryPOIs = newSymbols
+
             }
         }
 
