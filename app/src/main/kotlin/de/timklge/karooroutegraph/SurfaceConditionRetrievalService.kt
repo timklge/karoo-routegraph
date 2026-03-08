@@ -76,6 +76,11 @@ class SurfaceConditionRetrievalService(
         const val MAPFILE_SCAN_INTERVAL_MS = 60_000L * 5 // 5 minutes
     }
 
+    data class TileInMapfiles(
+        val tile: MapfileTile,
+        val mapfiles: List<File>
+    )
+
     data class MapFileInfo(
         val file: File,
         val boundingBox: BoundingBox,
@@ -199,13 +204,17 @@ class SurfaceConditionRetrievalService(
     private fun buildSurfaceConditionSegments(
         routeLength: Double,
         coords: List<RouteSamplePoint>,
-        mapfilesToTiles: Map<File?, List<MapfileTile>>,
+        tilesInMapfiles: List<TileInMapfiles>,
     ): List<SurfaceConditionSegment> {
         val sampledSurfaceConditions = mutableMapOf<RouteSamplePoint, SurfaceCondition>()
 
-        for ((mapFile, tiles) in mapfilesToTiles) {
-            if (mapFile == null) continue
+        val tilesByMapfile = tilesInMapfiles.flatMap { tileInMapfiles ->
+            tileInMapfiles.mapfiles.map { mapfile ->
+                Pair(mapfile, tileInMapfiles.tile)
+            }
+        }.groupBy({ it.first }) { it.second }
 
+        for ((mapFile, tiles) in tilesByMapfile) {
             val mapFileReader = MapFile(mapFile)
             try {
                 // Process each tile covered by this mapfile
@@ -373,7 +382,7 @@ class SurfaceConditionRetrievalService(
 
                 Log.d(KarooRouteGraphExtension.TAG, "Sampled route with ${routeSampled.size} points over $routeDistance meters")
 
-                val zoomLevel = 17
+                val zoomLevel = 16
                 val samplesByTile = routeSampled.groupBy { sample ->
                     val (x, y) = TileUtils.locationToTileXY(sample.latLong.latitude, sample.latLong.longitude, z = zoomLevel)
                     Tile(x, y, zoomLevel)
@@ -381,7 +390,7 @@ class SurfaceConditionRetrievalService(
                 val tiles = samplesByTile.keys
 
                 val tilesWithMapfiles = tiles.associateWith { tile ->
-                    knownMapfiles.firstOrNull { mapfileInfo ->
+                    knownMapfiles.filter { mapfileInfo ->
                         val bbox = mapfileInfo.boundingBox
 
                         // Get the bounding box of the tile by converting its corners to lat/lon
@@ -405,22 +414,27 @@ class SurfaceConditionRetrievalService(
 
                         // Check if tile bounding box intersects with mapfile bounding box
                         bbox.intersects(tileBbox)
-                    }?.file
+                    }.map { it.file }
                 }
                 val neededMapfiles = tilesWithMapfiles.values.toSet()
 
                 Log.d(KarooRouteGraphExtension.TAG, "Route intersects ${tiles.size} tiles in ${neededMapfiles.size} mapfiles")
 
-                val tilesWithoutMapfile = tilesWithMapfiles.filter { it.value == null }.keys
+                val tilesWithoutMapfile = tilesWithMapfiles.filter { (_, value) -> value.isEmpty() }.keys
                 if (tilesWithoutMapfile.isNotEmpty()) {
                     Log.w(KarooRouteGraphExtension.TAG, "No mapfile found for ${tilesWithoutMapfile.size} tiles: $tilesWithoutMapfile")
                 }
 
                 val mapfilesToTiles = tilesWithMapfiles.entries
                     .map { (tile, mapfile) ->
-                        Pair(mapfile, MapfileTile(tile, samplesByTile[tile] ?: emptyList()))
+                        TileInMapfiles(
+                            tile = MapfileTile(
+                                tile = tile,
+                                samples = samplesByTile[tile] ?: emptyList()
+                            ),
+                            mapfiles = mapfile
+                        )
                     }
-                    .groupBy({ it.first }, { it.second })
 
                 val surfaceConditionSegments = buildSurfaceConditionSegments(routeDistance,
                     routeSampled,
