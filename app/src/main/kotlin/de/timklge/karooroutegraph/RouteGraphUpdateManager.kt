@@ -157,7 +157,7 @@ class RouteGraphUpdateManager(
                 val locationAndRemainingRouteDistance = data[3] as LocationAndRemainingRouteDistance
                 val pois = data[4] as OnGlobalPOIs
                 val temporaryPOIs = data[5] as RouteGraphTemporaryPOIs
-                val onRoute = (data[6] as? StreamState.Streaming)?.dataPoint?.values?.get(DataType.Field.ON_ROUTE) == 0.0
+                val onRoute = (data[6] as? StreamState.Streaming)?.dataPoint?.values?.get(DataType.Field.ON_ROUTE) == 1.0
                 val viewSettings = data[7] as RouteGraphPoiSettings
 
                 NavigationStreamState(settings, navigationState.state, userProfile, pois, locationAndRemainingRouteDistance, temporaryPOIs, onRoute, viewSettings)
@@ -228,15 +228,14 @@ class RouteGraphUpdateManager(
                 }
 
                 val newClimbs = karooClimbs?.let {
-                    val offsetDistance = 0
-                    Log.d(TAG, "Karoo reported climbs: $karooClimbs, Offset Distance: $offsetDistance")
+                    Log.d(TAG, "Karoo reported climbs: $karooClimbs")
 
                     karooClimbs.mapNotNull { karooClimb ->
                         val category = ClimbCategory.categorize(
                             karooClimb.grade.toFloat() / 100.0f,
                             karooClimb.length.toFloat()
                         )
-                        val startDistance = (karooClimb.startDistance + offsetDistance).toFloat()
+                        val startDistance = karooClimb.startDistance.toFloat()
 
                         category?.let {
                             Climb(
