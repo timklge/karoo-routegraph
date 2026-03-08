@@ -40,13 +40,13 @@ fun isNightMode(applicationContext: Context): Boolean {
 fun getSurfaceConditionPaints(applicationContext: Context, isNightMode: Boolean = isNightMode(applicationContext)) = mapOf(
     SurfaceConditionRetrievalService.SurfaceCondition.GRAVEL to Paint().apply {
         style = Paint.Style.FILL
-        alpha = 255 / 2
+        alpha = 255 / 3
         val patternBitmap = BitmapFactory.decodeResource(applicationContext.resources, if (isNightMode) R.drawable.cross_pattern_white else R.drawable.cross_pattern)
         shader = android.graphics.BitmapShader(patternBitmap, android.graphics.Shader.TileMode.REPEAT, android.graphics.Shader.TileMode.REPEAT)
     },
     SurfaceConditionRetrievalService.SurfaceCondition.LOOSE to Paint().apply {
         style = Paint.Style.FILL
-        alpha = 255 / 2
+        alpha = 255 / 3
         val patternBitmap = BitmapFactory.decodeResource(applicationContext.resources, if (isNightMode) R.drawable.cross_pattern_white else R.drawable.cross_pattern)
         shader = android.graphics.BitmapShader(patternBitmap, android.graphics.Shader.TileMode.REPEAT, android.graphics.Shader.TileMode.REPEAT)
     }
