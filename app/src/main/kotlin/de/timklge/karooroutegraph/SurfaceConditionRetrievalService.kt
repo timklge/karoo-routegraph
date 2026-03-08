@@ -164,27 +164,22 @@ class SurfaceConditionRetrievalService(
             }
         }
     }
-    val gravelSurfaces = setOf("unpaved", "dirt", "ground", "gravel", "fine_gravel", "compacted", "pebblestone", "cobblestone")
-    val looseSurfaces = setOf("grass", "sand", "mud")
+    val gravelSurfaces = setOf(
+        "unpaved", "dirt", "ground", "gravel", "fine_gravel", "compacted",
+        "pebblestone", "cobblestone", "sett", "unhewn_cobblestone",
+        "rock", "rocks", "stone", "grass_paver", "clay", "woodchips", "salt", "wood"
+    )
+    val looseSurfaces = setOf("grass", "sand", "mud", "snow", "ice")
 
     private fun getSurfaceConditionFromTags(tags: List<org.mapsforge.core.model.Tag>): SurfaceCondition? {
         val surfaceTag = tags.find { it.key.equals("surface", ignoreCase = true) }?.value?.lowercase()
         val trackTypeTag = tags.find { it.key.equals("tracktype", ignoreCase = true) }?.value?.lowercase()
 
-        if (surfaceTag in gravelSurfaces) {
+        if (trackTypeTag in setOf("grade2", "grade3") || surfaceTag in gravelSurfaces) {
             return SurfaceCondition.GRAVEL
         }
 
-        if (surfaceTag in looseSurfaces) {
-            return SurfaceCondition.LOOSE
-        }
-
-        // Check tracktype
-        if (trackTypeTag in setOf("grade2", "grade3", "grade4")) {
-            return SurfaceCondition.GRAVEL
-        }
-
-        if (trackTypeTag in setOf("grade5")) {
+        if (trackTypeTag in setOf("grade4", "grade5") || surfaceTag in looseSurfaces) {
             return SurfaceCondition.LOOSE
         }
 
