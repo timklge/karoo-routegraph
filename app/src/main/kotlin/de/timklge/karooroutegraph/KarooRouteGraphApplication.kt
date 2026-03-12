@@ -28,6 +28,7 @@ val appModule = module {
     singleOf(::PoiApproachAlertService) { createdAtStart() }
     singleOf(::NearbyPOIPbfDownloadService) { createdAtStart() }
     singleOf(::SurfaceConditionRetrievalService) { createdAtStart() }
+    singleOf(::TravelTimeEstimationService) { createdAtStart() }
     singleOf(::RouteGraphUpdateManager) { createdAtStart() }
     singleOf(::OfflineNearbyPOIProvider) { createdAtStart() }
     singleOf(::AutoAddedPOIsViewModelProvider) { createdAtStart() }
