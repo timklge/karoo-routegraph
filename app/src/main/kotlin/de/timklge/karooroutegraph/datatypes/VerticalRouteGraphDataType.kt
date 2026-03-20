@@ -183,7 +183,8 @@ class VerticalRouteGraphDataType(
     data class TextDrawCommandGroup(val commands: List<TextDrawCommand>)
 
     // Surface condition paints with hatched patterns
-    val surfaceConditionFillPaints = getSurfaceConditionPaints(applicationContext)
+    val surfaceConditionFillPaintsNightmode = getSurfaceConditionPaints(applicationContext, true)
+    val surfaceConditionFillPaintsDaymode = getSurfaceConditionPaints(applicationContext, false)
 
     override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
         Log.d(TAG, "Starting route view with $emitter")
@@ -592,6 +593,8 @@ class VerticalRouteGraphDataType(
 
                                 canvas.withClip(clipRect) {
                                     canvas.withClip(filledPath) {
+                                        val surfaceConditionFillPaints = if (isNightMode()) surfaceConditionFillPaintsNightmode else surfaceConditionFillPaintsDaymode
+
                                         surfaceConditionFillPaints[segment.condition]?.let { paint ->
                                             canvas.drawRect(clipRect, paint)
                                         }
