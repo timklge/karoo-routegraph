@@ -266,8 +266,13 @@ class RouteGraphDataType(
                 }
                 val viewRange = viewDistanceStart..viewDistanceEnd
 
-                val minElevation = (viewModel.sampledElevationData?.getMinimumElevationInRange(viewDistanceStart, viewDistanceEnd) ?: 0.0f).let { floor(it / 30.0f) * 30.0f }
-                val maxElevation = (viewModel.sampledElevationData?.getMaximumElevationInRange(viewDistanceStart, viewDistanceEnd) ?: 0.0f).let { ceil(it / 100.0f) * 100.0f }
+                val minElevationActual = (viewModel.sampledElevationData?.getMinimumElevationInRange(viewDistanceStart, viewDistanceEnd) ?: 0.0f).let { floor(it / 30.0f) * 30.0f }
+                val maxElevationActual = (viewModel.sampledElevationData?.getMaximumElevationInRange(viewDistanceStart, viewDistanceEnd) ?: 0.0f).let { ceil(it / 100.0f) * 100.0f }
+
+                // Add some padding to the min and max elevation for better visualization
+                val elevationPadding = ((maxElevationActual - minElevationActual) * 0.2f).coerceAtLeast(50.0f)
+                val maxElevation = maxElevationActual + elevationPadding * 0.5f
+                val minElevation = minElevationActual - elevationPadding
 
                 if (viewModel.routeDistance == null) {
                     emitter.onNext(ShowCustomStreamState(applicationContext.getString( R.string.no_route), if (isNightMode()) Color.WHITE else Color.BLACK))
