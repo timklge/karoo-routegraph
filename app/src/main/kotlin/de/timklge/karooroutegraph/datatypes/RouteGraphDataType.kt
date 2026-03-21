@@ -97,7 +97,8 @@ class RouteGraphDataType(
         return nightModeFlags == Configuration.UI_MODE_NIGHT_YES
     }
 
-    val surfaceConditionFillPaints = getSurfaceConditionPaints(applicationContext)
+    val surfaceConditionFillPaintsNightmode = getSurfaceConditionPaints(applicationContext, true)
+    val surfaceConditionFillPaintsDaymode = getSurfaceConditionPaints(applicationContext, false)
 
     data class StreamData(val routeGraphViewModel: RouteGraphViewModel, val routeGraphDisplayViewModel: RouteGraphDisplayViewModel,
                           val settings: RouteGraphSettings, val isVisible: Boolean, val surfaceConditions: List<SurfaceConditionRetrievalService.SurfaceConditionSegment>?)
@@ -452,6 +453,8 @@ class RouteGraphDataType(
                             canvas.withClip(clipRect) {
                                 filledPath?.let { filledPath ->
                                     canvas.withClip(filledPath) {
+                                        val surfaceConditionFillPaints = if (isNightMode()) surfaceConditionFillPaintsNightmode else surfaceConditionFillPaintsDaymode
+
                                         surfaceConditionFillPaints[segment.condition]?.let { paint ->
                                             canvas.drawRect(clipRect, paint)
                                         }

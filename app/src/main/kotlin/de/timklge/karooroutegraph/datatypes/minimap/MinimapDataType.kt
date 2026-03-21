@@ -49,6 +49,7 @@ import de.timklge.karooroutegraph.RouteGraphUpdateManager
 import de.timklge.karooroutegraph.RouteGraphViewModel
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.TileDownloadService
+import de.timklge.karooroutegraph.getSurfaceConditionPaints
 import de.timklge.karooroutegraph.getSurfaceConditionStrokePaints
 import de.timklge.karooroutegraph.screens.NearbyPoiCategory
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
@@ -133,7 +134,8 @@ class MinimapDataType(
     private val METERS_PER_FOOT = 0.3048
     private val FEET_PER_MILE = 5280.0
 
-    private val surfaceConditionPaints = getSurfaceConditionStrokePaints(applicationContext)
+    val surfaceConditionFillPaintsNightmode = getSurfaceConditionPaints(applicationContext, true)
+    val surfaceConditionFillPaintsDaymode = getSurfaceConditionPaints(applicationContext, false)
 
     private fun isNightMode(): Boolean {
         val nightModeFlags =
@@ -501,6 +503,8 @@ class MinimapDataType(
                                     segment.endMeters,
                                     UNIT_METERS
                                 )
+
+                                val surfaceConditionPaints = if (nightMode) surfaceConditionFillPaintsNightmode else surfaceConditionFillPaintsDaymode
 
                                 surfaceConditionPaints[segment.condition]?.let { paint ->
                                     this@MinimapDataType.drawPolylineWithPaint(

@@ -37,7 +37,7 @@ fun isNightMode(applicationContext: Context): Boolean {
 }
 
 // Surface condition paints with hatched patterns
-fun getSurfaceConditionPaints(applicationContext: Context, isNightMode: Boolean = isNightMode(applicationContext)) = mapOf(
+fun getSurfaceConditionPaints(applicationContext: Context, isNightMode: Boolean) = mapOf(
     SurfaceConditionRetrievalService.SurfaceCondition.GRAVEL to Paint().apply {
         style = Paint.Style.FILL
         alpha = 255 / 3
