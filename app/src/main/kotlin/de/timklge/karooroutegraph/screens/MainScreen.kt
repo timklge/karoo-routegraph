@@ -3,6 +3,8 @@ package de.timklge.karooroutegraph.screens
 import android.Manifest
 import android.content.pm.PackageManager
 import android.util.Log
+import android.content.Intent
+import de.timklge.karooroutegraph.pois.POIActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -507,6 +509,23 @@ fun MainScreen(onFinish: () -> Unit) {
                             })
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(stringResource(R.string.show_poi_labels))
+                        }
+
+                        FilledTonalButton(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(40.dp),
+                            onClick = {
+                                ctx.startActivity(Intent(ctx, POIActivity::class.java))
+                            }
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.bx_info_circle),
+                                contentDescription = stringResource(R.string.open_poi_menu),
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.open_poi_menu))
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically) {

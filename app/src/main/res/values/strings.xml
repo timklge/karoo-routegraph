@@ -51,6 +51,7 @@
     <string name="points_of_interest_poi">Points of Interest (POI)</string>
     <string name="show_poi_labels">Show POI labels on minimap</string>
     <string name="manage_pois">Manage POIs</string>
+    <string name="open_poi_menu">Open POI menu</string>
     <string name="manage_pois_description">Manage POIs</string>
     <string name="max_poi_distance">Max POI distance from route:</string>
     <string name="poi_approach_alert_distance">POI approach alert distance:</string>
