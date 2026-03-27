@@ -71,12 +71,6 @@ suspend fun updatePbfDownloadStoreStatus(context: Context, countryKey: String, s
     }
 }
 
-suspend fun saveSettings(context: Context, settings: RouteGraphSettings) {
-    context.dataStore.edit { t ->
-        t[settingsKey] = Json.encodeToString(settings)
-    }
-}
-
 fun Context.streamSettings(karooSystemService: KarooSystemService): Flow<RouteGraphSettings> {
     return dataStore.data.map { settingsJson ->
         try {
