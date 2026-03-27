@@ -5,7 +5,7 @@ INPUT_PBF="pois.osm.pbf"
 PLANET_PBF="planet-latest.osm.pbf"
 POI_FILTER_FILE="poi-filter.txt"
 OUT_DIR="output"
-export OSMIUM_POOL_THREADS=4
+export OSMIUM_POOL_THREADS=16
 
 # Check if jq is installed
 if ! command -v jq &> /dev/null; then
@@ -21,8 +21,8 @@ fi
 # Create output directory if it doesn't exist
 mkdir -p "$OUT_DIR/pois"
 
-#pyosmium-up-to-date "$PLANET_PBF"
-#osmium tags-filter "$PLANET_PBF" --expressions="$POI_FILTER_FILE" -o "$INPUT_PBF" --overwrite
+pyosmium-up-to-date "$PLANET_PBF"
+osmium tags-filter "$PLANET_PBF" --expressions="$POI_FILTER_FILE" -o "$INPUT_PBF" --overwrite
 
 # Verify files exist
 if [[ ! -f "$JSON_FILE" ]]; then
@@ -45,7 +45,8 @@ jq -r 'to_entries[] | "\(.key) \(.value[1] | join(","))"' "$JSON_FILE" | while r
     echo "Processing $code..."
 
     osmium extract --bbox "$bbox" "$INPUT_PBF" -o tmp.osm.pbf --overwrite
-    ./sqlite/osm-to-sqlite tmp.osm.pbf "$OUT_DIR/pois/pois.${low_code}.db" 
+    ./sqlite/osm-to-sqlite tmp.osm.pbf "$OUT_DIR/pois/pois.${low_code}.db"
+    gzip -9k "$OUT_DIR/pois/pois.${low_code}.db"
 done
 
 #mv output/* /srv/routegraph/

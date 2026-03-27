@@ -18,6 +18,14 @@ const (
 	batchSize = 2_000000
 )
 
+type LatLng struct {
+	Lat float64
+	Lon float64
+}
+
+var nodes = make(map[int64]LatLng)
+var ways = make(map[int64]*osmpbf.Way)
+
 func main() {
 	if len(os.Args) < 3 {
 		fmt.Printf("Usage: %s <inputFile> <dbFile>\n", os.Args[0])
@@ -42,7 +50,9 @@ func main() {
 	}
 
 	// Remove existing DB file to start fresh
-	os.Remove(dbFile)
+	if _, err := os.Stat(dbFile); err == nil {
+		os.Remove(dbFile)
+	}
 
 	// Open SQLite database
 	db, err := sql.Open("sqlite3", dbFile)
@@ -57,7 +67,8 @@ func main() {
 		id INTEGER PRIMARY KEY,
 		lat REAL,
 		lon REAL,
-		tags TEXT
+		tags TEXT,
+		radius REAL
 	);
 	`
 	_, err = db.Exec(sqlStmt)
@@ -70,14 +81,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error beginning transaction: %v", err)
 	}
-	stmtNode, err := tx.Prepare("INSERT INTO nodes(id, lat, lon, tags) VALUES(?, ?, ?, ?)")
+	stmtNode, err := tx.Prepare("INSERT INTO nodes(id, lat, lon, tags, radius) VALUES(?, ?, ?, ?, ?)")
 	if err != nil {
 		log.Fatalf("Error preparing node statement: %v", err)
 	}
 
-	count := 0
+	nodeCount := 0
+	wayCount := 0
 	startTime := time.Now()
 
+	// Read nodes
 	for {
 		if v, err := d.Decode(); err == io.EOF {
 			break
@@ -91,18 +104,63 @@ func main() {
 					log.Fatalf("Error marshaling tags for node %d: %v", v.ID, err)
 				}
 
-				_, err = stmtNode.Exec(v.ID, v.Lat, v.Lon, jsonTags)
+				_, err = stmtNode.Exec(v.ID, v.Lat, v.Lon, jsonTags, 0.0)
 				if err != nil {
 					log.Fatalf("Error inserting node %d: %v", v.ID, err)
 				}
 
-				count++
+				nodes[v.ID] = LatLng{Lat: v.Lat, Lon: v.Lon}
+
+				nodeCount++
 			case *osmpbf.Way:
-				// Ignore ways
+				ways[v.ID] = v
 			case *osmpbf.Relation:
 				// Ignore relations
 			}
 		}
+	}
+
+	for _, way := range ways {
+		centerLat := 0.0
+		centerLon := 0.0
+		nodeCount := 0
+		radius := 0.0
+
+		for _, nodeID := range way.NodeIDs {
+			if latlng, exists := nodes[nodeID]; exists {
+				centerLat += latlng.Lat
+				centerLon += latlng.Lon
+				nodeCount++
+			}
+		}
+
+		for _, nodeID := range way.NodeIDs {
+			if latlng, exists := nodes[nodeID]; exists {
+				dx := latlng.Lon - centerLon/float64(nodeCount)
+				dy := latlng.Lat - centerLat/float64(nodeCount)
+				dist := (dx*dx + dy*dy)
+				if dist > radius {
+					radius = dist
+				}
+			}
+		}
+
+		if nodeCount > 0 {
+			centerLat /= float64(nodeCount)
+			centerLon /= float64(nodeCount)
+		}
+
+		jsonTags, err := json.Marshal(way.Tags)
+		if err != nil {
+			log.Fatalf("Error marshaling tags for way %d: %v", -way.ID, err)
+		}
+
+		_, err = stmtNode.Exec(-way.ID, centerLat, centerLon, jsonTags, radius)
+		if err != nil {
+			log.Fatalf("Error inserting way %d: %v", -way.ID, err)
+		}
+
+		wayCount++
 	}
 
 	// Final commit
@@ -118,5 +176,5 @@ func main() {
 	}
 
 	elapsed := time.Since(startTime)
-	fmt.Printf("Finished processing %d nodes in %s\n", count, elapsed)
+	fmt.Printf("Finished processing %d nodes and %d ways in %s\n", nodeCount, wayCount, elapsed)
 }
