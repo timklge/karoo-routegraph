@@ -48,7 +48,7 @@
     <string name="gradient_frequency_high">High</string>
     <string name="gradient_frequency_max">Max</string>
 
-    <string name="points_of_interest_poi">Points of Interest (POI)</string>
+    <string name="points_of_interest_poi">Points of Interest</string>
     <string name="show_poi_labels">Show POI labels on minimap</string>
     <string name="manage_pois">Manage POIs</string>
     <string name="open_poi_menu">Open POI menu</string>
