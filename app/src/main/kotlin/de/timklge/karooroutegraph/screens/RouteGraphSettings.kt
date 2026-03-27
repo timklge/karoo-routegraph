@@ -21,7 +21,10 @@ data class RouteGraphSettings(
     val onlyHighlightClimbsAtZoomLevel: Int? = 1, // null means "Never"
     val shiftForRadarSwimLane: Boolean = true,
     val indicateSurfaceConditionsOnGraph: Boolean = false,
-    val minimapNightMode: Boolean = true
+    val minimapNightMode: Boolean = true,
+    val showEtaOnVerticalRouteGraph: Boolean = true,
+    val showRemainingElevationOnVerticalRouteGraph: Boolean = true,
+    val showRemainingDistanceOnVerticalRouteGraph: Boolean = true,
 ){
 
     companion object {

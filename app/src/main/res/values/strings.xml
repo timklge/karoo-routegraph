@@ -9,6 +9,10 @@
     <string name="distance_to_poi_description">Distance to the next POI</string>
     <string name="elevation_to_poi">Elevation to POI</string>
     <string name="elevation_to_poi_description">Elevation to the next POI</string>
+    <string name="etapoi">ETA at POI</string>
+    <string name="etapoi_description">Estimated arrival time at next POI</string>
+    <string name="eta">ETA</string>
+    <string name="eta_description">Estimated time of arrival at end of route</string>
     <string name="minimap">Minimap</string>
     <string name="minimap_description">Secondary map display (with route and POIs)</string>
     <string name="minimap_night_mode">Dark mode at night</string>
@@ -140,6 +144,9 @@
     <string name="kilometers">km</string>
     <string name="miles">mi</string>
     <string name="shift_for_radar_swim_lane">Shift for radar swim lane</string>
+    <string name="show_eta_on_vertical_route_graph">Show ETA on vertical route graph</string>
+    <string name="show_remaining_elevation_on_vertical_route_graph">Show remaining elevation on vertical route graph</string>
+    <string name="show_remaining_distance_on_vertical_route_graph">Show remaining distance on vertical route graph</string>
 
     <!-- Offline POIs -->
     <string name="offline_pois">Offline POIs</string>

@@ -30,12 +30,12 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlin.time.DurationUnit
 
-class ETAAtNextPOIDataType(
+class ETADataType(
     private val karooSystemProvider: KarooSystemServiceProvider,
     private val viewModelProvider: RouteGraphViewModelProvider,
     private val travelTimeEstimationService: TravelTimeEstimationService,
     private val surfaceConditionRetrievalService: SurfaceConditionRetrievalService
-) : DataTypeImpl("karoo-routegraph", "etapoi") {
+) : DataTypeImpl("karoo-routegraph", "eta") {
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun startStream(emitter: Emitter<StreamState>) {
         data class StreamState(val state: RouteGraphViewModel, val riderWeight: Float, val averageHourPower: Double?, val averageSpeedPerHour: Double?, val surfaceConditions: List<SurfaceConditionSegment>?)
@@ -52,44 +52,25 @@ class ETAAtNextPOIDataType(
                 StreamState(viewModel, userProfile.weight, averagePower, averageEstimatedPower, surfaceConditions)
             }.throttle(20_000L).collect { (state, riderWeight, averagePower, averageEstimatedPower, surfaceConditions) ->
                 val currentDistanceAlongRoute = state.distanceAlongRoute?.toDouble()
+                val currentRouteLength = state.routeDistance?.toDouble()
                 val totalWeight = riderWeight + 10.0f
-                val routeDistance = state.routeDistance?.toDouble()
 
-                if (currentDistanceAlongRoute == null || routeDistance == null){
+                if (currentDistanceAlongRoute == null || currentRouteLength == null){
                     emitter.onNext(io.hammerhead.karooext.models.StreamState.NotAvailable)
                     return@collect
                 }
 
-                val poiDistances = state.poiDistances?.entries?.flatMap { (poi, list) ->
-                    list.map { distance ->
-                        poi to distance
-                    }
-                }
-
-                val poisAhead = poiDistances?.filter { (_, distance) ->
-                    distance.distanceFromRouteStart - currentDistanceAlongRoute > 0
-                }
-
-                val poisAheadSorted = poisAhead?.sortedBy { (_, distance) ->
-                    distance.distanceFromRouteStart
-                }
-
-                val nextPoi = poisAheadSorted?.firstOrNull()
-                val targetDistanceFromRouteStart = nextPoi?.second?.distanceFromRouteStart?.toDouble() ?: routeDistance
-
                 val estimatedTravelTime = travelTimeEstimationService.estimateTravelTime(
                     routeElevationData = state.sampledElevationData,
                     startDistance = currentDistanceAlongRoute,
-                    endDistance = targetDistanceFromRouteStart,
+                    endDistance = currentRouteLength,
                     totalWeight = totalWeight.toDouble(),
                     lastHourAvgPower = averageEstimatedPower ?: averagePower,
                     surfaceConditions = surfaceConditions ?: emptyList()
                 )
                 val estimatedArrivalTimeInUnixMs = System.currentTimeMillis() + estimatedTravelTime.toLong(DurationUnit.MILLISECONDS)
 
-                Log.i(TAG, "Estimated arrival time at next POI (${nextPoi?.first} in ${nextPoi?.second?.distanceFromRouteStart?.minus(
-                    currentDistanceAlongRoute
-                )} m): $estimatedArrivalTimeInUnixMs (in ${estimatedTravelTime.toLong(DurationUnit.SECONDS)} seconds)")
+                Log.i(TAG, "Estimated travel time to route end: ${estimatedTravelTime.inWholeSeconds} seconds, estimated arrival time (unix ms): $estimatedArrivalTimeInUnixMs")
 
                 emitter.onNext(io.hammerhead.karooext.models.StreamState.Streaming(DataPoint(dataTypeId, mapOf(DataType.Field.SINGLE to estimatedArrivalTimeInUnixMs.toDouble()))))
             }
@@ -100,7 +81,7 @@ class ETAAtNextPOIDataType(
     }
 
     override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
-        Log.d(TAG, "Starting ETA at next poi view with $emitter")
+        Log.d(TAG, "Starting ETA at route end view with $emitter")
 
         val configJob = CoroutineScope(Dispatchers.Default).launch {
             emitter.onNext(UpdateGraphicConfig(formatDataTypeId = DataType.Type.TIME_OF_ARRIVAL))

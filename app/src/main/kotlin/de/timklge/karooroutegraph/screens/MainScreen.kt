@@ -126,6 +126,9 @@ fun MainScreen(onFinish: () -> Unit) {
     var shiftForRadarSwimLane by remember { mutableStateOf(true) }
     var indicateSurfaceConditionsOnGraph by remember { mutableStateOf(true) }
     var minimapNightMode by remember { mutableStateOf(true) }
+    var showEtaOnVerticalRouteGraph by remember { mutableStateOf(true) }
+    var showRemainingElevationOnVerticalRouteGraph by remember { mutableStateOf(true) }
+    var showRemainingDistanceOnVerticalRouteGraph by remember { mutableStateOf(true) }
     var hereMapsApiKey by remember { mutableStateOf("") }
     var enableTrafficIncidentReporting by remember { mutableStateOf(false) }
     var poiDistanceToRouteMaxMeters by remember { mutableDoubleStateOf(1000.0) }
@@ -176,7 +179,10 @@ fun MainScreen(onFinish: () -> Unit) {
             elevationProfileZoomLevels = elevationProfileZoomLevels,
             onlyHighlightClimbsAtZoomLevel = onlyHighlightClimbsAtZoomLevel,
             indicateSurfaceConditionsOnGraph = indicateSurfaceConditionsOnGraph,
-            minimapNightMode = minimapNightMode
+            minimapNightMode = minimapNightMode,
+            showEtaOnVerticalRouteGraph = showEtaOnVerticalRouteGraph,
+            showRemainingElevationOnVerticalRouteGraph = showRemainingElevationOnVerticalRouteGraph,
+            showRemainingDistanceOnVerticalRouteGraph = showRemainingDistanceOnVerticalRouteGraph
         )
 
         saveSettings(ctx, newSettings)
@@ -228,6 +234,9 @@ fun MainScreen(onFinish: () -> Unit) {
             onlyHighlightClimbsAtZoomLevel = settings.onlyHighlightClimbsAtZoomLevel
             indicateSurfaceConditionsOnGraph = settings.indicateSurfaceConditionsOnGraph
             minimapNightMode = settings.minimapNightMode
+            showEtaOnVerticalRouteGraph = settings.showEtaOnVerticalRouteGraph
+            showRemainingElevationOnVerticalRouteGraph = settings.showRemainingElevationOnVerticalRouteGraph
+            showRemainingDistanceOnVerticalRouteGraph = settings.showRemainingDistanceOnVerticalRouteGraph
         }
     }
 
@@ -301,6 +310,33 @@ fun MainScreen(onFinish: () -> Unit) {
                             })
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(stringResource(R.string.shift_for_radar_swim_lane))
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Switch(checked = showEtaOnVerticalRouteGraph, onCheckedChange = {
+                                showEtaOnVerticalRouteGraph = it
+                                coroutineScope.launch { updateSettings() }
+                            })
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(stringResource(R.string.show_eta_on_vertical_route_graph))
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Switch(checked = showRemainingElevationOnVerticalRouteGraph, onCheckedChange = {
+                                showRemainingElevationOnVerticalRouteGraph = it
+                                coroutineScope.launch { updateSettings() }
+                            })
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(stringResource(R.string.show_remaining_elevation_on_vertical_route_graph))
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Switch(checked = showRemainingDistanceOnVerticalRouteGraph, onCheckedChange = {
+                                showRemainingDistanceOnVerticalRouteGraph = it
+                                coroutineScope.launch { updateSettings() }
+                            })
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(stringResource(R.string.show_remaining_distance_on_vertical_route_graph))
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically) {

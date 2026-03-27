@@ -114,5 +114,5 @@ dependencies {
     implementation(libs.osm4j.pbf)
     implementation(libs.okhttp)
     testImplementation(libs.testng)
-    testImplementation(kotlin("test"))
+    testImplementation(libs.kotlin.test)
 }

@@ -42,6 +42,20 @@
         typeId="elevationtopoi" />
 
     <DataType
+        description="@string/etapoi_description"
+        displayName="@string/etapoi"
+        graphical="false"
+        icon="@drawable/trip"
+        typeId="etapoi" />
+
+    <DataType
+        description="@string/eta_description"
+        displayName="@string/eta"
+        graphical="false"
+        icon="@drawable/trip"
+        typeId="eta" />
+
+    <DataType
         description="@string/poi_button_description"
         displayName="@string/poi_button"
         graphical="true"

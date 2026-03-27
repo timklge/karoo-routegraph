@@ -129,7 +129,7 @@ class TravelTimeEstimationService {
         // Determine effective power output
         val effectivePower: Double = when {
             lastHourAvgPower != null -> lastHourAvgPower
-            lastHourAvgSpeed != null ->
+            lastHourAvgSpeed != null && lastHourAvgSpeed > 1 ->
                 // Back-calculate power from flat-terrain average speed:
                 // P_flat = Crr·m·g·v + ½·CdA·ρ·v³
                 CRR_PAVEMENT * totalWeight * G * lastHourAvgSpeed +
