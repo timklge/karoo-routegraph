@@ -53,6 +53,7 @@
     <string name="points_of_interest_poi">Sehenswürdigkeiten (POI)</string>
     <string name="show_poi_labels">POI-Beschriftungen auf Minikarte anzeigen</string>
     <string name="manage_pois">POIs verwalten</string>
+    <string name="open_poi_menu">POI-Menü öffnen</string>
     <string name="manage_pois_description">POIs verwalten</string>
     <string name="max_poi_distance">Max. POI-Entfernung von Route:</string>
     <string name="poi_approach_alert_distance">POI-Annäherungsalarm-Entfernung:</string>
