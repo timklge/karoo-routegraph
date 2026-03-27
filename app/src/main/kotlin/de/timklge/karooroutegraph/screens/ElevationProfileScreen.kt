@@ -181,33 +181,6 @@ fun ElevationProfileScreen(
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Switch(checked = showEtaOnVerticalRouteGraph, onCheckedChange = {
-                            showEtaOnVerticalRouteGraph = it
-                            coroutineScope.launch { updateSettings() }
-                        })
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(stringResource(R.string.show_eta_on_vertical_route_graph))
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Switch(checked = showRemainingElevationOnVerticalRouteGraph, onCheckedChange = {
-                            showRemainingElevationOnVerticalRouteGraph = it
-                            coroutineScope.launch { updateSettings() }
-                        })
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(stringResource(R.string.show_remaining_elevation_on_vertical_route_graph))
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Switch(checked = showRemainingDistanceOnVerticalRouteGraph, onCheckedChange = {
-                            showRemainingDistanceOnVerticalRouteGraph = it
-                            coroutineScope.launch { updateSettings() }
-                        })
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(stringResource(R.string.show_remaining_distance_on_vertical_route_graph))
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Switch(checked = indicateSurfaceConditionsOnGraph, onCheckedChange = { checked ->
                             indicateSurfaceConditionsOnGraph = checked
                             if (checked && !hasStoragePermission) {
@@ -325,6 +298,33 @@ fun ElevationProfileScreen(
                                 Text(label, style = MaterialTheme.typography.labelSmall)
                             }
                         }
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Switch(checked = showRemainingDistanceOnVerticalRouteGraph, onCheckedChange = {
+                            showRemainingDistanceOnVerticalRouteGraph = it
+                            coroutineScope.launch { updateSettings() }
+                        })
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(stringResource(R.string.show_remaining_distance_on_vertical_route_graph))
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Switch(checked = showEtaOnVerticalRouteGraph, onCheckedChange = {
+                            showEtaOnVerticalRouteGraph = it
+                            coroutineScope.launch { updateSettings() }
+                        })
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(stringResource(R.string.show_eta_on_vertical_route_graph))
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Switch(checked = showRemainingElevationOnVerticalRouteGraph, onCheckedChange = {
+                            showRemainingElevationOnVerticalRouteGraph = it
+                            coroutineScope.launch { updateSettings() }
+                        })
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(stringResource(R.string.show_remaining_elevation_on_vertical_route_graph))
                     }
 
                     Spacer(modifier = Modifier.padding(30.dp))
