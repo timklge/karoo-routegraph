@@ -1,0 +1,95 @@
+package de.timklge.karooroutegraph.datatypes
+
+import android.content.Context
+import android.util.Log
+import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
+import de.timklge.karooroutegraph.KarooSystemServiceProvider
+import de.timklge.karooroutegraph.RouteGraphViewModel
+import de.timklge.karooroutegraph.RouteGraphViewModelProvider
+import de.timklge.karooroutegraph.SurfaceConditionRetrievalService
+import de.timklge.karooroutegraph.SurfaceConditionRetrievalService.SurfaceConditionSegment
+import de.timklge.karooroutegraph.TravelTimeEstimationService
+import de.timklge.karooroutegraph.throttle
+import io.hammerhead.karooext.extension.DataTypeImpl
+import io.hammerhead.karooext.internal.Emitter
+import io.hammerhead.karooext.internal.ViewEmitter
+import io.hammerhead.karooext.models.DataPoint
+import io.hammerhead.karooext.models.DataType
+import io.hammerhead.karooext.models.StreamState
+import io.hammerhead.karooext.models.UpdateGraphicConfig
+import io.hammerhead.karooext.models.UserProfile
+import io.hammerhead.karooext.models.ViewConfig
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.launch
+import kotlin.time.DurationUnit
+
+class ETADataType(
+    private val karooSystemProvider: KarooSystemServiceProvider,
+    private val viewModelProvider: RouteGraphViewModelProvider,
+    private val travelTimeEstimationService: TravelTimeEstimationService,
+    private val surfaceConditionRetrievalService: SurfaceConditionRetrievalService
+) : DataTypeImpl("karoo-routegraph", "eta") {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override fun startStream(emitter: Emitter<StreamState>) {
+        data class StreamState(val state: RouteGraphViewModel, val riderWeight: Float, val averageHourPower: Double?, val averageSpeedPerHour: Double?, val surfaceConditions: List<SurfaceConditionSegment>?)
+
+        val job = CoroutineScope(Dispatchers.Default).launch {
+            val averagePowerFlow = karooSystemProvider.streamDataFlow(DataType.Type.SMOOTHED_1HR_AVERAGE_POWER).map { (it as? io.hammerhead.karooext.models.StreamState.Streaming)?.dataPoint?.singleValue }
+            val surfaceConditionFlow = surfaceConditionRetrievalService.flow
+            val averageEstimatedPowerFlow = karooSystemProvider.stream<UserProfile>().flatMapLatest { profile ->
+                val totalWeight = profile.weight + 10.0
+                streamEstimatedPowerPerHour(totalWeight, karooSystemProvider).map { it as Double? }.onStart { emit(null) }
+            }
+
+            combine(viewModelProvider.viewModelFlow, karooSystemProvider.stream<UserProfile>(), averagePowerFlow, averageEstimatedPowerFlow, surfaceConditionFlow) { viewModel, userProfile, averagePower, averageEstimatedPower, surfaceConditions ->
+                StreamState(viewModel, userProfile.weight, averagePower, averageEstimatedPower, surfaceConditions)
+            }.throttle(20_000L).collect { (state, riderWeight, averagePower, averageEstimatedPower, surfaceConditions) ->
+                val currentDistanceAlongRoute = state.distanceAlongRoute?.toDouble()
+                val currentRouteLength = state.routeDistance?.toDouble()
+                val totalWeight = riderWeight + 10.0f
+
+                if (currentDistanceAlongRoute == null || currentRouteLength == null){
+                    emitter.onNext(io.hammerhead.karooext.models.StreamState.NotAvailable)
+                    return@collect
+                }
+
+                val estimatedTravelTime = travelTimeEstimationService.estimateTravelTime(
+                    routeElevationData = state.sampledElevationData,
+                    startDistance = currentDistanceAlongRoute,
+                    endDistance = currentRouteLength,
+                    totalWeight = totalWeight.toDouble(),
+                    lastHourAvgPower = averageEstimatedPower ?: averagePower,
+                    surfaceConditions = surfaceConditions ?: emptyList()
+                )
+                val estimatedArrivalTimeInUnixMs = System.currentTimeMillis() + estimatedTravelTime.toLong(DurationUnit.MILLISECONDS)
+
+                Log.i(TAG, "Estimated travel time to route end: ${estimatedTravelTime.inWholeSeconds} seconds, estimated arrival time (unix ms): $estimatedArrivalTimeInUnixMs")
+
+                emitter.onNext(io.hammerhead.karooext.models.StreamState.Streaming(DataPoint(dataTypeId, mapOf(DataType.Field.SINGLE to estimatedArrivalTimeInUnixMs.toDouble()))))
+            }
+        }
+        emitter.setCancellable {
+            job.cancel()
+        }
+    }
+
+    override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
+        Log.d(TAG, "Starting ETA at route end view with $emitter")
+
+        val configJob = CoroutineScope(Dispatchers.Default).launch {
+            emitter.onNext(UpdateGraphicConfig(formatDataTypeId = DataType.Type.TIME_OF_ARRIVAL))
+            awaitCancellation()
+        }
+
+        emitter.setCancellable {
+            configJob.cancel()
+        }
+    }
+}
