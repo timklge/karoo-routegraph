@@ -45,6 +45,7 @@ androidx-glance-appwidget = { group = "androidx.glance", name = "glance-appwidge
 androidx-glance-appwidget-preview = { group = "androidx.glance", name = "glance-appwidget-preview", version.ref = "glance" }
 androidx-glance-preview = { group = "androidx.glance", name = "glance-preview", version.ref = "glance" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 testng = { group = "org.testng", name = "testng", version.ref = "testng" }
 osm4j-core = { module = "de.topobyte:osm4j-core", version.ref = "osm4j" }
 osm4j-pbf = { module = "de.topobyte:osm4j-pbf", version.ref = "osm4j" }

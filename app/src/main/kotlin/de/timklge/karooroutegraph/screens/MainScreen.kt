@@ -33,7 +33,6 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -83,15 +82,12 @@ import de.timklge.karooroutegraph.pois.NearbyPOIPbfDownloadService
 import de.timklge.karooroutegraph.pois.PbfDownloadStatus
 import de.timklge.karooroutegraph.pois.PbfType
 import de.timklge.karooroutegraph.pois.POIActivity
-import de.timklge.karooroutegraph.saveSettings
 import de.timklge.karooroutegraph.streamPbfDownloadStore
 import de.timklge.karooroutegraph.streamSettings
 import de.timklge.karooroutegraph.streamUserProfile
 import de.timklge.karooroutegraph.updatePbfDownloadStore
 import de.timklge.karooroutegraph.updatePbfDownloadStoreStatus
-import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.models.UserProfile
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.koin.compose.koinInject
@@ -172,14 +168,12 @@ fun MainScreen(onFinish: () -> Unit) {
         }
         SettingsScreen.ELEVATION_PROFILE -> {
             ElevationProfileScreen(
-                onBack = { currentScreen = SettingsScreen.MENU },
-                onFinish = onFinish
+                onBack = { currentScreen = SettingsScreen.MENU }
             )
         }
         SettingsScreen.GRADIENT_CHEVRONS -> {
             GradientChevronsScreen(
-                onBack = { currentScreen = SettingsScreen.MENU },
-                onFinish = onFinish
+                onBack = { currentScreen = SettingsScreen.MENU }
             )
         }
         SettingsScreen.MINIMAP -> {
@@ -197,8 +191,7 @@ fun MainScreen(onFinish: () -> Unit) {
         }
         SettingsScreen.TRAFFIC_INCIDENTS -> {
             TrafficIncidentsScreen(
-                onBack = { currentScreen = SettingsScreen.MENU },
-                onFinish = onFinish
+                onBack = { currentScreen = SettingsScreen.MENU }
             )
         }
     }
@@ -293,8 +286,7 @@ fun MenuItemRow(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ElevationProfileScreen(
-    onBack: () -> Unit,
-    onFinish: () -> Unit
+    onBack: () -> Unit
 ) {
     val ctx = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -307,35 +299,32 @@ fun ElevationProfileScreen(
     var showAddZoomLevelDialog by remember { mutableStateOf(false) }
     var newZoomLevelText by remember { mutableStateOf("") }
     var zoomLevelError by remember { mutableStateOf("") }
+    var showEtaOnVerticalRouteGraph by remember { mutableStateOf(true) }
+    var showRemainingElevationOnVerticalRouteGraph by remember { mutableStateOf(true) }
+    var showRemainingDistanceOnVerticalRouteGraph by remember { mutableStateOf(true) }
     val surfaceConditionViewModelProvider = koinInject<SurfaceConditionViewModelProvider>()
     val surfaceConditionViewModel by surfaceConditionViewModelProvider.viewModelFlow.collectAsStateWithLifecycle(SurfaceConditionViewModel())
-    var welcomeDialogVisible by remember { mutableStateOf(false) }
-    val karooSystem = koinInject<KarooSystemServiceProvider>().karooSystemService
+    val karooSystemServiceProvider = koinInject<KarooSystemServiceProvider>()
 
     fun checkStoragePermission(): Boolean {
         return ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
     }
 
-    val userProfile by karooSystem.streamUserProfile().collectAsStateWithLifecycle(null)
+    val userProfile by karooSystemServiceProvider.karooSystemService.streamUserProfile().collectAsStateWithLifecycle(null)
 
     suspend fun updateSettings(){
-        val newSettings = RouteGraphSettings(
-            showGradientIndicatorsOnMap = true,
-            welcomeDialogAccepted = !welcomeDialogVisible,
-            showPOILabelsOnMinimap = true,
-            hereMapsApiKey = "",
-            gradientIndicatorFrequency = GradientIndicatorFrequency.HIGH,
-            enableTrafficIncidentReporting = false,
-            showNavigateButtonOnGraphs = showNavigateButtonOnGraphs,
-            shiftForRadarSwimLane = shiftForRadarSwimLane,
-            poiDistanceToRouteMaxMeters = 1000.0,
-            poiApproachAlertAtDistance = 500.0,
-            elevationProfileZoomLevels = elevationProfileZoomLevels,
-            onlyHighlightClimbsAtZoomLevel = onlyHighlightClimbsAtZoomLevel,
-            indicateSurfaceConditionsOnGraph = indicateSurfaceConditionsOnGraph,
-            minimapNightMode = true
-        )
-        saveSettings(ctx, newSettings)
+        karooSystemServiceProvider.saveSettings {
+                it.copy(
+                    showNavigateButtonOnGraphs = showNavigateButtonOnGraphs,
+                    shiftForRadarSwimLane = shiftForRadarSwimLane,
+                    elevationProfileZoomLevels = elevationProfileZoomLevels,
+                    onlyHighlightClimbsAtZoomLevel = onlyHighlightClimbsAtZoomLevel,
+                    indicateSurfaceConditionsOnGraph = indicateSurfaceConditionsOnGraph,
+                    showEtaOnVerticalRouteGraph = showEtaOnVerticalRouteGraph,
+                    showRemainingElevationOnVerticalRouteGraph = showRemainingElevationOnVerticalRouteGraph,
+                    showRemainingDistanceOnVerticalRouteGraph = showRemainingDistanceOnVerticalRouteGraph
+                )
+        }
     }
 
     val storagePermissionLauncher = rememberLauncherForActivityResult(
@@ -355,13 +344,16 @@ fun ElevationProfileScreen(
     }
 
     LaunchedEffect(Unit) {
-        ctx.streamSettings(karooSystem).collect { settings ->
-            welcomeDialogVisible = !settings.welcomeDialogAccepted
+        ctx.streamSettings(karooSystemServiceProvider.karooSystemService).collect { settings ->
             showNavigateButtonOnGraphs = settings.showNavigateButtonOnGraphs
             shiftForRadarSwimLane = settings.shiftForRadarSwimLane
             indicateSurfaceConditionsOnGraph = settings.indicateSurfaceConditionsOnGraph
             elevationProfileZoomLevels = settings.elevationProfileZoomLevels
             onlyHighlightClimbsAtZoomLevel = settings.onlyHighlightClimbsAtZoomLevel
+            indicateSurfaceConditionsOnGraph = settings.indicateSurfaceConditionsOnGraph
+            showEtaOnVerticalRouteGraph = settings.showEtaOnVerticalRouteGraph
+            showRemainingElevationOnVerticalRouteGraph = settings.showRemainingElevationOnVerticalRouteGraph
+            showRemainingDistanceOnVerticalRouteGraph = settings.showRemainingDistanceOnVerticalRouteGraph
         }
     }
 
@@ -402,6 +394,33 @@ fun ElevationProfileScreen(
                         })
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(stringResource(R.string.shift_for_radar_swim_lane))
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                            Switch(checked = showEtaOnVerticalRouteGraph, onCheckedChange = {
+                                showEtaOnVerticalRouteGraph = it
+                                coroutineScope.launch { updateSettings() }
+                            })
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(stringResource(R.string.show_eta_on_vertical_route_graph))
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Switch(checked = showRemainingElevationOnVerticalRouteGraph, onCheckedChange = {
+                            showRemainingElevationOnVerticalRouteGraph = it
+                            coroutineScope.launch { updateSettings() }
+                        })
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(stringResource(R.string.show_remaining_elevation_on_vertical_route_graph))
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Switch(checked = showRemainingDistanceOnVerticalRouteGraph, onCheckedChange = {
+                            showRemainingDistanceOnVerticalRouteGraph = it
+                            coroutineScope.launch { updateSettings() }
+                        })
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(stringResource(R.string.show_remaining_distance_on_vertical_route_graph))
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -603,25 +622,25 @@ fun ElevationProfileScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GradientChevronsScreen(
-    onBack: () -> Unit,
-    onFinish: () -> Unit
+    onBack: () -> Unit
 ) {
     val ctx = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var showGradientIndicatorsOnMap by remember { mutableStateOf(false) }
     var gradientIndicatorFrequency by remember { mutableStateOf(GradientIndicatorFrequency.HIGH) }
-    val karooSystem = koinInject<KarooSystemServiceProvider>().karooSystemService
+    val karooSystem = koinInject<KarooSystemServiceProvider>()
 
-    suspend fun updateSettings(){
-        val currentSettings = ctx.streamSettings(karooSystem)
-        saveSettings(ctx, RouteGraphSettings(
-            showGradientIndicatorsOnMap = showGradientIndicatorsOnMap,
-            gradientIndicatorFrequency = gradientIndicatorFrequency
-        ))
+    suspend fun updateSettings() {
+        karooSystem.saveSettings { settings ->
+            settings.copy(
+                showGradientIndicatorsOnMap = showGradientIndicatorsOnMap,
+                gradientIndicatorFrequency = gradientIndicatorFrequency
+            )
+        }
     }
 
     LaunchedEffect(Unit) {
-        ctx.streamSettings(karooSystem).collect { settings ->
+        ctx.streamSettings(karooSystem.karooSystemService).collect { settings ->
             showGradientIndicatorsOnMap = settings.showGradientIndicatorsOnMap
             gradientIndicatorFrequency = settings.gradientIndicatorFrequency
         }
@@ -1062,8 +1081,7 @@ fun PointsOfInterestScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrafficIncidentsScreen(
-    onBack: () -> Unit,
-    onFinish: () -> Unit
+    onBack: () -> Unit
 ) {
     val ctx = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -1076,10 +1094,12 @@ fun TrafficIncidentsScreen(
     val karooSystemServiceProvider = koinInject<KarooSystemServiceProvider>()
 
     suspend fun updateSettings(){
-        saveSettings(ctx, RouteGraphSettings(
-            enableTrafficIncidentReporting = enableTrafficIncidentReporting,
-            hereMapsApiKey = hereMapsApiKey
-        ))
+        karooSystemServiceProvider.saveSettings { settings ->
+            settings.copy(
+                enableTrafficIncidentReporting = enableTrafficIncidentReporting,
+                hereMapsApiKey = hereMapsApiKey
+            )
+        }
     }
 
     LaunchedEffect(Unit) {

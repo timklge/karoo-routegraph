@@ -7,6 +7,8 @@ import com.mapbox.geojson.Point
 import com.mapbox.turf.TurfConstants
 import com.mapbox.turf.TurfMeasurement
 import de.timklge.karooroutegraph.datatypes.DistanceToNextPOIDataType
+import de.timklge.karooroutegraph.datatypes.ETAAtNextPOIDataType
+import de.timklge.karooroutegraph.datatypes.ETADataType
 import de.timklge.karooroutegraph.datatypes.ElevationToNextPOIDataType
 import de.timklge.karooroutegraph.datatypes.PoiButtonDataType
 import de.timklge.karooroutegraph.datatypes.RouteGraphDataType
@@ -61,16 +63,18 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     private val nearbyPoiPbfDownloadService: NearbyPOIPbfDownloadService by inject()
     private val routeGraphUpdateManager: RouteGraphUpdateManager by inject()
     private val autoAddedPOIsViewModelProvider: AutoAddedPOIsViewModelProvider by inject()
-
+    private val travelTimeEstimationService: TravelTimeEstimationService by inject()
 
     override val types by lazy {
         listOf(
             RouteGraphDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, displayViewModelProvider, applicationContext, surfaceConditionRetrievalService),
-            VerticalRouteGraphDataType(routeGraphViewModelProvider, displayViewModelProvider, karooSystem, surfaceConditionRetrievalService, applicationContext),
+            VerticalRouteGraphDataType(routeGraphViewModelProvider, displayViewModelProvider, karooSystem, surfaceConditionRetrievalService, travelTimeEstimationService, applicationContext),
             DistanceToNextPOIDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, applicationContext),
             ElevationToNextPOIDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, applicationContext),
             MinimapDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, displayViewModelProvider, minimapViewModelProvider, tileDownloadService, locationViewModelProvider, applicationContext, surfaceConditionRetrievalService),
             PoiButtonDataType(karooSystem.karooSystemService, applicationContext),
+            ETAAtNextPOIDataType(karooSystem, routeGraphViewModelProvider, travelTimeEstimationService, surfaceConditionRetrievalService),
+            ETADataType(karooSystem, routeGraphViewModelProvider, travelTimeEstimationService, surfaceConditionRetrievalService)
         )
     }
 

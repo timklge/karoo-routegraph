@@ -46,6 +46,7 @@ import de.timklge.karooroutegraph.RouteGraphViewModel
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.SparseElevationData
 import de.timklge.karooroutegraph.SurfaceConditionRetrievalService
+import de.timklge.karooroutegraph.TravelTimeEstimationService
 import de.timklge.karooroutegraph.ZoomLevel
 import de.timklge.karooroutegraph.datatypes.minimap.ChangeVerticalZoomLevelAction
 import de.timklge.karooroutegraph.datatypes.minimap.mapPoiToIcon
@@ -60,6 +61,7 @@ import de.timklge.karooroutegraph.streamUserProfile
 import de.timklge.karooroutegraph.throttle
 import io.hammerhead.karooext.extension.DataTypeImpl
 import io.hammerhead.karooext.internal.ViewEmitter
+import io.hammerhead.karooext.models.DataType
 import io.hammerhead.karooext.models.ShowCustomStreamState
 import io.hammerhead.karooext.models.Symbol
 import io.hammerhead.karooext.models.UpdateGraphicConfig
@@ -67,19 +69,25 @@ import io.hammerhead.karooext.models.UserProfile
 import io.hammerhead.karooext.models.ViewConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
+import java.util.Date
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
+import kotlin.time.DurationUnit
 
 @OptIn(ExperimentalGlanceRemoteViewsApi::class)
 class VerticalRouteGraphDataType(
@@ -87,6 +95,7 @@ class VerticalRouteGraphDataType(
     private val displayViewModelProvider: RouteGraphDisplayViewModelProvider,
     private val karooSystemServiceProvider: KarooSystemServiceProvider,
     private val surfaceConditionRetrievalService: SurfaceConditionRetrievalService,
+    private val travelTimeEstimationService: TravelTimeEstimationService,
     private val applicationContext: Context
 ) : DataTypeImpl("karoo-routegraph", "verticalroutegraph") {
     private val glance = GlanceRemoteViews()
@@ -170,7 +179,9 @@ class VerticalRouteGraphDataType(
                           val profile: UserProfile,
                           val settings: RouteGraphSettings,
                           val isVisible: Boolean,
-                          val radarLaneIsVisible: Boolean)
+                          val radarLaneIsVisible: Boolean,
+                          val averagePowerLastHour: Double? = null,
+                          val averageEstimatedPowerLastHour: Double? = null)
 
     data class TextDrawCommand(val x: Float, val y: Float, val text: String, val paint: Paint, val importance: Int = 10,
                                /** If set, draws this text over the original text */
@@ -186,6 +197,7 @@ class VerticalRouteGraphDataType(
     val surfaceConditionFillPaintsNightmode = getSurfaceConditionPaints(applicationContext, true)
     val surfaceConditionFillPaintsDaymode = getSurfaceConditionPaints(applicationContext, false)
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
         Log.d(TAG, "Starting route view with $emitter")
 
@@ -200,6 +212,11 @@ class VerticalRouteGraphDataType(
         val flow = if (config.preview){
             previewFlow()
         } else {
+            val averageEstimatedPowerFlow = karooSystemServiceProvider.stream<UserProfile>().flatMapLatest { profile ->
+                val totalWeight = profile.weight + 10.0
+                streamEstimatedPowerPerHour(totalWeight, karooSystemServiceProvider).map { it as Double? }.onStart { emit(null) }
+            }
+
             combine(
                 viewModelProvider.viewModelFlow,
                 displayViewModelProvider.viewModelFlow,
@@ -207,7 +224,9 @@ class VerticalRouteGraphDataType(
                 context.streamSettings(karooSystemServiceProvider.karooSystemService),
                 karooSystemServiceProvider.karooSystemService.streamDatatypeIsVisible(dataTypeId),
                 karooSystemServiceProvider.streamRadarSwimLaneIsVisible(),
-                surfaceConditionRetrievalService.flow
+                surfaceConditionRetrievalService.flow,
+                karooSystemServiceProvider.streamDataFlow(DataType.Type.SMOOTHED_1HR_AVERAGE_POWER).map { (it as? io.hammerhead.karooext.models.StreamState.Streaming)?.dataPoint?.singleValue }.throttle(10_000),
+                averageEstimatedPowerFlow.throttle(10_000),
             ) { data ->
                 val viewModel = data[0] as RouteGraphViewModel
                 val displayViewModel = data[1] as RouteGraphDisplayViewModel
@@ -217,13 +236,15 @@ class VerticalRouteGraphDataType(
                 val radarLaneIsVisible = data[5] as Boolean
                 @Suppress("UNCHECKED_CAST")
                 val surfaceConditions = data[6] as List<SurfaceConditionRetrievalService.SurfaceConditionSegment>?
+                val averagePowerFlow = data[7] as Double?
+                val averageEstimatedPowerLastHour = data[8] as Double?
 
-                StreamData(viewModel, displayViewModel, surfaceConditions, profile, settings, isVisible, radarLaneIsVisible)
+                StreamData(viewModel, displayViewModel, surfaceConditions, profile, settings, isVisible, radarLaneIsVisible, averagePowerFlow, averageEstimatedPowerLastHour)
             }
         }
 
         val viewJob = CoroutineScope(Dispatchers.Default).launch {
-            flow.throttle(1_000L).filter { it.isVisible }.collect { (viewModel, displayViewModel, surfaceConditions, userProfile, settings, _, radarLaneIsVisibleValue) ->
+            flow.throttle(1_000L).filter { it.isVisible }.collect { (viewModel, displayViewModel, surfaceConditions, userProfile, settings, _, radarLaneIsVisibleValue, averagePower, averageEstimatedPowerLastHour) ->
                 val bitmap = createBitmap(config.viewSize.first, config.viewSize.second)
 
                 val canvas = Canvas(bitmap)
@@ -649,15 +670,36 @@ class VerticalRouteGraphDataType(
 
                         if (viewModel.distanceAlongRoute != null && nearestPoint.distanceFromRouteStart > viewModel.distanceAlongRoute){
                             val distanceMeters = nearestPoint.distanceFromRouteStart - viewModel.distanceAlongRoute
-                            var distanceStr = "In ${distanceToString(distanceMeters, isImperial, false)}"
+                            var distanceStr = ""
 
-                            val elevationMetersRemaining = viewModel.sampledElevationData?.getTotalClimb(viewModel.distanceAlongRoute, nearestPoint.distanceFromRouteStart)
-                            if (elevationMetersRemaining != null && !distanceIsZero(elevationMetersRemaining.toFloat(), userProfile)) {
-                                distanceStr += " ↗ ${distanceToString(elevationMetersRemaining.toFloat(), isImperial, true)}"
+                            if (settings.showRemainingDistanceOnVerticalRouteGraph) {
+                                distanceStr = "In ${distanceToString(distanceMeters, isImperial, false)}"
                             }
 
-                            val distanceAvailableWidth = config.viewSize.first.toFloat() - (labelStartX) - 20f
-                            poiCommands.add(TextDrawCommand(labelStartX, progressPixels + 15f, distanceStr, textPaint, labelPriority, maxWidth = distanceAvailableWidth))
+                            if (settings.showRemainingElevationOnVerticalRouteGraph) {
+                                val elevationMetersRemaining = viewModel.sampledElevationData?.getTotalClimb(viewModel.distanceAlongRoute, nearestPoint.distanceFromRouteStart)
+                                if (elevationMetersRemaining != null && !distanceIsZero(elevationMetersRemaining.toFloat(), userProfile)) {
+                                    distanceStr += " ↗ ${distanceToString(elevationMetersRemaining.toFloat(), isImperial, true)}"
+                                }
+                            }
+
+                            if (settings.showEtaOnVerticalRouteGraph) {
+                                val estimatedTravelTime = travelTimeEstimationService.estimateTravelTime(
+                                    routeElevationData = viewModel.sampledElevationData,
+                                    startDistance = viewModel.distanceAlongRoute.toDouble(),
+                                    endDistance = nearestPoint.distanceFromRouteStart.toDouble(),
+                                    totalWeight = userProfile.weight + 10.0,
+                                    lastHourAvgPower = averageEstimatedPowerLastHour ?: averagePower,
+                                    surfaceConditions = surfaceConditions ?: emptyList()
+                                )
+                                val eta = System.currentTimeMillis() + estimatedTravelTime.toLong(DurationUnit.MILLISECONDS)
+                                distanceStr += " ⏲ ${android.text.format.DateFormat.getTimeFormat(applicationContext).format(Date(eta))}"
+                            }
+
+                            if (distanceStr.isNotEmpty()) {
+                                val distanceAvailableWidth = config.viewSize.first.toFloat() - (labelStartX) - 20f
+                                poiCommands.add(TextDrawCommand(labelStartX, progressPixels + 15f, distanceStr, textPaint, labelPriority, maxWidth = distanceAvailableWidth))
+                            }
                         }
 
                         textDrawCommands.add(TextDrawCommandGroup(poiCommands))
@@ -887,7 +929,7 @@ class VerticalRouteGraphDataType(
                 surfaceConditions = surfaceConditions,
                 profile = karooSystemServiceProvider.karooSystemService.streamUserProfile().first(), settings,
                 isVisible = true,
-                radarLaneIsVisible = false
+                radarLaneIsVisible = false,
             )
 
             emit(streamData)

@@ -10,6 +10,10 @@
     <string name="distance_to_poi_description">Entfernung zum nächsten POI</string>
     <string name="elevation_to_poi">Höhe zum POI</string>
     <string name="elevation_to_poi_description">Höhe zum nächsten POI</string>
+    <string name="etapoi">Ankuntszeit am POI</string>
+    <string name="etapoi_description">Geschätzte Ankunftszeit am nächsten POI</string>
+    <string name="eta">Ankunftszeit</string>
+    <string name="eta_description">Geschätzte Ankunftszeit am Ende der Route</string>
     <string name="minimap">Minikarte</string>
     <string name="minimap_description">Sekundäre Kartenanzeige (mit Route und POIs)</string>
     <string name="minimap_night_mode">Dunkelmodus bei Nacht</string>
@@ -17,6 +21,9 @@
     <string name="poi_button_description">Knopf zum schnellen Öffnen der POI-Liste</string>
     <string name="shift_for_radar_swim_lane">Verschiebung für Radar</string>
     <string name="no_route">Keine Route geladen</string>
+    <string name="show_eta_on_vertical_route_graph">Ankunftszeit auf vertikalem Profil anzeigen</string>
+    <string name="show_remaining_elevation_on_vertical_route_graph">Verbleibende Steigung auf vertikalem Profil anzeigen</string>
+    <string name="show_remaining_distance_on_vertical_route_graph">Verbleibende Strecke auf vertikalem Profil anzeigen</string>
 
     <!-- MainScreen strings -->
     <string name="device_status_warning">Gerätestatus konnte nicht gelesen werden. Bitte Karoo-Software aktualisieren.</string>
