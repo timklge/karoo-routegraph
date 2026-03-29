@@ -6,10 +6,10 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 data class RouteGraphPoiSettings(
-    val poiSortOptionForCustomPois: PoiSortOption = PoiSortOption.LINEAR_DISTANCE,
-    val poiSortOptionForNearbyPois: PoiSortOption = PoiSortOption.LINEAR_DISTANCE,
+    val poiSortOptionForCustomPois: PoiSortOption = PoiSortOption.AHEAD_ON_ROUTE,
+    val poiSortOptionForNearbyPois: PoiSortOption = PoiSortOption.AHEAD_ON_ROUTE,
     val poiCategoriesForNearbyPois: Set<NearbyPoiCategory> = emptySet(),
-    val poiSortOptionForSearchedPois: PoiSortOption = PoiSortOption.LINEAR_DISTANCE,
+    val poiSortOptionForSearchedPois: PoiSortOption = PoiSortOption.AHEAD_ON_ROUTE,
     val autoAddPoiCategories: Set<NearbyPoiCategory> = emptySet(),
     val autoAddToElevationProfileAndMinimap: Boolean = false,
     val enableOfflinePoiStorage: Boolean = false,

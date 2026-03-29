@@ -305,8 +305,14 @@ fun NearbyPoiListScreen() {
 
     LaunchedEffect(Unit) {
         val viewSettings = karooSystemServiceProvider.streamViewSettings().first()
-        selectedSort = viewSettings.poiSortOptionForNearbyPois
+        val savedSort = viewSettings.poiSortOptionForNearbyPois
         selectedCategories = viewSettings.poiCategoriesForNearbyPois
+
+        if (viewModel?.knownRoute == null && savedSort == PoiSortOption.AHEAD_ON_ROUTE) {
+            selectedSort = PoiSortOption.LINEAR_DISTANCE
+        } else {
+            selectedSort = savedSort
+        }
 
         if (selectedCategories.isNotEmpty()) {
             onRefresh()
@@ -407,14 +413,16 @@ fun NearbyPoiListScreen() {
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    IconButton(
-                        onClick = { showSortDialog = true },
-                        modifier = Modifier.padding(0.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Sort Options"
-                        )
+                    if (viewModel?.knownRoute != null) {
+                        IconButton(
+                            onClick = { showSortDialog = true },
+                            modifier = Modifier.padding(0.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Sort Options"
+                            )
+                        }
                     }
                 }
             }

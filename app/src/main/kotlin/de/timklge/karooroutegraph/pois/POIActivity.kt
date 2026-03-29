@@ -5,14 +5,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import de.timklge.karooroutegraph.screens.PoiScreen
 import de.timklge.karooroutegraph.theme.AppTheme
-import org.koin.compose.KoinContext
+import org.koin.androidx.compose.KoinAndroidContext
 
 class POIActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
-            KoinContext {
+            KoinAndroidContext {
                 AppTheme {
                     PoiScreen() {
                         finish()

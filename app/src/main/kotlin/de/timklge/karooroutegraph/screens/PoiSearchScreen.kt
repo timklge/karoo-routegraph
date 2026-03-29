@@ -53,12 +53,12 @@ import com.mapbox.turf.TurfConstants
 import com.mapbox.turf.TurfMeasurement
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.LocationViewModelProvider
+import de.timklge.karooroutegraph.R
+import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.pois.NearestPoint
 import de.timklge.karooroutegraph.pois.NominatimProvider
 import de.timklge.karooroutegraph.pois.OsmPlace
 import de.timklge.karooroutegraph.pois.POI
-import de.timklge.karooroutegraph.R
-import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.pois.calculatePoiDistances
 import de.timklge.karooroutegraph.pois.distanceToPoi
 import de.timklge.karooroutegraph.pois.formatDistance
@@ -96,7 +96,14 @@ fun PoiSearchScreen() {
 
     LaunchedEffect(Unit) {
         val viewSettings = karooSystemServiceProvider.streamViewSettings().first()
-        selectedSort = viewSettings.poiSortOptionForSearchedPois
+        val savedSort = viewSettings.poiSortOptionForSearchedPois
+        val viewModel = routeGraphViewModelProvider.viewModelFlow.first()
+
+        selectedSort = if (viewModel.knownRoute == null && savedSort == PoiSortOption.AHEAD_ON_ROUTE) {
+            PoiSortOption.LINEAR_DISTANCE
+        } else {
+            savedSort
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -286,14 +293,16 @@ fun PoiSearchScreen() {
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    IconButton(
-                        onClick = { showSortDialog = true },
-                        modifier = Modifier.padding(0.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Sort Options"
-                        )
+                    if (viewModel?.knownRoute != null) {
+                        IconButton(
+                            onClick = { showSortDialog = true },
+                            modifier = Modifier.padding(0.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Sort Options"
+                            )
+                        }
                     }
                 }
             }
