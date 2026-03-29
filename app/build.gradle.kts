@@ -83,6 +83,9 @@ tasks.register("generateManifest") {
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/routegraph_surface_conditions.png",
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/chevrons.png",
             ),
+            "tags" to listOf(
+                "performance"
+            )
         )
 
         val gson = groovy.json.JsonBuilder(manifest).toPrettyString()
