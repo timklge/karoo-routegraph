@@ -136,7 +136,7 @@ fun MainMenuScreen(
 ) {
     var karooConnected by remember { mutableStateOf(false) }
     val ctx = LocalContext.current
-    val karooSystem = koinInject<KarooSystemServiceProvider>().karooSystemService
+    val karooSystem = KarooSystemServiceProvider(ctx).karooSystemService
 
     DisposableEffect(Unit) {
         karooSystem.connect { connected ->
@@ -159,13 +159,13 @@ fun MainMenuScreen(
                         .background(MaterialTheme.colorScheme.background)
                 ) {
                     if (!karooConnected){
-                        Text(modifier = Modifier.padding(5.dp), text = stringResource(R.string.device_status_warning))
+                        Text(modifier = Modifier.padding(10.dp), text = stringResource(R.string.device_status_warning))
                     }
 
                     LazyColumn(
                         modifier = Modifier
                             .weight(1f)
-                            .padding(10.dp),
+                            .padding(start = 10.dp, top = 0.dp, end = 10.dp, 10.dp),
                         verticalArrangement = Arrangement.spacedBy(0.dp),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 60.dp)
                     ) {

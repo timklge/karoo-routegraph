@@ -110,7 +110,12 @@ fun TrafficIncidentsScreen(
                     if (enableTrafficIncidentReporting) {
                         OutlinedTextField(
                             value = hereMapsApiKey,
-                            onValueChange = { hereMapsApiKey = it },
+                            onValueChange = {
+                                hereMapsApiKey = it
+                                coroutineScope.launch {
+                                    updateSettings()
+                                }
+                            },
                             label = { Text(stringResource(R.string.here_maps_api_key)) },
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                             singleLine = true

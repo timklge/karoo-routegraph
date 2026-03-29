@@ -144,17 +144,22 @@ class SurfaceConditionRetrievalService(
 
                     val startTime = Instant.now()
 
-                    knownMapfiles = mapFiles.map { file ->
-                        val mapfile = MapFile(file)
+                    knownMapfiles = mapFiles.mapNotNull{ file ->
                         try {
-                            val boundingBox = mapfile.mapFileInfo.boundingBox
+                            val mapfile = MapFile(file)
+                            try {
+                                val boundingBox = mapfile.mapFileInfo.boundingBox
 
-                            MapFileInfo(
-                                file = file,
-                                boundingBox = boundingBox,
-                            )
-                        } finally {
-                            mapfile.close()
+                                MapFileInfo(
+                                    file = file,
+                                    boundingBox = boundingBox,
+                                )
+                            } finally {
+                                mapfile.close()
+                            }
+                        } catch (e: Exception) {
+                            Log.e(KarooRouteGraphExtension.TAG, "Error reading mapfile ${file.name}: ${e.message}", e)
+                            null
                         }
                     }.toSet()
 

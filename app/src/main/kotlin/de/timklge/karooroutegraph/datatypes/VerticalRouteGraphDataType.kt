@@ -35,10 +35,6 @@ import androidx.glance.layout.size
 import de.timklge.karooroutegraph.ClimbCategory
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
-import de.timklge.karooroutegraph.pois.NearestPoint
-import de.timklge.karooroutegraph.pois.POI
-import de.timklge.karooroutegraph.pois.POIActivity
-import de.timklge.karooroutegraph.pois.PoiType
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModel
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModelProvider
@@ -54,6 +50,10 @@ import de.timklge.karooroutegraph.distanceIsZero
 import de.timklge.karooroutegraph.distanceToString
 import de.timklge.karooroutegraph.getInclineIndicatorColor
 import de.timklge.karooroutegraph.getSurfaceConditionPaints
+import de.timklge.karooroutegraph.pois.NearestPoint
+import de.timklge.karooroutegraph.pois.POI
+import de.timklge.karooroutegraph.pois.POIActivity
+import de.timklge.karooroutegraph.pois.PoiType
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.streamDatatypeIsVisible
 import de.timklge.karooroutegraph.streamSettings
@@ -662,47 +662,49 @@ class VerticalRouteGraphDataType(
                         canvas.drawLine(graphBounds.left, progressPixels, config.viewSize.first.toFloat(), progressPixels, backgroundStrokePaintDashed)
                         canvas.drawLine(graphBounds.left, progressPixels, config.viewSize.first.toFloat(), progressPixels, if (poi.type == PoiType.INCIDENT) incidentLinePaintDashed else poiLinePaintDashed)
 
-                        val poiCommands = mutableListOf<TextDrawCommand>()
-                        val availableWidth = config.viewSize.first.toFloat() - (labelStartX + 40f) - 20f
-                        poiCommands.add(TextDrawCommand(labelStartX + 40f, progressPixels + 15f, text, textPaintBold, labelPriority, leadingIcon = mapPoiToIcon(poi.symbol.type), maxWidth = availableWidth))
+                        if (poi.type != PoiType.INCIDENT) {
+                            val poiCommands = mutableListOf<TextDrawCommand>()
+                            val availableWidth = config.viewSize.first.toFloat() - (labelStartX + 40f) - 20f
+                            poiCommands.add(TextDrawCommand(labelStartX + 40f, progressPixels + 15f, text, textPaintBold, labelPriority, leadingIcon = mapPoiToIcon(poi.symbol.type), maxWidth = availableWidth))
 
-                        val isImperial = userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
+                            val isImperial = userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
 
-                        if (viewModel.distanceAlongRoute != null && nearestPoint.distanceFromRouteStart > viewModel.distanceAlongRoute){
-                            val distanceMeters = nearestPoint.distanceFromRouteStart - viewModel.distanceAlongRoute
-                            var distanceStr = ""
+                            if (viewModel.distanceAlongRoute != null && nearestPoint.distanceFromRouteStart > viewModel.distanceAlongRoute){
+                                val distanceMeters = nearestPoint.distanceFromRouteStart - viewModel.distanceAlongRoute
+                                var distanceStr = ""
 
-                            if (settings.showRemainingDistanceOnVerticalRouteGraph) {
-                                distanceStr = "In ${distanceToString(distanceMeters, isImperial, false)}"
-                            }
+                                if (settings.showRemainingDistanceOnVerticalRouteGraph) {
+                                    distanceStr = "In ${distanceToString(distanceMeters, isImperial, false)}"
+                                }
 
-                            if (settings.showRemainingElevationOnVerticalRouteGraph) {
-                                val elevationMetersRemaining = viewModel.sampledElevationData?.getTotalClimb(viewModel.distanceAlongRoute, nearestPoint.distanceFromRouteStart)
-                                if (elevationMetersRemaining != null && !distanceIsZero(elevationMetersRemaining.toFloat(), userProfile)) {
-                                    distanceStr += " ↗ ${distanceToString(elevationMetersRemaining.toFloat(), isImperial, true)}"
+                                if (settings.showRemainingElevationOnVerticalRouteGraph) {
+                                    val elevationMetersRemaining = viewModel.sampledElevationData?.getTotalClimb(viewModel.distanceAlongRoute, nearestPoint.distanceFromRouteStart)
+                                    if (elevationMetersRemaining != null && !distanceIsZero(elevationMetersRemaining.toFloat(), userProfile)) {
+                                        distanceStr += " ↗ ${distanceToString(elevationMetersRemaining.toFloat(), isImperial, true)}"
+                                    }
+                                }
+
+                                if (settings.showEtaOnVerticalRouteGraph) {
+                                    val estimatedTravelTime = travelTimeEstimationService.estimateTravelTime(
+                                        routeElevationData = viewModel.sampledElevationData,
+                                        startDistance = viewModel.distanceAlongRoute.toDouble(),
+                                        endDistance = nearestPoint.distanceFromRouteStart.toDouble(),
+                                        totalWeight = userProfile.weight + 10.0,
+                                        lastHourAvgPower = averageEstimatedPowerLastHour ?: averagePower,
+                                        surfaceConditions = surfaceConditions ?: emptyList()
+                                    )
+                                    val eta = System.currentTimeMillis() + estimatedTravelTime.toLong(DurationUnit.MILLISECONDS)
+                                    distanceStr += " ⏲ ${android.text.format.DateFormat.getTimeFormat(applicationContext).format(Date(eta))}"
+                                }
+
+                                if (distanceStr.isNotEmpty()) {
+                                    val distanceAvailableWidth = config.viewSize.first.toFloat() - (labelStartX) - 20f
+                                    poiCommands.add(TextDrawCommand(labelStartX, progressPixels + 15f, distanceStr, textPaint, labelPriority, maxWidth = distanceAvailableWidth))
                                 }
                             }
 
-                            if (settings.showEtaOnVerticalRouteGraph) {
-                                val estimatedTravelTime = travelTimeEstimationService.estimateTravelTime(
-                                    routeElevationData = viewModel.sampledElevationData,
-                                    startDistance = viewModel.distanceAlongRoute.toDouble(),
-                                    endDistance = nearestPoint.distanceFromRouteStart.toDouble(),
-                                    totalWeight = userProfile.weight + 10.0,
-                                    lastHourAvgPower = averageEstimatedPowerLastHour ?: averagePower,
-                                    surfaceConditions = surfaceConditions ?: emptyList()
-                                )
-                                val eta = System.currentTimeMillis() + estimatedTravelTime.toLong(DurationUnit.MILLISECONDS)
-                                distanceStr += " ⏲ ${android.text.format.DateFormat.getTimeFormat(applicationContext).format(Date(eta))}"
-                            }
-
-                            if (distanceStr.isNotEmpty()) {
-                                val distanceAvailableWidth = config.viewSize.first.toFloat() - (labelStartX) - 20f
-                                poiCommands.add(TextDrawCommand(labelStartX, progressPixels + 15f, distanceStr, textPaint, labelPriority, maxWidth = distanceAvailableWidth))
-                            }
+                            textDrawCommands.add(TextDrawCommandGroup(poiCommands))
                         }
-
-                        textDrawCommands.add(TextDrawCommandGroup(poiCommands))
                     }
 
                     canvas.drawRect(
