@@ -4,13 +4,13 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
     alias(libs.plugins.compose.compiler)
-    kotlin("plugin.serialization") version "2.0.21"
+    kotlin("plugin.serialization") version "2.3.20"
     id("com.google.devtools.ksp")
 }
 
 android {
     namespace = "de.timklge.karooroutegraph"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "de.timklge.karooroutegraph"
@@ -48,8 +48,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
-    kotlinOptions {
-        jvmTarget = "1.8"
+    kotlin {
+        compilerOptions {
+            jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8
+        }
     }
     buildFeatures {
         compose = true
@@ -102,6 +104,7 @@ dependencies {
     implementation(libs.bundles.androidx.lifeycle)
     implementation(libs.androidx.activity.compose)
     implementation(libs.bundles.compose.ui)
+    implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.glance.appwidget)
@@ -115,4 +118,5 @@ dependencies {
     implementation(libs.okhttp)
     testImplementation(libs.testng)
     testImplementation(libs.kotlin.test)
+    testImplementation(libs.mockk)
 }

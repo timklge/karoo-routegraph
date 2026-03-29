@@ -13,15 +13,15 @@ class TravelTimeEstimationService {
         /** Air density at sea level (kg/m³) */
         const val RHO_AIR = 1.225
         /** Drag coefficient × frontal area (m²) – typical road cyclist in hoods position */
-        const val CDA = 0.4
+        const val CDA = 0.45
         /** Rolling resistance coefficient on smooth pavement */
         const val CRR_PAVEMENT = 0.005
         /** Rolling resistance coefficient on gravel / compacted surface */
         const val CRR_GRAVEL = 0.015
         /** Rolling resistance coefficient on loose / off-road surface */
-        const val CRR_LOOSE = 0.030
-        /** Fallback power when neither avgPower nor avgSpeed is given (W) */
-        const val DEFAULT_POWER_W = 150.0
+        const val CRR_LOOSE = 0.050
+        /** Fallback power when avgPower is not given (W) */
+        const val DEFAULT_POWER_W = 130.0
         /** Maximum modelled speed – 60 km/h (m/s) */
         const val MAX_SPEED_MS = 60.0 / 3.6
         /** Minimum modelled speed – effectively a walk on steep terrain (m/s) */
@@ -108,9 +108,6 @@ class TravelTimeEstimationService {
      * @param endDistance end point of the segment, in meters from beginning of the route
      * @param totalWeight combined weight of rider + bike (kg)
      * @param lastHourAvgPower average power output over the last hour in watts (if known).
-     *        Takes priority over [lastHourAvgSpeed] when both are supplied.
-     * @param lastHourAvgSpeed average speed over the last hour in meters per second (if known).
-     *        Used to back-calculate an effective flat-terrain power when [lastHourAvgPower] is null.
      * @param surfaceConditions known surface conditions along the route where the road is not smooth pavement
      */
     fun estimateTravelTime(
@@ -119,7 +116,6 @@ class TravelTimeEstimationService {
         endDistance: Double,
         totalWeight: Double,
         lastHourAvgPower: Double? = null,
-        lastHourAvgSpeed: Double? = null,
         surfaceConditions: List<SurfaceConditionRetrievalService.SurfaceConditionSegment> = emptyList()
     ): Duration {
         require(totalWeight > 0) { "totalWeight must be positive" }
@@ -128,12 +124,7 @@ class TravelTimeEstimationService {
 
         // Determine effective power output
         val effectivePower: Double = when {
-            lastHourAvgPower != null -> lastHourAvgPower
-            lastHourAvgSpeed != null && lastHourAvgSpeed > 1 ->
-                // Back-calculate power from flat-terrain average speed:
-                // P_flat = Crr·m·g·v + ½·CdA·ρ·v³
-                CRR_PAVEMENT * totalWeight * G * lastHourAvgSpeed +
-                    0.5 * CDA * RHO_AIR * lastHourAvgSpeed.pow(3)
+            lastHourAvgPower != null && lastHourAvgPower >= 50 -> lastHourAvgPower
             else -> DEFAULT_POWER_W
         }
 

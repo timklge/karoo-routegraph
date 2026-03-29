@@ -165,15 +165,20 @@ class TravelTimeEstimationTest {
     // ─── speed calibration ────────────────────────────────────────────────────
 
     @Test
-    fun `lastHourAvgSpeed on flat reproduces approximate speed`() {
-        // Back-calculated power from 30 km/h should yield ≈ 30 km/h on the same flat terrain
-        val avgSpeedMs = 30.0 / 3.6          // 8.33 m/s
-        val distanceM  = 10_000.0
-        val route      = flatRoute(distanceM.toFloat())
-        val time       = est.estimateTravelTime(route, 0.0, distanceM, 80.0, lastHourAvgSpeed = avgSpeedMs)
+    fun `power matching 30 kmh on flat yields approximately 30 kmh travel time`() {
+        // Back-calculate the power required to sustain 30 km/h on flat for an 80 kg rider
+        // using the standard cycling power model: P = ½·CdA·ρ·v³ + m·g·Crr·v
+        val targetSpeedMs = 30.0 / 3.6   // 8.333 m/s
+        val v3 = targetSpeedMs * targetSpeedMs * targetSpeedMs
+        val power = 0.5 * TravelTimeEstimationService.CDA * TravelTimeEstimationService.RHO_AIR * v3 +
+                    80.0 * TravelTimeEstimationService.G * TravelTimeEstimationService.CRR_PAVEMENT * targetSpeedMs
+
+        val distanceM = 10_000.0
+        val route     = flatRoute(distanceM.toFloat())
+        val time      = est.estimateTravelTime(route, 0.0, distanceM, 80.0, lastHourAvgPower = power)
 
         // Expected seconds for 10 km at 30 km/h = 1200 s; allow 2 % tolerance
-        val expectedS = distanceM / avgSpeedMs
+        val expectedS = distanceM / targetSpeedMs
         val actualS   = time.inWholeMilliseconds / 1000.0
         assertTrue(
             abs(actualS - expectedS) / expectedS < 0.02,
@@ -182,19 +187,12 @@ class TravelTimeEstimationTest {
     }
 
     @Test
-    fun `lastHourAvgPower takes priority over lastHourAvgSpeed`() {
+    fun `below-threshold power falls back to default power`() {
         val route = flatRoute(10_000f)
-        // With a very fast speed but low explicit power, the power should dominate
-        val tPowerDriven = est.estimateTravelTime(
-            route, 0.0, 10_000.0, 80.0,
-            lastHourAvgPower = 150.0,
-            lastHourAvgSpeed = 50.0 / 3.6   // would imply very high power if used
-        )
-        val tPowerOnly = est.estimateTravelTime(
-            route, 0.0, 10_000.0, 80.0,
-            lastHourAvgPower = 150.0
-        )
-        assertEquals(tPowerOnly, tPowerDriven)
+        // Power below the 50 W threshold should fall back to DEFAULT_POWER_W
+        val tBelowThreshold = est.estimateTravelTime(route, 0.0, 10_000.0, 80.0, lastHourAvgPower = 10.0)
+        val tDefault        = est.estimateTravelTime(route, 0.0, 10_000.0, 80.0)
+        assertEquals(tDefault, tBelowThreshold)
     }
 
     // ─── sub-segment additivity ───────────────────────────────────────────────
@@ -242,9 +240,11 @@ class TravelTimeEstimationTest {
 
     @Test
     fun `extremely steep uphill clamps to minimum speed`() {
-        // At 1 W on a 20 % grade the rider can barely move
+        // 60 W is above the 50 W fallback threshold so it is used as-is, but
+        // sustaining MIN_SPEED_MS (0.5 m/s) on a 20 % grade for 80 kg requires
+        // ~80.5 W, so the model clamps the speed to MIN_SPEED_MS.
         val uphill = gradedRoute(600f, grade = 0.20f)
-        val time   = est.estimateTravelTime(uphill, 0.0, 600.0, 80.0, lastHourAvgPower = 1.0)
+        val time   = est.estimateTravelTime(uphill, 0.0, 600.0, 80.0, lastHourAvgPower = 60.0)
         val routeLen = (uphill.elevations.size - 1) * uphill.interval.toDouble()
         val maxTime  = routeLen / TravelTimeEstimationService.MIN_SPEED_MS
         assertTrue(

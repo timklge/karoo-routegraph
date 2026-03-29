@@ -57,22 +57,34 @@ internal fun Flow<Pair<Double, Double>>.averagePowerOverHour(totalWeight: Double
     }
 }
 
+/**
+ * Builds a flow of average estimated power (W) from pre-processed speed (m/s)
+ * and grade (%) flows. Exposed as `internal` for unit-testing purposes.
+ */
+internal fun buildEstimatedPowerFlow(
+    totalWeight: Double,
+    speedFlow: Flow<Double>,
+    gradeFlow: Flow<Double>,
+    currentTimeMillis: () -> Long = { System.currentTimeMillis() }
+): Flow<Double> {
+    return combine(speedFlow, gradeFlow) { speed, grade -> Pair(speed, grade) }
+        .averagePowerOverHour(totalWeight, currentTimeMillis)
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 fun streamEstimatedPowerPerHour(
     totalWeight: Double,
     karooSystemServiceProvider: KarooSystemServiceProvider,
     currentTimeMillis: () -> Long = { System.currentTimeMillis() }
 ): Flow<Double> {
-    val currentSpeedFlow = karooSystemServiceProvider.streamDataFlow(DataType.Type.SPEED).mapNotNull { (it as? StreamState.Streaming)?.dataPoint?.singleValue }
-    val currentGradeFlow = karooSystemServiceProvider.streamDataFlow(DataType.Type.ELEVATION_GRADE).mapNotNull { (it as? StreamState.Streaming)?.dataPoint?.singleValue }
+    val scope = CoroutineScope(Dispatchers.Default)
 
-    val speedAndGradeFlow = combine(
-        currentSpeedFlow,
-        currentGradeFlow.stateIn(CoroutineScope(Dispatchers.Default), SharingStarted.Eagerly, 0.0)
-    ) { speed, grade ->
-        Pair(speed, grade)
-    }
+    val currentSpeedFlow = karooSystemServiceProvider.streamDataFlow(DataType.Type.SPEED)
+        .mapNotNull { (it as? StreamState.Streaming)?.dataPoint?.singleValue }
+    val currentGradeFlow = karooSystemServiceProvider.streamDataFlow(DataType.Type.ELEVATION_GRADE)
+        .mapNotNull { (it as? StreamState.Streaming)?.dataPoint?.singleValue }
+        .stateIn(scope, SharingStarted.Eagerly, 0.0)
 
-    return speedAndGradeFlow.averagePowerOverHour(totalWeight, currentTimeMillis)
-        .shareIn(CoroutineScope(Dispatchers.Default), SharingStarted.WhileSubscribed())
+    return buildEstimatedPowerFlow(totalWeight, currentSpeedFlow, currentGradeFlow, currentTimeMillis)
+        .shareIn(scope, SharingStarted.WhileSubscribed())
 }
