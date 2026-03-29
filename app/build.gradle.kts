@@ -74,7 +74,7 @@ tasks.register("generateManifest") {
             "latestVersionCode" to android.defaultConfig.versionCode,
             "developer" to "github.com/timklge",
             "description" to "Open-source extension that provides an elevation graph datafield depicting the complete current route, including climbs and POIs (e. g. checkpoints and refueling stops)",
-            "releaseNotes" to "* Fix surface condition lookup only checks first map that covers a tile\n* Fix climbs are only updated when off-route\n* Consider more surface types as gravel / offroad\n* Make hatched (offroad) fill pattern slightly more transparent",
+            "releaseNotes" to "* Add power-based travel time estimation to POIs and end of route\n* Sort POI lookup screens by ahead on route distance by default\n* Split settings menu into sub menus",
             "screenshotUrls" to listOf(
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/horizontal_routegraph.png",
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/minimap.png",
@@ -83,9 +83,6 @@ tasks.register("generateManifest") {
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/routegraph_surface_conditions.png",
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/chevrons.png",
             ),
-            "tags" to listOf(
-                "performance"
-            )
         )
 
         val gson = groovy.json.JsonBuilder(manifest).toPrettyString()

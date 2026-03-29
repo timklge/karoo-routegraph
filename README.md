@@ -51,8 +51,8 @@ you can also look for nearby POIs of certain categories (e. g. cafes, restaurant
 By default, route graph datafields also feature a POI button in the top right corner.
 - Distance to POI: Shows the distance to the next POI along the route. Note that this is the distance along the route and not the straight-line distance.
 - Elevation to POI: Shows the remaining climbing to the next POI along the route. Note that this is the elevation along the route and not the straight-line elevation.
-- ETA at POI: Shows the estimated time of arrival at the next POI along the route. The ETA is calculated based on your average power output over the last hour if you have a powermeter, or your average speed over the last hour if you don't.
-- ETA at end ouf route: Shows the estimated time of arrival at the end of the route.
+- ETA at POI: Shows the estimated time of arrival at the next POI along the route. The ETA is calculated based on your average power output over the last hour. If you don't have a powermeter, this uses a rough approximation based on your speed and the route gradient.
+- ETA at end of route: Shows the estimated time of arrival at the end of the route.
 
 Additionally, you can enable chevrons on the map to indicate gradients. The chevrons are drawn on top of the route (see third screenshot). Find more information below.
 
