@@ -46,8 +46,7 @@ fun PoiScreen(finish: () -> Unit){
         showWarnings = true
     }
 
-    val selectedTabIndex by remember { mutableIntStateOf(0) }
-    val pagerState = rememberPagerState(pageCount = { 3 })
+    val pagerState = rememberPagerState(pageCount = { 3 }, initialPage = 1)
 
     Box(
         modifier = Modifier.fillMaxSize()
@@ -91,19 +90,19 @@ fun PoiScreen(finish: () -> Unit){
                 }
             ) {
 
-                Tab(selected = selectedTabIndex == 0, text = { Text(stringResource(R.string.poi_tab_custom)) }, icon = { Icon(
+                Tab(selected = pagerState.currentPage == 0, text = { Text(stringResource(R.string.poi_tab_custom)) }, icon = { Icon(
                     painterResource(R.drawable.bx_home), contentDescription = stringResource(R.string.poi_tab_custom), modifier = Modifier
                         .size(30.dp)
                         .padding(2.dp)
                 ) }, onClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } })
 
-                Tab(selected = selectedTabIndex == 1, text = { Text(stringResource(R.string.poi_tab_nearby)) }, icon = { Icon(
+                Tab(selected = pagerState.currentPage == 1, text = { Text(stringResource(R.string.poi_tab_nearby)) }, icon = { Icon(
                     painterResource(R.drawable.bx_info_circle), contentDescription = stringResource(R.string.poi_tab_nearby), modifier = Modifier
                         .size(30.dp)
                         .padding(2.dp)
                 ) }, onClick = { coroutineScope.launch { pagerState.animateScrollToPage(1) } })
 
-                Tab(selected = selectedTabIndex == 2, text = { Text(stringResource(R.string.poi_tab_search)) }, icon = { Icon(
+                Tab(selected = pagerState.currentPage == 2, text = { Text(stringResource(R.string.poi_tab_search)) }, icon = { Icon(
                     painterResource(R.drawable.bx_search_alt), contentDescription = stringResource(R.string.poi_tab_search), modifier = Modifier
                         .size(30.dp)
                         .padding(2.dp)

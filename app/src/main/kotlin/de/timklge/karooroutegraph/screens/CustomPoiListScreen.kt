@@ -140,7 +140,13 @@ fun CustomPoiListScreen() {
 
     LaunchedEffect(Unit) {
         val settings = karooSystemServiceProvider.streamViewSettings().first()
-        selectedSort = settings.poiSortOptionForCustomPois
+        val savedSort = settings.poiSortOptionForCustomPois
+
+        if (routeGraphViewModel?.knownRoute == null && savedSort == PoiSortOption.AHEAD_ON_ROUTE) {
+            selectedSort = PoiSortOption.LINEAR_DISTANCE
+        } else {
+            selectedSort = savedSort
+        }
     }
 
     val pois by remember {
@@ -175,45 +181,47 @@ fun CustomPoiListScreen() {
     }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
-            ) {
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = !expanded },
-                    modifier = Modifier.fillMaxWidth()
+        if (routeGraphViewModel?.knownRoute != null) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
                 ) {
-                    OutlinedTextField(
-                        value = stringResource(selectedSort.displayNameRes),
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text(stringResource(R.string.sort_by)) },
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-                        },
-                        modifier = Modifier.menuAnchor().fillMaxWidth()
-                    )
-                    ExposedDropdownMenu(
+                    ExposedDropdownMenuBox(
                         expanded = expanded,
-                        onDismissRequest = { expanded = false }
+                        onExpandedChange = { expanded = !expanded },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        PoiSortOption.entries.forEach { option ->
-                            DropdownMenuItem(
-                                text = { Text(stringResource(option.displayNameRes), style = MaterialTheme.typography.bodyLarge) },
-                                onClick = {
-                                    selectedSort = option
-                                    expanded = false
+                        OutlinedTextField(
+                            value = stringResource(selectedSort.displayNameRes),
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text(stringResource(R.string.sort_by)) },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                            },
+                            modifier = Modifier.menuAnchor().fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
+                        ) {
+                            PoiSortOption.entries.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(option.displayNameRes), style = MaterialTheme.typography.bodyLarge) },
+                                    onClick = {
+                                        selectedSort = option
+                                        expanded = false
 
-                                    coroutineScope.launch {
-                                        karooSystemServiceProvider.saveViewSettings { settings ->
-                                            settings.copy(poiSortOptionForCustomPois = option)
+                                        coroutineScope.launch {
+                                            karooSystemServiceProvider.saveViewSettings { settings ->
+                                                settings.copy(poiSortOptionForCustomPois = option)
+                                            }
                                         }
                                     }
-                                }
-                            )
+                                )
+                            }
                         }
                     }
                 }
