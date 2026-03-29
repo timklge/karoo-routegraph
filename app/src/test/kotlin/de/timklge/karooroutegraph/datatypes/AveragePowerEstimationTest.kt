@@ -15,7 +15,7 @@ class AveragePowerEstimationTest {
         var last: T? = null
         runBlocking { collect { last = it } }
         @Suppress("UNCHECKED_CAST")
-        return last as T?
+        return last
     }
 
     private fun calculatePower(speed: Double, gradePercent: Double): Double {

@@ -347,6 +347,8 @@ fun ElevationProfileScreen(
             Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface, modifier = Modifier.padding(16.dp)) {
                 Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     val zoomLevelUnit = if (userProfile?.preferredUnit?.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL) ZoomUnit.MILES else ZoomUnit.KILOMETERS
+                    val invalidZoomLevelString = stringResource(R.string.invalid_zoom_level)
+                    val zoomLevelExistsString = stringResource(R.string.zoom_level_exists)
 
                     OutlinedTextField(
                         value = newZoomLevelText,
@@ -373,9 +375,9 @@ fun ElevationProfileScreen(
                             onClick = {
                                 val zoomLevel = newZoomLevelText.toIntOrNull()
                                 when {
-                                    zoomLevel == null -> zoomLevelError = ctx.getString(R.string.invalid_zoom_level)
-                                    zoomLevel < 1 || zoomLevel > 999 -> zoomLevelError = ctx.getString(R.string.invalid_zoom_level)
-                                    elevationProfileZoomLevels.contains(zoomLevel) -> zoomLevelError = ctx.getString(R.string.zoom_level_exists)
+                                    zoomLevel == null -> zoomLevelError = invalidZoomLevelString
+                                    zoomLevel < 1 || zoomLevel > 999 -> zoomLevelError = invalidZoomLevelString
+                                    elevationProfileZoomLevels.contains(zoomLevel) -> zoomLevelError = zoomLevelExistsString
                                     else -> {
                                         elevationProfileZoomLevels = (elevationProfileZoomLevels + zoomLevel).sorted()
                                         newZoomLevelText = ""

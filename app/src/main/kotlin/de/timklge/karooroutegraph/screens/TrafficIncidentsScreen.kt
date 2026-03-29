@@ -61,6 +61,9 @@ fun TrafficIncidentsScreen(
     var apiTestDialogPending by remember { mutableStateOf(false) }
     var apiTestErrorMessage by remember { mutableStateOf("") }
     val karooSystemServiceProvider = koinInject<KarooSystemServiceProvider>()
+    val testingApiKeyString = stringResource(R.string.testing_api_key)
+    val apiKeyErrorString = stringResource(R.string.api_key_error)
+    val apiKeyValidFormat = stringResource(R.string.api_key_valid)
 
     suspend fun updateSettings(){
         karooSystemServiceProvider.saveSettings { settings ->
@@ -140,18 +143,18 @@ fun TrafficIncidentsScreen(
                         FilledTonalButton(modifier = Modifier.fillMaxWidth().height(40.dp), onClick = {
                             apiTestDialogVisible = true
                             apiTestDialogPending = true
-                            apiTestErrorMessage = ctx.getString(R.string.testing_api_key)
+                            apiTestErrorMessage = testingApiKeyString
 
                             coroutineScope.launch {
                                 try {
                                     val response = hereMapsIncidentProvider.requestIncidents(hereMapsApiKey, Point.fromLngLat(13.399, 52.5186), 2000.0)
                                     apiTestDialogPending = false
-                                    apiTestErrorMessage = ctx.getString(R.string.api_key_valid, response.results?.size ?: 0, response.sourceUpdated ?: "")
+                                    apiTestErrorMessage = String.format(apiKeyValidFormat, response.results?.size ?: 0, response.sourceUpdated ?: "")
                                     Log.d(KarooRouteGraphExtension.TAG, apiTestErrorMessage)
                                 } catch (e: Exception) {
                                     Log.e(KarooRouteGraphExtension.TAG, "Error testing API key: ${e.message}")
                                     apiTestDialogPending = false
-                                    apiTestErrorMessage = ctx.getString(R.string.api_key_error)
+                                    apiTestErrorMessage = apiKeyErrorString
                                 }
                             }
                         }) {
