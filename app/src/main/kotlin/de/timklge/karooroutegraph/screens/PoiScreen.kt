@@ -46,7 +46,7 @@ fun PoiScreen(finish: () -> Unit){
         showWarnings = true
     }
 
-    val selectedTabIndex by remember { mutableIntStateOf(0) }
+    val selectedTabIndex by remember { mutableIntStateOf(1) }
     val pagerState = rememberPagerState(pageCount = { 3 })
 
     Box(

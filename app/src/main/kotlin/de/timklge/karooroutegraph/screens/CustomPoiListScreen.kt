@@ -140,7 +140,13 @@ fun CustomPoiListScreen() {
 
     LaunchedEffect(Unit) {
         val settings = karooSystemServiceProvider.streamViewSettings().first()
-        selectedSort = settings.poiSortOptionForCustomPois
+        val routeLoaded = routeGraphViewModel?.knownRoute != null
+
+        selectedSort = if (routeLoaded) {
+            settings.poiSortOptionForCustomPois
+        } else {
+            PoiSortOption.LINEAR_DISTANCE
+        }
     }
 
     val pois by remember {

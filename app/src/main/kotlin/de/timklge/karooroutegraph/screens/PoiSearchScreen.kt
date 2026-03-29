@@ -96,7 +96,12 @@ fun PoiSearchScreen() {
 
     LaunchedEffect(Unit) {
         val viewSettings = karooSystemServiceProvider.streamViewSettings().first()
-        selectedSort = viewSettings.poiSortOptionForSearchedPois
+        val routeLoaded = routeGraphViewModelProvider.viewModelFlow.first().knownRoute != null
+        selectedSort = if (routeLoaded) {
+            viewSettings.poiSortOptionForSearchedPois
+        } else {
+            PoiSortOption.LINEAR_DISTANCE
+        }
     }
 
     LaunchedEffect(Unit) {

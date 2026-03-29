@@ -90,7 +90,7 @@ fun NearbyPoiListScreen() {
     var isRefreshing by remember { mutableStateOf(false) }
     var lastErrorMessage by remember { mutableStateOf<String?>(null) }
     var showSortDialog by remember { mutableStateOf(false) }
-    var selectedSort by remember { mutableStateOf(PoiSortOption.LINEAR_DISTANCE) }
+    var selectedSort by remember { mutableStateOf(PoiSortOption.AHEAD_ON_ROUTE) }
 
     val karooSystemServiceProvider = koinInject<KarooSystemServiceProvider>()
     val offlineNearbyPOIProvider = koinInject<OfflineNearbyPOIProvider>()
@@ -305,7 +305,13 @@ fun NearbyPoiListScreen() {
 
     LaunchedEffect(Unit) {
         val viewSettings = karooSystemServiceProvider.streamViewSettings().first()
-        selectedSort = viewSettings.poiSortOptionForNearbyPois
+        val isRouteLoaded = viewModel?.knownRoute != null
+
+        selectedSort = if (isRouteLoaded) {
+            viewSettings.poiSortOptionForNearbyPois
+        } else {
+            PoiSortOption.LINEAR_DISTANCE
+        }
         selectedCategories = viewSettings.poiCategoriesForNearbyPois
 
         if (selectedCategories.isNotEmpty()) {
