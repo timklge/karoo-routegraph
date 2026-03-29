@@ -482,80 +482,6 @@ class RouteGraphDataType(
                     }
                 }
 
-                if (viewModel.poiDistances != null){
-                    val previousPOIs = mutableSetOf<RectF>()
-
-                    val allPoisInRange = viewModel.poiDistances.values.flatten().filter { nearestPoint ->
-                        nearestPoint.distanceFromRouteStart in viewRange
-                    }
-
-                    viewModel.poiDistances.forEach { (poi, distances) ->
-                        val poisInRange = distances.filter { nearestPoint ->
-                            nearestPoint.distanceFromRouteStart in viewRange
-                        }
-
-                        poisInRange.forEach { nearestPoint ->
-                            val distanceFromRouteStart = nearestPoint.distanceFromRouteStart
-                            val text = poi.symbol.name ?: "X"
-                            val textWidth = textPaintInv.measureText(text)
-                            val pixelsFromLeft = remap(distanceFromRouteStart, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
-                            val maxPois = if (config.gridSize.first <= 30) 2 else 4
-                            val drawLabel = allPoisInRange.size <= maxPois && config.gridSize.first > 30
-
-                            val textStartFromLeft = (pixelsFromLeft - textWidth / 2)
-                                .coerceIn(graphBounds.left, (graphBounds.right - textWidth - 5f).coerceAtLeast(graphBounds.left))
-
-                            val currentPOI = RectF(
-                                textStartFromLeft - 5,
-                                graphBounds.top,
-                                textStartFromLeft + textWidth + 5,
-                                30f + graphBounds.top
-                            )
-
-                            val currentPOIBottomIcon = RectF(
-                                pixelsFromLeft - 35f / 2 - 5f,
-                                graphBounds.bottom - 40f,
-                                pixelsFromLeft + 35f / 2 + 5f,
-                                graphBounds.bottom
-                            )
-
-                            previousPOIs.forEach { previousPOI ->
-                                if (RectF.intersects(currentPOI, previousPOI)){
-                                    currentPOI.offset(0f, 35f)
-                                }
-                            }
-
-                            canvas.drawLine(pixelsFromLeft, if (drawLabel) currentPOI.bottom else graphBounds.top,
-                                pixelsFromLeft, graphBounds.bottom, backgroundStrokePaintDashed)
-                            canvas.drawLine(pixelsFromLeft, if (drawLabel) currentPOI.bottom else graphBounds.top,
-                                pixelsFromLeft, graphBounds.bottom, if (poi.type == PoiType.INCIDENT) incidentLinePaintDashed else poiLinePaintDashed)
-
-                            if (drawLabel){
-                                canvas.drawRoundRect(currentPOI, 5f, 5f, backgroundFillPaint)
-                                Log.i(TAG, "Drawing text $text at $textStartFromLeft, $currentPOI")
-
-                                canvas.drawText(text, textStartFromLeft, 20f + currentPOI.top + 5f, textPaintInv)
-                            }
-
-                            if (config.gridSize.first > 30){
-                                canvas.drawRoundRect(currentPOIBottomIcon, 5f, 5f, backgroundFillPaint)
-
-                                val icon = mapPoiToIcon(poi.symbol.type)
-                                val sizeX = 35
-                                val sizeY = 35
-                                val bitmap = AppCompatResources.getDrawable(context, icon)?.toBitmap(sizeX, sizeY)
-
-                                val iconPaint = if (!isNightMode()) inversePaintFilter else textPaint
-
-                                if (bitmap != null) canvas.drawBitmap(bitmap, currentPOIBottomIcon.left + 5f, currentPOIBottomIcon.top, iconPaint)
-                            }
-                            
-
-                            previousPOIs.add(currentPOI)
-                        }
-                    }
-                }
-
                 run  {
                     // Ticks on X axis
                     val unitFactor = if (!viewModel.isImperial) 1000.0f else 1609.344f
@@ -636,6 +562,80 @@ class RouteGraphDataType(
                             remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom, clamp = false) + 5f,
                             textPaint
                         )
+                    }
+                }
+
+                if (viewModel.poiDistances != null){
+                    val previousPOIs = mutableSetOf<RectF>()
+
+                    val allPoisInRange = viewModel.poiDistances.values.flatten().filter { nearestPoint ->
+                        nearestPoint.distanceFromRouteStart in viewRange
+                    }
+
+                    viewModel.poiDistances.forEach { (poi, distances) ->
+                        val poisInRange = distances.filter { nearestPoint ->
+                            nearestPoint.distanceFromRouteStart in viewRange
+                        }
+
+                        poisInRange.forEach { nearestPoint ->
+                            val distanceFromRouteStart = nearestPoint.distanceFromRouteStart
+                            val text = poi.symbol.name ?: "X"
+                            val textWidth = textPaintInv.measureText(text)
+                            val pixelsFromLeft = remap(distanceFromRouteStart, viewDistanceStart, viewDistanceEnd, graphBounds.left, graphBounds.right)
+                            val maxPois = if (config.gridSize.first <= 30) 2 else 4
+                            val drawLabel = allPoisInRange.size <= maxPois && config.gridSize.first > 30
+
+                            val textStartFromLeft = (pixelsFromLeft - textWidth / 2)
+                                .coerceIn(graphBounds.left, (graphBounds.right - textWidth - 5f).coerceAtLeast(graphBounds.left))
+
+                            val currentPOI = RectF(
+                                textStartFromLeft - 5,
+                                graphBounds.top,
+                                textStartFromLeft + textWidth + 5,
+                                30f + graphBounds.top
+                            )
+
+                            val currentPOIBottomIcon = RectF(
+                                pixelsFromLeft - 35f / 2 - 5f,
+                                graphBounds.bottom - 40f,
+                                pixelsFromLeft + 35f / 2 + 5f,
+                                graphBounds.bottom
+                            )
+
+                            previousPOIs.forEach { previousPOI ->
+                                if (RectF.intersects(currentPOI, previousPOI)){
+                                    currentPOI.offset(0f, 35f)
+                                }
+                            }
+
+                            canvas.drawLine(pixelsFromLeft, if (drawLabel) currentPOI.bottom else graphBounds.top,
+                                pixelsFromLeft, graphBounds.bottom, backgroundStrokePaintDashed)
+                            canvas.drawLine(pixelsFromLeft, if (drawLabel) currentPOI.bottom else graphBounds.top,
+                                pixelsFromLeft, graphBounds.bottom, if (poi.type == PoiType.INCIDENT) incidentLinePaintDashed else poiLinePaintDashed)
+
+                            if (config.gridSize.first > 30){
+                                canvas.drawRoundRect(currentPOIBottomIcon, 5f, 5f, backgroundFillPaint)
+
+                                val icon = mapPoiToIcon(poi.symbol.type)
+                                val sizeX = 35
+                                val sizeY = 35
+                                val bitmap = AppCompatResources.getDrawable(context, icon)?.toBitmap(sizeX, sizeY)
+
+                                val iconPaint = if (!isNightMode()) inversePaintFilter else textPaint
+
+                                if (bitmap != null) canvas.drawBitmap(bitmap, currentPOIBottomIcon.left + 5f, currentPOIBottomIcon.top, iconPaint)
+                            }
+
+                            if (drawLabel){
+                                canvas.drawRoundRect(currentPOI, 5f, 5f, backgroundFillPaint)
+                                Log.i(TAG, "Drawing text $text at $textStartFromLeft, $currentPOI")
+
+                                canvas.drawText(text, textStartFromLeft, 20f + currentPOI.top + 5f, textPaintInv)
+                            }
+                            
+
+                            previousPOIs.add(currentPOI)
+                        }
                     }
                 }
 
