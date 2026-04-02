@@ -181,47 +181,47 @@ fun CustomPoiListScreen() {
     }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        if (routeGraphViewModel?.knownRoute != null) {
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
+        item {
+            val routeLoaded = routeGraphViewModel?.knownRoute != null
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+            ) {
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { if (routeLoaded) expanded = !expanded },
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    ExposedDropdownMenuBox(
+                    OutlinedTextField(
+                        value = stringResource(selectedSort.displayNameRes),
+                        onValueChange = {},
+                        readOnly = true,
+                        enabled = routeLoaded,
+                        label = { Text(stringResource(R.string.sort_by)) },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                        },
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
                         expanded = expanded,
-                        onExpandedChange = { expanded = !expanded },
-                        modifier = Modifier.fillMaxWidth()
+                        onDismissRequest = { expanded = false }
                     ) {
-                        OutlinedTextField(
-                            value = stringResource(selectedSort.displayNameRes),
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text(stringResource(R.string.sort_by)) },
-                            trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-                            },
-                            modifier = Modifier.menuAnchor().fillMaxWidth()
-                        )
-                        ExposedDropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false }
-                        ) {
-                            PoiSortOption.entries.forEach { option ->
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(option.displayNameRes), style = MaterialTheme.typography.bodyLarge) },
-                                    onClick = {
-                                        selectedSort = option
-                                        expanded = false
+                        PoiSortOption.entries.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(stringResource(option.displayNameRes), style = MaterialTheme.typography.bodyLarge) },
+                                onClick = {
+                                    selectedSort = option
+                                    expanded = false
 
-                                        coroutineScope.launch {
-                                            karooSystemServiceProvider.saveViewSettings { settings ->
-                                                settings.copy(poiSortOptionForCustomPois = option)
-                                            }
+                                    coroutineScope.launch {
+                                        karooSystemServiceProvider.saveViewSettings { settings ->
+                                            settings.copy(poiSortOptionForCustomPois = option)
                                         }
                                     }
-                                )
-                            }
+                                }
+                            )
                         }
                     }
                 }
