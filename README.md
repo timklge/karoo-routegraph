@@ -10,8 +10,6 @@ a button to navigate to POIs along the route (e. g. upcoming gas stations for re
 as a companion app on long rides where you want to have a quick overview of the route that includes upcoming checkpoints,
 climbs and refueling opportunities so that you can pace yourself accordingly.
 
-Please note that an active internet connection is required to search for nearby POIs while riding.
-
 Compatible with Karoo 2 and Karoo 3 devices.
 
 ![Minimap](minimap.png)
