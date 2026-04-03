@@ -107,6 +107,7 @@ You will also get a notification when loading a route if there are traffic incid
   - OpenStreetMap raster tiles for the minimap served by https://tile.openstreetmap.org
   - Nearby POI search uses https://overpass-api.de
   - POI search box uses nominatim API for geocoding: https://nominatim.openstreetmap.org/
+  - Offline POIs are downloaded from https://routegraph.timklge.de
 - Icons are from [boxicons.com](https://boxicons.com) ([MIT-licensed](icon_credits.txt))
 - Uses [karoo-ext](https://github.com/hammerheadnav/karoo-ext) (Apache2-licensed)
 - Uses Flexpolyline encoder / decoder by HERE Europe B. V. (MIT-licensed)
