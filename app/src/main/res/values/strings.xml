@@ -108,26 +108,18 @@
 
     <!-- POI Categories -->
     <string name="category_water">Water</string>
-    <string name="category_gas_station">Gas Station</string>
-    <string name="category_supermarket">Supermarket</string>
     <string name="category_restaurant">Restaurant</string>
     <string name="category_cafe">Café</string>
     <string name="category_ice_cream">Ice Cream</string>
+    <string name="category_fast_food">Fast Food</string>
+    <string name="category_supermarket">Supermarket</string>
+    <string name="category_convenience">Convenience Store</string>
     <string name="category_bakery">Bakery</string>
-    <string name="category_toilets">Toilets</string>
-    <string name="category_showers">Showers</string>
-    <string name="category_atms">ATMs</string>
-    <string name="category_shelter">Shelter</string>
     <string name="category_camping_site">Camping Site</string>
-    <string name="category_hotel">Hotel</string>
-    <string name="category_train_station">Train Station</string>
-    <string name="category_waste_basket">Waste Basket</string>
-    <string name="category_bench">Bench</string>
-    <string name="category_bike_shop">Bike Shop</string>
-    <string name="category_pharmacy">Pharmacy</string>
-    <string name="category_hospital">Hospital</string>
-    <string name="category_village">Village</string>
-    <string name="category_town">Town</string>
+    <string name="category_attraction">Attraction</string>
+    <string name="category_viewpoint">Viewpoint</string>
+    <string name="category_beach">Beach</string>
+    <string name="category_swimming_area">Swimming Area</string>
 
     <!-- Distance formatting strings -->
     <string name="distance_ahead">%1$s ahead, %2$s from route</string>
@@ -140,8 +132,6 @@
     <string name="error_fetch_pois">Failed to fetch POIs: %1$s</string>
     <string name="start_of_route">Start</string>
     <string name="end_of_route">End</string>
-    <string name="category_attraction">Attraction</string>
-    <string name="category_viewpoint">Viewpoint</string>
     <string name="kilometers">km</string>
     <string name="miles">mi</string>
     <string name="shift_for_radar_swim_lane">Shift for radar swim lane</string>
