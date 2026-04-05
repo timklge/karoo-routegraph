@@ -25,7 +25,7 @@ class NearbyPOIPbfDownloadService(
     private val context: Context,
 ) {
     companion object {
-        const val DOWNLOAD_URL = "https://raw.githubusercontent.com/masiina/karoo-routegraph/main/pois"
+        const val DOWNLOAD_URL = "https://raw.githubusercontent.com/masiina/karoo-routegraph/master/pois"
     }
 
     private val okHttpClient = OkHttpClient()
