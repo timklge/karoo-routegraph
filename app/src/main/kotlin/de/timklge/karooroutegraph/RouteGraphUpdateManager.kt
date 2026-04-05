@@ -3,7 +3,6 @@ package de.timklge.karooroutegraph
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import androidx.compose.ui.res.stringResource
 import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
 import com.mapbox.turf.TurfConstants
@@ -282,7 +281,8 @@ class RouteGraphUpdateManager(
                     true
                 } else false
 
-                if (onRoute) {
+                val shouldUpdateClimbs = onRoute && (routeChanged || (newClimbs?.size ?: 0) > (knownClimbs?.size ?: 0))
+                if (shouldUpdateClimbs) {
                     knownClimbs = newClimbs
                 }
 
