@@ -11,14 +11,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -29,7 +26,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -37,8 +33,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import de.timklge.karooroutegraph.KarooRouteGraphExtension
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.R
+import de.timklge.karooroutegraph.streamUserProfile
 import kotlinx.coroutines.flow.first
 import org.koin.compose.koinInject
 
@@ -48,24 +46,22 @@ fun ProfileSelectionScreen(
     onBack: () -> Unit
 ) {
     val karooSystemServiceProvider = koinInject<KarooSystemServiceProvider>()
-    var showAddDialog by remember { mutableStateOf(false) }
-    var newProfileName by remember { mutableStateOf("") }
-    val profiles = remember { mutableStateListOf<String>() }
-    var selectedProfileName by remember { mutableStateOf<String?>(null) }
+    var showNameDialog by remember { mutableStateOf(false) }
+    var profileNameInput by remember { mutableStateOf("") }
+    var currentProfileHash by remember { mutableStateOf<String?>(null) }
+    var currentProfileName by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
-        // Load saved profiles from DataStore
-        val stored = karooSystemServiceProvider.getAvailableProfileNames().first()
-        profiles.clear()
-        profiles.addAll(stored)
+        val profile = karooSystemServiceProvider.karooSystemService.streamUserProfile().first()
+        val hash = karooSystemServiceProvider.computeProfileHash(profile)
+        currentProfileHash = hash
 
-        karooSystemServiceProvider.getSelectedProfileName().first()?.let {
-            selectedProfileName = it
-        }
+        val knownName = karooSystemServiceProvider.getProfileNameForHash(hash).first()
+        currentProfileName = knownName
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.select_ride_profile)) }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.ride_profile)) }) },
         content = { padding ->
             Box(Modifier.fillMaxSize()) {
                 Column(
@@ -74,43 +70,65 @@ fun ProfileSelectionScreen(
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background)
                 ) {
-                    if (profiles.isEmpty()) {
-                        Text(
-                            text = "No ride profiles configured. Add one to manage POI visibility per profile.",
-                            modifier = Modifier.padding(16.dp),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(0.dp),
-                        ) {
-                            items(profiles) { name ->
-                                ProfileRow(
-                                    name = name,
-                                    isSelected = name == selectedProfileName,
-                                    onClick = {
-                                        selectedProfileName = name
-                                        karooSystemServiceProvider.setSelectedProfileName(name)
-                                    },
-                                    onDelete = {
-                                        profiles.remove(name)
-                                        if (selectedProfileName == name) {
-                                            selectedProfileName = null
-                                            karooSystemServiceProvider.clearSelectedProfileName()
-                                        }
-                                    }
-                                )
-                                HorizontalDivider()
+                    LazyColumn(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        item {
+                            if (currentProfileName != null) {
+                                Column {
+                                    Text(
+                                        text = stringResource(R.string.current_profile, currentProfileName!!),
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                    Text(
+                                        text = "POI settings for this profile will be used automatically",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            } else {
+                                Column {
+                                    Text(
+                                        text = "New ride profile detected",
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                    Text(
+                                        text = "Give this Karoo ride profile a name so the app can remember your POI settings for it.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
-                    }
 
-                    Button(
-                        onClick = { showAddDialog = true },
-                        modifier = Modifier.fillMaxWidth().padding(16.dp)
-                    ) {
-                        Text("Add Profile")
+                        item {
+                            Button(
+                                onClick = {
+                                    if (currentProfileName == null) {
+                                        showNameDialog = true
+                                    } else {
+                                        // Allow renaming existing profile
+                                        profileNameInput = currentProfileName ?: ""
+                                        showNameDialog = true
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Filled.Person, contentDescription = null, modifier = Modifier.size(20.dp))
+                                Text(if (currentProfileName == null) "Name this profile" else "Rename profile")
+                            }
+                        }
+
+                        item {
+                            Text(
+                                text = "Switch ride profiles on your Karoo device to change which POI settings are active.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
 
@@ -122,79 +140,36 @@ fun ProfileSelectionScreen(
         }
     )
 
-    if (showAddDialog) {
+    if (showNameDialog) {
         AlertDialog(
-            onDismissRequest = { showAddDialog = false },
-            title = { Text("New Ride Profile") },
+            onDismissRequest = { showNameDialog = false },
+            title = { Text("Profile Name") },
             text = {
                 OutlinedTextField(
-                    value = newProfileName,
-                    onValueChange = { newProfileName = it },
-                    label = { Text("Profile name (e.g. Road, Gravel, MTB)") },
+                    value = profileNameInput,
+                    onValueChange = { profileNameInput = it },
+                    label = { Text("Enter name (e.g. Road, Gravel, MTB)") },
                     modifier = Modifier.fillMaxWidth()
                 )
             },
             confirmButton = {
                 TextButton(
-                    enabled = newProfileName.isNotBlank(),
+                    enabled = profileNameInput.isNotBlank(),
                     onClick = {
-                        val name = newProfileName.trim()
-                        if (name !in profiles) {
-                            profiles.add(name)
-                            karooSystemServiceProvider.addProfileName(name)
-                        }
-                        selectedProfileName = name
-                        karooSystemServiceProvider.setSelectedProfileName(name)
-                        showAddDialog = false
-                        newProfileName = ""
+                        val name = profileNameInput.trim()
+                        val hash = currentProfileHash ?: return@TextButton
+                        karooSystemServiceProvider.setProfileNameForHash(hash, name)
+                        currentProfileName = name
+                        showNameDialog = false
+                        profileNameInput = ""
                     }
-                ) { Text("Add") }
+                ) { Text("Save") }
             },
             dismissButton = {
-                TextButton(onClick = { showAddDialog = false; newProfileName = "" }) {
+                TextButton(onClick = { showNameDialog = false; profileNameInput = "" }) {
                     Text("Cancel")
                 }
             }
         )
-    }
-}
-
-@Composable
-fun ProfileRow(
-    name: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    onDelete: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = Icons.Default.Person,
-            contentDescription = null,
-            modifier = Modifier.size(32.dp),
-            tint = MaterialTheme.colorScheme.onSurface
-        )
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(start = 16.dp)
-        ) {
-            Text(
-                text = name,
-                style = MaterialTheme.typography.titleMedium
-            )
-        }
-        if (isSelected) {
-            Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = "Selected",
-                modifier = Modifier.size(24.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-        }
     }
 }

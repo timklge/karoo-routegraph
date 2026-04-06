@@ -139,7 +139,7 @@ fun CustomPoiListScreen() {
     var selectedSort by remember { mutableStateOf(PoiSortOption.LINEAR_DISTANCE) }
 
     LaunchedEffect(Unit) {
-        val profileName = karooSystemServiceProvider.getSelectedProfileName().first()
+        val profileName = karooSystemServiceProvider.streamActiveKarooProfileName().first()
         val settings = if (profileName != null) {
             karooSystemServiceProvider.streamProfileViewSettings(profileName).first()
         } else {

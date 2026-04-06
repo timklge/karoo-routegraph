@@ -13,6 +13,7 @@ import io.hammerhead.karooext.models.DataType
 import io.hammerhead.karooext.models.KarooEvent
 import io.hammerhead.karooext.models.OnStreamState
 import io.hammerhead.karooext.models.StreamState
+import io.hammerhead.karooext.models.UserProfile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -29,6 +31,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
+import java.security.MessageDigest
 
 class KarooSystemServiceProvider(private val context: Context) {
     val karooSystemService: KarooSystemService = KarooSystemService(context)
@@ -51,64 +54,96 @@ class KarooSystemServiceProvider(private val context: Context) {
     val settingsKey = stringPreferencesKey("settings")
     val viewSettingsKey = stringPreferencesKey("viewSettings")
     val temporaryPOIsKey = stringPreferencesKey("temporaryPOIs")
-    val selectedProfileNameKey = stringPreferencesKey("selectedProfileName")
+
+    /**
+     * Computes a hash from the Karoo UserProfile to uniquely identify each ride profile.
+     * Uses weight, maxHr, restingHr, and ftp as the signature.
+     * When the user switches ride profiles on the Karoo device, these values change,
+     * producing a different hash.
+     */
+    fun computeProfileHash(profile: UserProfile): String {
+        val data = "w=${profile.weight}" +
+                "_mhr=${profile.maxHr}" +
+                "_rhr=${profile.restingHr}" +
+                "_ftp=${profile.ftp}" +
+                "_zones=${profile.heartRateZones?.size ?: 0}_${profile.powerZones?.size ?: 0}"
+        val md = MessageDigest.getInstance("SHA-256")
+        val digest = md.digest(data.toByteArray())
+        return digest.joinToString("") { "%02x".format(it) }.take(16)
+    }
+
+    // Mapping: profile hash → user-provided name (e.g. "Road", "Gravel")
+    private val profileHashToNameKey = stringPreferencesKey("profileHashToName")
+
+    fun setProfileNameForHash(hash: String, name: String) {
+        CoroutineScope(Dispatchers.Default).launch {
+            context.dataStore.edit { prefs ->
+                val current = prefs[profileHashToNameKey]?.let { json ->
+                    jsonWithUnknownKeys.decodeFromString<Map<String, String>>(json)
+                } ?: emptyMap()
+                prefs[profileHashToNameKey] = jsonWithUnknownKeys.encodeToString(current + (hash to name))
+            }
+        }
+    }
+
+    fun getProfileNameForHash(hash: String): Flow<String?> {
+        return context.dataStore.data.map { prefs ->
+            prefs[profileHashToNameKey]?.let { json ->
+                jsonWithUnknownKeys.decodeFromString<Map<String, String>>(json)[hash]
+            }
+        }.distinctUntilChanged()
+    }
+
+    /**
+     * Streams the currently active Karoo ride profile name.
+     * Combines the live UserProfile stream with the stored hash→name mapping.
+     * Returns null if the current profile hasn't been named yet.
+     */
+    fun streamActiveKarooProfileName(): Flow<String?> {
+        return combine(
+            karooSystemService.streamUserProfile(),
+            context.dataStore.data
+        ) { profile, prefs ->
+            val hash = computeProfileHash(profile)
+            prefs[profileHashToNameKey]?.let { json ->
+                jsonWithUnknownKeys.decodeFromString<Map<String, String>>(json)[hash]
+            }
+        }.distinctUntilChanged()
+    }
 
     /**
      * Builds a DataStore key for POI settings scoped to a specific ride profile.
-     * Profile name is sanitized to be safe as a preferences key.
      */
     fun profilePoiSettingsKey(profileName: String): String {
         val sanitizedName = profileName.replace(Regex("[^a-zA-Z0-9_-]"), "_")
         return "viewSettings_profile_$sanitizedName"
     }
 
-    private var _currentProfileName: MutableStateFlow<String?> = MutableStateFlow(null)
-    val currentProfileName = _currentProfileName.asStateFlow()
-
-    fun setSelectedProfileName(name: String) {
-        CoroutineScope(Dispatchers.Default).launch {
-            _currentProfileName.emit(name)
-            context.dataStore.edit { t ->
-                t[selectedProfileNameKey] = name
-            }
+    /**
+     * Save POI settings for a specific ride profile.
+     */
+    suspend fun saveProfileViewSettings(profileName: String, function: (settings: RouteGraphPoiSettings) -> RouteGraphPoiSettings) {
+        val key = stringPreferencesKey(profilePoiSettingsKey(profileName))
+        context.dataStore.edit { t ->
+            val settings = readViewSettings(t[key])
+            val newSettings = function(settings)
+            t[key] = jsonWithUnknownKeys.encodeToString(newSettings)
         }
     }
 
-    fun getSelectedProfileName(): Flow<String?> {
-        return context.dataStore.data.map { prefs ->
-            prefs[selectedProfileNameKey]
+    /**
+     * Stream POI settings for a specific ride profile.
+     */
+    fun streamProfileViewSettings(profileName: String): Flow<RouteGraphPoiSettings> {
+        val key = stringPreferencesKey(profilePoiSettingsKey(profileName))
+        return context.dataStore.data.map { settingsJson ->
+            try {
+                readViewSettings(settingsJson[key])
+            } catch(e: Throwable){
+                Log.e(TAG, "Failed to read profile preferences for $profileName", e)
+                jsonWithUnknownKeys.decodeFromString<RouteGraphPoiSettings>(RouteGraphPoiSettings.defaultSettings)
+            }
         }.distinctUntilChanged()
-    }
-
-    private val profileNamesKey = stringPreferencesKey("profileNames")
-
-    fun getAvailableProfileNames(): Flow<List<String>> {
-        return context.dataStore.data.map { prefs ->
-            prefs[profileNamesKey]?.let { json ->
-                jsonWithUnknownKeys.decodeFromString<List<String>>(json)
-            } ?: emptyList()
-        }.distinctUntilChanged()
-    }
-
-    fun addProfileName(name: String) {
-        CoroutineScope(Dispatchers.Default).launch {
-            context.dataStore.edit { prefs ->
-                val current = prefs[profileNamesKey]?.let { json ->
-                    jsonWithUnknownKeys.decodeFromString<List<String>>(json)
-                } ?: emptyList()
-                if (name !in current) {
-                    prefs[profileNamesKey] = jsonWithUnknownKeys.encodeToString(current + name)
-                }
-            }
-        }
-    }
-
-    fun clearSelectedProfileName() {
-        CoroutineScope(Dispatchers.Default).launch {
-            context.dataStore.edit { prefs ->
-                prefs.remove(selectedProfileNameKey)
-            }
-        }
     }
 
     private fun readSettings(settingsJson: String?): RouteGraphSettings {
@@ -166,33 +201,6 @@ class KarooSystemServiceProvider(private val context: Context) {
             val newSettings = function(settings)
             t[temporaryPOIsKey] = jsonWithUnknownKeys.encodeToString(newSettings)
         }
-    }
-
-    /**
-     * Save POI settings for a specific ride profile.
-     */
-    suspend fun saveProfileViewSettings(profileName: String, function: (settings: RouteGraphPoiSettings) -> RouteGraphPoiSettings) {
-        val key = stringPreferencesKey(profilePoiSettingsKey(profileName))
-        context.dataStore.edit { t ->
-            val settings = readViewSettings(t[key])
-            val newSettings = function(settings)
-            t[key] = jsonWithUnknownKeys.encodeToString(newSettings)
-        }
-    }
-
-    /**
-     * Stream POI settings for a specific ride profile.
-     */
-    fun streamProfileViewSettings(profileName: String): Flow<RouteGraphPoiSettings> {
-        val key = stringPreferencesKey(profilePoiSettingsKey(profileName))
-        return context.dataStore.data.map { settingsJson ->
-            try {
-                readViewSettings(settingsJson[key])
-            } catch(e: Throwable){
-                Log.e(TAG, "Failed to read profile preferences for $profileName", e)
-                jsonWithUnknownKeys.decodeFromString<RouteGraphPoiSettings>(RouteGraphPoiSettings.defaultSettings)
-            }
-        }.distinctUntilChanged()
     }
 
     fun streamSettings(): Flow<RouteGraphSettings> {

@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker build *)",
+      "Bash(mkdir *)",
+      "Bash(curl *)",
+      "Bash(docker run *)",
+      "Bash(./gradlew *)",
+      "Bash(which *)",
+      "Bash(find *)",
+      "Bash(ls *)",
+      "Bash(dpkg *)",
+      "Bash(grep *)",
+      "Bash(apt *)",
+      "Bash(sudo *)",
+      "Bash(unzip *)",
+      "Bash(mv *)",
+      "Bash(rm *)",
+      "Bash(yes)",
+      "Bash(~/android/sdk/cmdline-tools/latest/bin/sdkmanager *)",
+      "Bash(cp *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push)",
+      "Bash(git config *)",
+      "Bash(git remote *)"
+    ]
+  },
+  "$version": 3
+}

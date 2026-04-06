@@ -130,7 +130,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 val settings: RouteGraphPoiSettings
             )
 
-            combine(karooSystem.streamTemporaryPOIs(), autoAddedPOIsViewModelProvider.viewModelFlow, karooSystem.getSelectedProfileName(), karooSystem.streamViewSettings()) { temporaryPois, autoAddedPois, profileName, globalSettings ->
+            combine(karooSystem.streamTemporaryPOIs(), autoAddedPOIsViewModelProvider.viewModelFlow, karooSystem.streamActiveKarooProfileName(), karooSystem.streamViewSettings()) { temporaryPois, autoAddedPois, profileName, globalSettings ->
                 val settings = if (profileName != null) {
                     try {
                         karooSystem.streamProfileViewSettings(profileName).first()

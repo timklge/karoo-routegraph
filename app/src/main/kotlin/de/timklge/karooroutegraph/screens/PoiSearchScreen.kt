@@ -96,7 +96,7 @@ fun PoiSearchScreen() {
     var maxDistanceFromRoute by remember { mutableDoubleStateOf(1_000.0) }
 
     LaunchedEffect(Unit) {
-        val profileName = karooSystemServiceProvider.getSelectedProfileName().first()
+        val profileName = karooSystemServiceProvider.streamActiveKarooProfileName().first()
         currentProfileName = profileName
         val viewSettings = if (profileName != null) {
             karooSystemServiceProvider.streamProfileViewSettings(profileName).first()

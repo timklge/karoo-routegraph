@@ -151,7 +151,7 @@ class RouteGraphUpdateManager(
                 karooSystem.stream<OnGlobalPOIs>(),
                 karooSystem.streamTemporaryPOIs(),
                 karooSystem.streamDataFlow(DataType.Type.DISTANCE_TO_DESTINATION),
-                karooSystem.getSelectedProfileName()
+                karooSystem.streamActiveKarooProfileName()
             ) { data ->
                 val settings = data[0] as RouteGraphSettings
                 val navigationState = data[1] as OnNavigationState

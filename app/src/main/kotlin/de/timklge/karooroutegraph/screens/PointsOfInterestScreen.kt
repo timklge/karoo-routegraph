@@ -132,7 +132,7 @@ fun PointsOfInterestScreen(
 
     // Load current profile name
     LaunchedEffect(Unit) {
-        karooSystemServiceProvider.getSelectedProfileName().collect { name ->
+        karooSystemServiceProvider.streamActiveKarooProfileName().collect { name ->
             currentProfileName = name
         }
     }
