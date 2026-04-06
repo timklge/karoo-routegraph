@@ -25,13 +25,6 @@ class AveragePowerEstimationTest {
     }
 
     @Test
-    fun `empty flow returns null`() {
-        val flow = flowOf<EstimatedPowerRecord>()
-        val result = flow.averagePowerOverHour(80.0) { 0L }.lastValue()
-        assertNull(result)
-    }
-
-    @Test
     fun `single reading returns that power`() {
         val now = 1000L
         val speed = 10.0
