@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
+import de.timklge.karooroutegraph.pois.PoiType
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.DataTypeImpl
 import io.hammerhead.karooext.internal.Emitter
@@ -39,8 +40,8 @@ class DistanceToNextPOIDataType(
                     }
                 }
 
-                val poisAhead = poiDistances?.filter { (_, distance) ->
-                    distance.distanceFromRouteStart - currentDistanceAlongRoute > 0
+                val poisAhead = poiDistances?.filter { (poi, distance) ->
+                    poi.type != PoiType.INCIDENT && distance.distanceFromRouteStart - currentDistanceAlongRoute > 0
                 }
 
                 val poisAheadSorted = poisAhead?.sortedBy { (_, distance) ->
