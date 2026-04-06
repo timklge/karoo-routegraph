@@ -80,6 +80,7 @@ fun PoiSearchScreen() {
     var lastErrorMessage by remember { mutableStateOf<String?>(null) }
     var showSortDialog by remember { mutableStateOf(false) }
     var selectedSort by remember { mutableStateOf(PoiSortOption.LINEAR_DISTANCE) }
+    var currentProfileName by remember { mutableStateOf<String?>(null) }
     val focusManager = LocalFocusManager.current
 
     // Get localized error messages
@@ -95,7 +96,13 @@ fun PoiSearchScreen() {
     var maxDistanceFromRoute by remember { mutableDoubleStateOf(1_000.0) }
 
     LaunchedEffect(Unit) {
-        val viewSettings = karooSystemServiceProvider.streamViewSettings().first()
+        val profileName = karooSystemServiceProvider.getSelectedProfileName().first()
+        currentProfileName = profileName
+        val viewSettings = if (profileName != null) {
+            karooSystemServiceProvider.streamProfileViewSettings(profileName).first()
+        } else {
+            karooSystemServiceProvider.streamViewSettings().first()
+        }
         val savedSort = viewSettings.poiSortOptionForSearchedPois
         val viewModel = routeGraphViewModelProvider.viewModelFlow.first()
 
@@ -225,8 +232,15 @@ fun PoiSearchScreen() {
             showSortDialog = false
 
             coroutineScope.launch {
-                karooSystemServiceProvider.saveViewSettings { settings ->
-                    settings.copy(poiSortOptionForSearchedPois = option)
+                val profileName = currentProfileName
+                if (profileName != null) {
+                    karooSystemServiceProvider.saveProfileViewSettings(profileName) { settings ->
+                        settings.copy(poiSortOptionForSearchedPois = option)
+                    }
+                } else {
+                    karooSystemServiceProvider.saveViewSettings { settings ->
+                        settings.copy(poiSortOptionForSearchedPois = option)
+                    }
                 }
             }
 

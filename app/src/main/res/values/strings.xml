@@ -153,4 +153,13 @@
     <string name="auto_add_pois_to_map">Automatically add POIs to map</string>
     <string name="auto_add_to_elevation_profile_and_minimap">Automatically add POIs to elevation profile and minimap</string>
     <string name="select_categories">Select categories</string>
+
+    <!-- Profile-specific POI settings -->
+    <string name="ride_profile">Ride Profile</string>
+    <string name="select_ride_profile">Select ride profile</string>
+    <string name="no_profile_selected">No profile selected</string>
+    <string name="profile_poi_settings">Profile-specific POI settings</string>
+    <string name="poi_settings_for_profile">POI settings for: %1$s</string>
+    <string name="switch_profile_to_configure_pois">Switch ride profile to configure POI visibility</string>
+    <string name="current_profile">Current profile: %1$s</string>
 </resources>

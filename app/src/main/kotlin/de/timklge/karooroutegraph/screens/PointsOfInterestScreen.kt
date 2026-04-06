@@ -107,6 +107,7 @@ fun PointsOfInterestScreen(
     var showDownloadPoisDialog by remember { mutableStateOf(false) }
     var poiDistanceToRouteMaxMeters by remember { mutableDoubleStateOf(1000.0) }
     var poiApproachAlertAtDistance by remember { mutableDoubleStateOf(500.0) }
+    var currentProfileName by remember { mutableStateOf<String?>(null) }
 
     suspend fun updateSettings(){
         karooSystemServiceProvider.saveSettings { settings ->
@@ -118,13 +119,21 @@ fun PointsOfInterestScreen(
     }
 
     suspend fun updatePoiSettings() {
-        karooSystemServiceProvider.saveViewSettings { settings ->
+        val profileName = currentProfileName ?: return
+        karooSystemServiceProvider.saveProfileViewSettings(profileName) { settings ->
             settings.copy(
                 enableOfflinePoiStorage = enableOfflinePoiStorage,
                 autoAddPoisToMap = autoAddPoisToMap,
                 autoAddPoiCategories = autoAddPoiCategories,
                 autoAddToElevationProfileAndMinimap = autoAddToElevationProfileAndMinimap
             )
+        }
+    }
+
+    // Load current profile name
+    LaunchedEffect(Unit) {
+        karooSystemServiceProvider.getSelectedProfileName().collect { name ->
+            currentProfileName = name
         }
     }
 
@@ -135,12 +144,16 @@ fun PointsOfInterestScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        karooSystemServiceProvider.streamViewSettings().collect { settings ->
-            enableOfflinePoiStorage = settings.enableOfflinePoiStorage
-            autoAddPoisToMap = settings.autoAddPoisToMap
-            autoAddPoiCategories = settings.autoAddPoiCategories
-            autoAddToElevationProfileAndMinimap = settings.autoAddToElevationProfileAndMinimap
+    // Load profile-specific POI settings
+    LaunchedEffect(currentProfileName) {
+        val profileName = currentProfileName
+        if (profileName != null) {
+            karooSystemServiceProvider.streamProfileViewSettings(profileName).collect { settings ->
+                enableOfflinePoiStorage = settings.enableOfflinePoiStorage
+                autoAddPoisToMap = settings.autoAddPoisToMap
+                autoAddPoiCategories = settings.autoAddPoiCategories
+                autoAddToElevationProfileAndMinimap = settings.autoAddToElevationProfileAndMinimap
+            }
         }
     }
 

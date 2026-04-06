@@ -91,6 +91,7 @@ fun NearbyPoiListScreen() {
     var lastErrorMessage by remember { mutableStateOf<String?>(null) }
     var showSortDialog by remember { mutableStateOf(false) }
     var selectedSort by remember { mutableStateOf(PoiSortOption.LINEAR_DISTANCE) }
+    var currentProfileName by remember { mutableStateOf<String?>(null) }
 
     val karooSystemServiceProvider = koinInject<KarooSystemServiceProvider>()
     val offlineNearbyPOIProvider = koinInject<OfflineNearbyPOIProvider>()
@@ -195,9 +196,6 @@ fun NearbyPoiListScreen() {
                 val desiredCount = 20 // Desired number of POIs to fetch
                 val limit = 30
 
-                val onlyTownOrVillagesSelected =
-                    selectedCategories.all { it == NearbyPoiCategory.TOWN || it == NearbyPoiCategory.VILLAGE }
-
                 val route = viewModel?.knownRoute
                 if (selectedSort != PoiSortOption.LINEAR_DISTANCE && route == null) {
                     lastErrorMessage = errorNoRoute
@@ -209,7 +207,7 @@ fun NearbyPoiListScreen() {
                 var overpassResponse: Set<NearbyPOI>? = null
 
                 kotlinx.coroutines.withContext(Dispatchers.IO) {
-                    val radius = if (onlyTownOrVillagesSelected) 50_000 else 10_000
+                    val radius = 10_000
                     val hasOfflineFiles = offlineNearbyPOIProvider.getAvailableCountriesInBounds(
                         listOf(currentPos),
                         radius
@@ -220,19 +218,13 @@ fun NearbyPoiListScreen() {
                             val offlineResponse = offlineNearbyPOIProvider.requestNearbyPOIs(
                                 selectedCategories.flatMap { it.osmTag }.distinct(),
                                 points = listOf(currentPos),
-                                radius = if (onlyTownOrVillagesSelected) 50_000 else 10_000,
+                                radius = 10_000,
                                 limit = limit
                             )
 
                             overpassResponse = offlineResponse.toSet()
                         } else {
-                            val radiusSteps = if (onlyTownOrVillagesSelected) {
-                                listOf(5_000, 10_000, 20_000, 50_000)
-                            } else {
-                                listOf(2_000, 5_000, 10_000)
-                            }
-
-                            for (step in radiusSteps) {
+                            for (step in listOf(2_000, 5_000, 10_000)) {
                                 val newResponse = overpassNearbyPOIProvider.requestNearbyPOIs(
                                     selectedCategories.flatMap { it.osmTag }.distinct(),
                                     points = listOf(currentPos),
@@ -250,7 +242,7 @@ fun NearbyPoiListScreen() {
                         val route = route ?: return@withContext
 
                         val routeLength = viewModel?.routeDistance?.toDouble() ?: TurfMeasurement.length(route, TurfConstants.UNIT_METERS)
-                        val radius = if (onlyTownOrVillagesSelected) 5_000 else maxDistanceFromRoute.roundToInt()
+                        val radius = maxDistanceFromRoute.roundToInt()
                         val nearbyPoiProvider = if (hasOfflineFiles) offlineNearbyPOIProvider else overpassNearbyPOIProvider
                         val lookaheadDistance = if (hasOfflineFiles) routeLength else 50_000.0
 
@@ -304,7 +296,13 @@ fun NearbyPoiListScreen() {
     }
 
     LaunchedEffect(Unit) {
-        val viewSettings = karooSystemServiceProvider.streamViewSettings().first()
+        val profileName = karooSystemServiceProvider.getSelectedProfileName().first()
+        currentProfileName = profileName
+        val viewSettings = if (profileName != null) {
+            karooSystemServiceProvider.streamProfileViewSettings(profileName).first()
+        } else {
+            karooSystemServiceProvider.streamViewSettings().first()
+        }
         val savedSort = viewSettings.poiSortOptionForNearbyPois
         selectedCategories = viewSettings.poiCategoriesForNearbyPois
 
@@ -326,8 +324,15 @@ fun NearbyPoiListScreen() {
             showSortDialog = false
 
             coroutineScope.launch {
-                karooSystemServiceProvider.saveViewSettings { settings ->
-                    settings.copy(poiSortOptionForNearbyPois = option)
+                val profileName = currentProfileName
+                if (profileName != null) {
+                    karooSystemServiceProvider.saveProfileViewSettings(profileName) { settings ->
+                        settings.copy(poiSortOptionForNearbyPois = option)
+                    }
+                } else {
+                    karooSystemServiceProvider.saveViewSettings { settings ->
+                        settings.copy(poiSortOptionForNearbyPois = option)
+                    }
                 }
             }
 
@@ -449,8 +454,11 @@ fun NearbyPoiListScreen() {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
+                            val poiName = poi.element.tags["name"]
+                            val poiCategory = NearbyPoiCategory.fromTag(poi.element.tags)
+                            val displayName = poiName ?: poiCategory?.let { stringResource(it.labelRes) } ?: unnamedPoi
                             Text(
-                                text = poi.element.tags["name"] ?: stringResource(R.string.unnamed_poi),
+                                text = displayName,
                                 style = MaterialTheme.typography.bodyLarge,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
@@ -585,8 +593,15 @@ fun NearbyPoiListScreen() {
                 showDialog = false
 
                 coroutineScope.launch {
-                    karooSystemServiceProvider.saveViewSettings { settings ->
-                        settings.copy(poiCategoriesForNearbyPois = selectedCategories)
+                    val profileName = currentProfileName
+                    if (profileName != null) {
+                        karooSystemServiceProvider.saveProfileViewSettings(profileName) { settings ->
+                            settings.copy(poiCategoriesForNearbyPois = selectedCategories)
+                        }
+                    } else {
+                        karooSystemServiceProvider.saveViewSettings { settings ->
+                            settings.copy(poiCategoriesForNearbyPois = selectedCategories)
+                        }
                     }
                     onRefresh()
                 }

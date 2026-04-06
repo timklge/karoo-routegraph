@@ -42,6 +42,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformLatest
@@ -96,7 +97,8 @@ class RouteGraphUpdateManager(
         val locationAndRemainingRouteDistance: LocationAndRemainingRouteDistance,
         val temporaryPOIs: RouteGraphTemporaryPOIs,
         val onRoute: Boolean,
-        val poiSettings: RouteGraphPoiSettings
+        val selectedProfileName: String?,
+        val poiSettings: RouteGraphPoiSettings?
     )
 
     data class LocationAndRemainingRouteDistance(val lat: Double?, val lon: Double?, val bearing: Double?, val remainingRouteDistance: Double?)
@@ -149,7 +151,7 @@ class RouteGraphUpdateManager(
                 karooSystem.stream<OnGlobalPOIs>(),
                 karooSystem.streamTemporaryPOIs(),
                 karooSystem.streamDataFlow(DataType.Type.DISTANCE_TO_DESTINATION),
-                karooSystem.streamViewSettings()
+                karooSystem.getSelectedProfileName()
             ) { data ->
                 val settings = data[0] as RouteGraphSettings
                 val navigationState = data[1] as OnNavigationState
@@ -158,9 +160,23 @@ class RouteGraphUpdateManager(
                 val pois = data[4] as OnGlobalPOIs
                 val temporaryPOIs = data[5] as RouteGraphTemporaryPOIs
                 val onRoute = (data[6] as? StreamState.Streaming)?.dataPoint?.values?.get(DataType.Field.ON_ROUTE) == 1.0
-                val viewSettings = data[7] as RouteGraphPoiSettings
+                val profileName = data[7] as String?
 
-                NavigationStreamState(settings, navigationState.state, userProfile, pois, locationAndRemainingRouteDistance, temporaryPOIs, onRoute, viewSettings)
+                NavigationStreamState(settings, navigationState.state, userProfile, pois, locationAndRemainingRouteDistance, temporaryPOIs, onRoute, profileName, null)
+            }.distinctUntilChanged().combine(karooSystem.streamViewSettings()) { navState, globalViewSettings ->
+                // Use profile-specific settings if a profile is selected, otherwise fall back to global
+                val viewSettings = if (navState.selectedProfileName != null) {
+                    try {
+                        karooSystem.streamProfileViewSettings(navState.selectedProfileName).first()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to load profile settings for ${navState.selectedProfileName}, using global", e)
+                        globalViewSettings
+                    }
+                } else {
+                    globalViewSettings
+                }
+
+                navState.copy(poiSettings = viewSettings)
             }.distinctUntilChanged().transformLatest { value ->
                 while(true){
                     emit(value)
@@ -168,7 +184,8 @@ class RouteGraphUpdateManager(
                 }
             }
             .throttle(5_000L)
-            .collect { (settings, navigationStateEvent: OnNavigationState.NavigationState, userProfile, globalPOIs, locationAndRemainingRouteDistance, temporaryPOIs: RouteGraphTemporaryPOIs, onRoute, poiSettings) ->
+            .collect { (settings, navigationStateEvent: OnNavigationState.NavigationState, userProfile, globalPOIs, locationAndRemainingRouteDistance, temporaryPOIs: RouteGraphTemporaryPOIs, onRoute, _, poiSettings) ->
+                val poiSettings = poiSettings ?: return@collect
                 val isImperial = userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
                 val navigatingToDestinationPolyline = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingToDestination)?.polyline?.let { LineString.fromPolyline(it, 5) }
                 val elevationPolyline: LineString? = when (navigationStateEvent) {
@@ -484,11 +501,14 @@ class RouteGraphUpdateManager(
                                     settings.poiDistanceToRouteMaxMeters.toInt(),
                                     200
                                 ).forEach { poi ->
+                                    val poiName = poi.tags["name"]
+                                        ?: NearbyPoiCategory.fromTag(poi.tags)?.let { context.getString(it.labelRes) }
+                                        ?: unnamedPoi
                                     val symbol = Symbol.POI(
                                         id = "autoadded-${poi.id}",
                                         lat = poi.lat,
                                         lng = poi.lon,
-                                        name = processPoiName(poi.tags["name"] ?: unnamedPoi),
+                                        name = processPoiName(poiName),
                                         type = NearbyPoiCategory.fromTag(poi.tags)?.hhType
                                             ?: Symbol.POI.Types.GENERIC,
                                     )
@@ -503,11 +523,14 @@ class RouteGraphUpdateManager(
                                     2_000,
                                     200
                                 ).forEach { poi ->
+                                    val poiName = poi.tags["name"]
+                                        ?: NearbyPoiCategory.fromTag(poi.tags)?.let { context.getString(it.labelRes) }
+                                        ?: unnamedPoi
                                     val symbol = Symbol.POI(
                                         id = "autoadded-${poi.id}",
                                         lat = poi.lat,
                                         lng = poi.lon,
-                                        name = processPoiName(poi.tags["name"] ?: unnamedPoi),
+                                        name = processPoiName(poiName),
                                         type = NearbyPoiCategory.fromTag(poi.tags)?.hhType
                                             ?: Symbol.POI.Types.GENERIC,
                                     )

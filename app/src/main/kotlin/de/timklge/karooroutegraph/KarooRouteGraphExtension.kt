@@ -40,6 +40,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import kotlin.math.pow
@@ -129,7 +130,16 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 val settings: RouteGraphPoiSettings
             )
 
-            combine(karooSystem.streamTemporaryPOIs(), autoAddedPOIsViewModelProvider.viewModelFlow, karooSystem.streamViewSettings()) { temporaryPois, autoAddedPois, settings ->
+            combine(karooSystem.streamTemporaryPOIs(), autoAddedPOIsViewModelProvider.viewModelFlow, karooSystem.getSelectedProfileName(), karooSystem.streamViewSettings()) { temporaryPois, autoAddedPois, profileName, globalSettings ->
+                val settings = if (profileName != null) {
+                    try {
+                        karooSystem.streamProfileViewSettings(profileName).first()
+                    } catch (e: Exception) {
+                        globalSettings
+                    }
+                } else {
+                    globalSettings
+                }
                 TemporaryAndAutoAddedPOIs(
                     temporaryPois,
                     autoAddedPois,
