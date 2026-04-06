@@ -13,7 +13,6 @@ import io.hammerhead.karooext.models.DataType
 import io.hammerhead.karooext.models.KarooEvent
 import io.hammerhead.karooext.models.OnStreamState
 import io.hammerhead.karooext.models.StreamState
-import io.hammerhead.karooext.models.UserProfile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -23,7 +22,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -31,7 +29,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
-import java.security.MessageDigest
 
 class KarooSystemServiceProvider(private val context: Context) {
     val karooSystemService: KarooSystemService = KarooSystemService(context)
@@ -56,59 +53,50 @@ class KarooSystemServiceProvider(private val context: Context) {
     val temporaryPOIsKey = stringPreferencesKey("temporaryPOIs")
 
     /**
-     * Computes a hash from the Karoo UserProfile to uniquely identify each ride profile.
-     * Uses weight, maxHr, restingHr, and ftp as the signature.
-     * When the user switches ride profiles on the Karoo device, these values change,
-     * producing a different hash.
+     * Mapping: Karoo ride profile ID → user-provided display name.
+     * The profile ID comes from the Karoo SDK's ActiveRideProfile event.
      */
-    fun computeProfileHash(profile: UserProfile): String {
-        val data = "w=${profile.weight}" +
-                "_mhr=${profile.maxHr}" +
-                "_rhr=${profile.restingHr}" +
-                "_ftp=${profile.ftp}" +
-                "_zones=${profile.heartRateZones?.size ?: 0}_${profile.powerZones?.size ?: 0}"
-        val md = MessageDigest.getInstance("SHA-256")
-        val digest = md.digest(data.toByteArray())
-        return digest.joinToString("") { "%02x".format(it) }.take(16)
-    }
+    private val profileIdToNameKey = stringPreferencesKey("profileIdToName")
 
-    // Mapping: profile hash → user-provided name (e.g. "Road", "Gravel")
-    private val profileHashToNameKey = stringPreferencesKey("profileHashToName")
-
-    fun setProfileNameForHash(hash: String, name: String) {
+    fun setProfileDisplayName(profileId: String, name: String) {
         CoroutineScope(Dispatchers.Default).launch {
             context.dataStore.edit { prefs ->
-                val current = prefs[profileHashToNameKey]?.let { json ->
+                val current = prefs[profileIdToNameKey]?.let { json ->
                     jsonWithUnknownKeys.decodeFromString<Map<String, String>>(json)
                 } ?: emptyMap()
-                prefs[profileHashToNameKey] = jsonWithUnknownKeys.encodeToString(current + (hash to name))
+                prefs[profileIdToNameKey] = jsonWithUnknownKeys.encodeToString(current + (profileId to name))
             }
         }
     }
 
-    fun getProfileNameForHash(hash: String): Flow<String?> {
+    fun getProfileDisplayName(profileId: String): Flow<String?> {
         return context.dataStore.data.map { prefs ->
-            prefs[profileHashToNameKey]?.let { json ->
-                jsonWithUnknownKeys.decodeFromString<Map<String, String>>(json)[hash]
+            prefs[profileIdToNameKey]?.let { json ->
+                jsonWithUnknownKeys.decodeFromString<Map<String, String>>(json)[profileId]
             }
         }.distinctUntilChanged()
     }
 
     /**
-     * Streams the currently active Karoo ride profile name.
-     * Combines the live UserProfile stream with the stored hash→name mapping.
-     * Returns null if the current profile hasn't been named yet.
+     * Streams the name of the currently active Karoo ride profile.
+     * Listens to ActiveRideProfile events from the Karoo SDK, which fire
+     * whenever the user switches ride profiles on the device.
+     * Looks up the user-provided display name for the profile ID.
      */
     fun streamActiveKarooProfileName(): Flow<String?> {
-        return combine(
-            karooSystemService.streamUserProfile(),
-            context.dataStore.data
-        ) { profile, prefs ->
-            val hash = computeProfileHash(profile)
-            prefs[profileHashToNameKey]?.let { json ->
-                jsonWithUnknownKeys.decodeFromString<Map<String, String>>(json)[hash]
+        return karooSystemService.streamActiveRideProfile()
+            .map { activeProfile ->
+                val profileId = activeProfile.profile.id
+                // Look up user-provided name, fall back to Karoo's profile name
+                context.dataStore.data.map { prefs ->
+                    val customName = prefs[profileIdToNameKey]?.let { json ->
+                        jsonWithUnknownKeys.decodeFromString<Map<String, String>>(json)[profileId]
+                    }
+                    customName ?: activeProfile.profile.name
+                }
             }
-        }.distinctUntilChanged()
+            .flatMapLatest { it }
+            .distinctUntilChanged()
     }
 
     /**

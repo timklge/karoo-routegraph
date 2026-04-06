@@ -14,6 +14,7 @@ import de.timklge.karooroutegraph.pois.PbfDownloadStatus
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.models.ActiveRidePage
+import io.hammerhead.karooext.models.ActiveRideProfile
 import io.hammerhead.karooext.models.UserProfile
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.channels.trySendBlocking
@@ -91,6 +92,17 @@ fun KarooSystemService.streamUserProfile(): Flow<UserProfile> {
     return callbackFlow {
         val listenerId = addConsumer { userProfile: UserProfile ->
             trySendBlocking(userProfile)
+        }
+        awaitClose {
+            removeConsumer(listenerId)
+        }
+    }
+}
+
+fun KarooSystemService.streamActiveRideProfile(): Flow<ActiveRideProfile> {
+    return callbackFlow {
+        val listenerId = addConsumer { profile: ActiveRideProfile ->
+            trySendBlocking(profile)
         }
         awaitClose {
             removeConsumer(listenerId)
