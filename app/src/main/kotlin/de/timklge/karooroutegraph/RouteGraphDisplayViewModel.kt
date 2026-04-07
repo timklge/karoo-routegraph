@@ -19,10 +19,10 @@ sealed class ZoomLevel {
             // Return first configured zoom level smaller than the route length
             val routeLength = viewModel.routeDistance
             if (routeLength == null) {
-                val maxZoomLevel = settings.elevationProfileZoomLevels.maxOrNull()
+                val minZoomLevel = settings.elevationProfileZoomLevels.minOrNull()
 
-                return if (maxZoomLevel != null) {
-                    Units(maxZoomLevel)
+                return if (minZoomLevel != null) {
+                    Units(minZoomLevel)
                 } else {
                     CompleteRoute
                 }
@@ -61,7 +61,7 @@ sealed class ZoomLevel {
                 .map { Units(it) }
                 .sortedByDescending { it.displayedUnits }
                 .firstOrNull {
-                    (it.getDistanceInMeters(viewModel, settings) ?: Float.MAX_VALUE) < currentDistance
+                    (it.getDistanceInMeters(viewModel, settings) ?: Float.MAX_VALUE) > currentDistance
                 } ?: CompleteRoute
         }
     }
