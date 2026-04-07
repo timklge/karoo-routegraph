@@ -77,6 +77,17 @@ class OfflineNearbyPOIProvider(val context: Context, val downloadService: Nearby
         radius: Int,
         limit: Int
     ): List<NearbyPOI> {
+        val lineLength = TurfMeasurement.length(points, TurfConstants.UNIT_METERS)
+        val sampleInterval = radius.toDouble()
+        val points = buildList {
+            var distance = 0.0
+            while (distance < lineLength) {
+                add(TurfMeasurement.along(points, distance, TurfConstants.UNIT_METERS))
+                distance += sampleInterval
+            }
+            add(TurfMeasurement.along(points, lineLength, TurfConstants.UNIT_METERS))
+        }
+
         if (points.isEmpty()) return emptyList()
         val requestedTagsOrEverything = requestedTags.ifEmpty {
             NearbyPoiCategory.entries.map { it.osmTag }.flatten().distinct()
