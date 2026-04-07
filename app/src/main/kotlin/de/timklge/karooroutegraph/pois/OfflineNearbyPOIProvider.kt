@@ -78,7 +78,7 @@ class OfflineNearbyPOIProvider(val context: Context, val downloadService: Nearby
         limit: Int
     ): List<NearbyPOI> {
         val lineLength = TurfMeasurement.length(points, TurfConstants.UNIT_METERS)
-        val sampleInterval = radius.toDouble()
+        val sampleInterval = radius.toDouble() / 2
         val points = buildList {
             var distance = 0.0
             while (distance < lineLength) {
