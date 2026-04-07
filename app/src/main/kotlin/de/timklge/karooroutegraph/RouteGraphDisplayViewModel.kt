@@ -16,7 +16,6 @@ sealed class ZoomLevel {
             viewModel: RouteGraphViewModel,
             settings: RouteGraphSettings,
         ): ZoomLevel {
-            // Return first configured zoom level smaller than the route length
             val routeLength = viewModel.routeDistance
             if (routeLength == null) {
                 val minZoomLevel = settings.elevationProfileZoomLevels.minOrNull()
@@ -29,11 +28,7 @@ sealed class ZoomLevel {
             }
 
             return settings.elevationProfileZoomLevels
-                .map { Units(it) }
-                .sortedByDescending { it.displayedUnits }
-                .firstOrNull {
-                    (it.getDistanceInMeters(viewModel, settings) ?: Float.MAX_VALUE) < routeLength
-                } ?: CompleteRoute
+                .map { Units(it) }.minByOrNull { it.displayedUnits } ?: CompleteRoute
         }
     }
 
@@ -48,6 +43,7 @@ sealed class ZoomLevel {
             }
         }
 
+        // Zooms out, but at most to [maxZoomLevel]. Afterwards it will return COMPLETE_ROUTE
         override fun next(
             viewModel: RouteGraphViewModel,
             settings: RouteGraphSettings,
@@ -59,9 +55,12 @@ sealed class ZoomLevel {
 
             return settings.elevationProfileZoomLevels
                 .map { Units(it) }
-                .sortedByDescending { it.displayedUnits }
+                .sortedBy { it.displayedUnits }
                 .firstOrNull {
-                    (it.getDistanceInMeters(viewModel, settings) ?: Float.MAX_VALUE) > currentDistance
+                    val d = it.getDistanceInMeters(viewModel, settings)
+                    val routeDistance = viewModel.routeDistance
+
+                    (routeDistance == null || d == null || d < routeDistance) && (d ?: Float.MAX_VALUE) > currentDistance
                 } ?: CompleteRoute
         }
     }
