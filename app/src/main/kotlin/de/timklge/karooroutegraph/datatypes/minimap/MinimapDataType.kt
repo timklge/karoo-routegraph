@@ -35,23 +35,20 @@ import com.mapbox.geojson.Point
 import com.mapbox.turf.TurfConstants.UNIT_METERS
 import com.mapbox.turf.TurfMeasurement
 import com.mapbox.turf.TurfMisc
-import de.timklge.karooroutegraph.KarooRouteGraphExtension
-import de.timklge.karooroutegraph.SurfaceConditionRetrievalService
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.LocationViewModelProvider
-import de.timklge.karooroutegraph.pois.NearestPoint
-import de.timklge.karooroutegraph.pois.POI
-import de.timklge.karooroutegraph.pois.PoiType
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModel
 import de.timklge.karooroutegraph.RouteGraphDisplayViewModelProvider
 import de.timklge.karooroutegraph.RouteGraphUpdateManager
 import de.timklge.karooroutegraph.RouteGraphViewModel
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
+import de.timklge.karooroutegraph.SurfaceConditionRetrievalService
 import de.timklge.karooroutegraph.TileDownloadService
 import de.timklge.karooroutegraph.getSurfaceConditionPaints
-import de.timklge.karooroutegraph.getSurfaceConditionStrokePaints
-import de.timklge.karooroutegraph.screens.NearbyPoiCategory
+import de.timklge.karooroutegraph.pois.NearestPoint
+import de.timklge.karooroutegraph.pois.POI
+import de.timklge.karooroutegraph.pois.PoiType
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.streamDatatypeIsVisible
 import de.timklge.karooroutegraph.streamSettings
@@ -92,29 +89,17 @@ enum class MinimapZoomLevel(val level: Float?) {
     FURTHEST(8.0f),
     COMPLETE_ROUTE(null);
 
+    // Zooms out, but at most to [maxZoomLevel]. Afterwards it will return COMPLETE_ROUTE
     fun next(maxZoomLevel: Float?): MinimapZoomLevel {
-        if (this == CLOSEST) {
-            return COMPLETE_ROUTE
+        if (this == COMPLETE_ROUTE) {
+            return CLOSEST
         }
 
-        val previousLevel = when (this) {
-            COMPLETE_ROUTE -> {
-                if (maxZoomLevel == null) {
-                    return FURTHEST
-                } else {
-                    val largestZoomLevel = MinimapZoomLevel.entries.filter { it.level != null && it.level >= maxZoomLevel }.sortedBy { it.level }.firstOrNull()
+        val nextZoomLevel = entries
+            .filter { it.level != null && it.level < (this.level ?: Float.MAX_VALUE) && it.level >= (maxZoomLevel ?: Float.MIN_VALUE) }
+            .maxByOrNull { it.level!! }
 
-                    largestZoomLevel ?: FURTHEST
-                }
-            }
-            FURTHEST -> FURTHER
-            FURTHER -> FAR
-            FAR -> CLOSE
-            CLOSE -> CLOSEST
-            else -> null
-        }
-
-        return previousLevel ?: COMPLETE_ROUTE
+        return nextZoomLevel ?: COMPLETE_ROUTE
     }
 }
 
