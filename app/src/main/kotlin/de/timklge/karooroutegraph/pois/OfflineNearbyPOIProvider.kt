@@ -79,7 +79,7 @@ class OfflineNearbyPOIProvider(val context: Context, val downloadService: Nearby
     ): List<NearbyPOI> {
         val lineLength = TurfMeasurement.length(points, TurfConstants.UNIT_METERS)
         val sampleInterval = radius.toDouble() / 2
-        val points = buildList {
+        val samples = if (points.size <= 2) points else buildList {
             var distance = 0.0
             while (distance < lineLength) {
                 add(TurfMeasurement.along(points, distance, TurfConstants.UNIT_METERS))
@@ -88,15 +88,15 @@ class OfflineNearbyPOIProvider(val context: Context, val downloadService: Nearby
             add(TurfMeasurement.along(points, lineLength, TurfConstants.UNIT_METERS))
         }
 
-        if (points.isEmpty()) return emptyList()
+        if (samples.isEmpty()) return emptyList()
         val requestedTagsOrEverything = requestedTags.ifEmpty {
             NearbyPoiCategory.entries.map { it.osmTag }.flatten().distinct()
         }
 
-        val pointsMinLon = points.minOf { it.longitude() }
-        val pointsMaxLon = points.maxOf { it.longitude() }
-        val pointsMinLat = points.minOf { it.latitude() }
-        val pointsMaxLat = points.maxOf { it.latitude() }
+        val pointsMinLon = samples.minOf { it.longitude() }
+        val pointsMaxLon = samples.maxOf { it.longitude() }
+        val pointsMinLat = samples.minOf { it.latitude() }
+        val pointsMaxLat = samples.maxOf { it.latitude() }
 
         val latRadius = radius / 111000.0
         val avgLat = (pointsMinLat + pointsMaxLat) / 2.0
@@ -107,7 +107,7 @@ class OfflineNearbyPOIProvider(val context: Context, val downloadService: Nearby
         val searchMinLon = pointsMinLon - lonRadius
         val searchMaxLon = pointsMaxLon + lonRadius
 
-        val availableCountriesInBounds = getAvailableCountriesInBounds(points, radius)
+        val availableCountriesInBounds = getAvailableCountriesInBounds(samples, radius)
 
         Log.i(KarooRouteGraphExtension.TAG, "Searching offline POIs in countries: $availableCountriesInBounds")
 
@@ -147,10 +147,10 @@ class OfflineNearbyPOIProvider(val context: Context, val downloadService: Nearby
 
                                     if (matchesTags) {
                                         val poiPoint = Point.fromLngLat(lon, lat)
-                                        val minDistance = if (points.size > 1) {
-                                            getNearestPointOnLineDistance(poiPoint, points)
+                                        val minDistance = if (samples.size > 1) {
+                                            getNearestPointOnLineDistance(poiPoint, samples)
                                         } else {
-                                            TurfMeasurement.distance(poiPoint, points[0], TurfConstants.UNIT_METERS)
+                                            TurfMeasurement.distance(poiPoint, samples[0], TurfConstants.UNIT_METERS)
                                         }
 
                                         if (minDistance != null && minDistance <= radius) {
