@@ -74,7 +74,7 @@ tasks.register("generateManifest") {
             "latestVersionCode" to android.defaultConfig.versionCode,
             "developer" to "github.com/timklge",
             "description" to "Open-source extension that provides an elevation graph datafield depicting the complete current route, including climbs and POIs (e. g. checkpoints and refueling stops). Also provides a minimap datafield and a POI navigation datafield to look up upcoming POIs of certain categories on the route (e. g. supermarkets).",
-            "releaseNotes" to "* Add power-based travel time estimation to POIs and end of route\n* Sort POI lookup screens by ahead on route distance by default\n* Split settings menu into sub menus",
+            "releaseNotes" to "* Fix missing offline POIs on straight route segments\n* Invert zoom action to make it consistent with native datafield\n* Fix ETA estimation based on ride speed factors in pauses",
             "screenshotUrls" to listOf(
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/horizontal_routegraph.png",
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/minimap.png",
