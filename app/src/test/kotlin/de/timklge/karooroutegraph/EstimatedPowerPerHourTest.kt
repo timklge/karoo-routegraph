@@ -7,6 +7,7 @@ import io.hammerhead.karooext.models.DataType
 import io.hammerhead.karooext.models.StreamState
 import io.mockk.every
 import io.mockk.mockk
+import io.hammerhead.karooext.models.RideState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.take
@@ -37,6 +38,7 @@ class EstimatedPowerPerHourTest {
     ): KarooSystemServiceProvider = mockk<KarooSystemServiceProvider>().also { mock ->
         every { mock.streamDataFlow(DataType.Type.SPEED) } returns speedStates
         every { mock.streamDataFlow(DataType.Type.ELEVATION_GRADE) } returns gradeStates
+        every { mock.streamRideState() } returns flowOf(RideState.Recording)
     }
 
     // ─── buildEstimatedPowerFlow tests ────────────────────────────────────────

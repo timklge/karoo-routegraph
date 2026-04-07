@@ -94,7 +94,7 @@ fun streamEstimatedPowerPerHour(
     val currentGradeFlow = karooSystemServiceProvider.streamDataFlow(DataType.Type.ELEVATION_GRADE)
         .mapNotNull { (it as? StreamState.Streaming)?.dataPoint?.singleValue }
         .stateIn(scope, SharingStarted.Eagerly, 0.0)
-    val rideStateFlow = karooSystemServiceProvider.stream<RideState>()
+    val rideStateFlow = karooSystemServiceProvider.streamRideState()
 
     return buildEstimatedPowerFlow(totalWeight, currentSpeedFlow, currentGradeFlow, rideStateFlow, currentTimeMillis)
         .shareIn(scope, SharingStarted.WhileSubscribed())
