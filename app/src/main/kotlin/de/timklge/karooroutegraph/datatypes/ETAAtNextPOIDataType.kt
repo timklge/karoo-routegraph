@@ -25,9 +25,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlin.time.DurationUnit
 
@@ -39,19 +36,15 @@ class ETAAtNextPOIDataType(
 ) : DataTypeImpl("karoo-routegraph", "etapoi") {
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun startStream(emitter: Emitter<StreamState>) {
-        data class StreamState(val state: RouteGraphViewModel, val riderWeight: Float, val averageHourPower: Double?, val averageSpeedPerHour: Double?, val surfaceConditions: List<SurfaceConditionSegment>?)
+        data class StreamState(val state: RouteGraphViewModel, val riderWeight: Float, val powerPerHour: Double?, val surfaceConditions: List<SurfaceConditionSegment>?)
 
         val job = CoroutineScope(Dispatchers.Default).launch {
-            val averagePowerFlow = karooSystemProvider.streamDataFlow(DataType.Type.SMOOTHED_1HR_AVERAGE_POWER).map { (it as? io.hammerhead.karooext.models.StreamState.Streaming)?.dataPoint?.singleValue }
+            val averagePowerFlow = streamPowerPerHour( karooSystemProvider)
             val surfaceConditionFlow = surfaceConditionRetrievalService.flow
-            val averageEstimatedPowerFlow = karooSystemProvider.stream<UserProfile>().flatMapLatest { profile ->
-                val totalWeight = profile.weight + 10.0
-                streamEstimatedPowerPerHour(totalWeight, karooSystemProvider).map { it as Double? }.onStart { emit(null) }
-            }
 
-            combine(viewModelProvider.viewModelFlow, karooSystemProvider.stream<UserProfile>(), averagePowerFlow, averageEstimatedPowerFlow, surfaceConditionFlow) { viewModel, userProfile, averagePower, averageEstimatedPower, surfaceConditions ->
-                StreamState(viewModel, userProfile.weight, averagePower, averageEstimatedPower, surfaceConditions)
-            }.throttle(20_000L).collect { (state, riderWeight, averagePower, averageEstimatedPower, surfaceConditions) ->
+            combine(viewModelProvider.viewModelFlow, karooSystemProvider.stream<UserProfile>(), averagePowerFlow, surfaceConditionFlow) { viewModel, userProfile, averagePower, surfaceConditions ->
+                StreamState(viewModel, userProfile.weight, averagePower, surfaceConditions)
+            }.throttle(20_000L).collect { (state, riderWeight, averagePower, surfaceConditions) ->
                 val currentDistanceAlongRoute = state.distanceAlongRoute?.toDouble()
                 val totalWeight = riderWeight + 10.0f
                 val routeDistance = state.routeDistance?.toDouble()
@@ -83,7 +76,7 @@ class ETAAtNextPOIDataType(
                     startDistance = currentDistanceAlongRoute,
                     endDistance = targetDistanceFromRouteStart,
                     totalWeight = totalWeight.toDouble(),
-                    lastHourAvgPower = averageEstimatedPower ?: averagePower,
+                    lastHourAvgPower = averagePower,
                     surfaceConditions = surfaceConditions ?: emptyList()
                 )
                 val estimatedArrivalTimeInUnixMs = System.currentTimeMillis() + estimatedTravelTime.toLong(DurationUnit.MILLISECONDS)
