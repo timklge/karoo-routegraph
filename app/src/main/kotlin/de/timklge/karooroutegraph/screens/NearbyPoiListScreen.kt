@@ -467,7 +467,7 @@ fun NearbyPoiListScreen() {
                                         )
                                     }
                                 } else {
-                                    val nearestPoints = nearestPointsOnRouteToFoundPois.entries.find { it.key.symbol == poi }?.value
+                                    val nearestPoints = nearestPointsOnRouteToFoundPois.entries.find { it.key.symbol == poi.poi }?.value
                                     val nearestPointAhead = nearestPoints?.sortedBy { point -> point.distanceFromRouteStart }?.firstOrNull { point ->
                                         point.distanceFromRouteStart >= (viewModel?.distanceAlongRoute ?: 0.0f)
                                     }
