@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -88,29 +87,34 @@ internal fun buildEstimatedPowerFlow(
 
 @OptIn(ExperimentalCoroutinesApi::class)
 fun streamEstimatedPowerPerHour(
+    totalWeight: Double,
     karooSystemServiceProvider: KarooSystemServiceProvider,
     currentTimeMillis: () -> Long = { System.currentTimeMillis() }
 ): Flow<Double> {
     val scope = CoroutineScope(Dispatchers.Default)
 
-    return karooSystemServiceProvider.stream<UserProfile>().flatMapLatest { profile ->
-        val totalWeight = profile.weight + 10.0
+    val currentSpeedFlow = karooSystemServiceProvider.streamDataFlow(DataType.Type.SPEED)
+        .mapNotNull { (it as? StreamState.Streaming)?.dataPoint?.singleValue }
+    val currentGradeFlow = karooSystemServiceProvider.streamDataFlow(DataType.Type.ELEVATION_GRADE)
+        .mapNotNull { (it as? StreamState.Streaming)?.dataPoint?.singleValue }
+        .stateIn(scope, SharingStarted.Eagerly, 0.0)
+    val rideStateFlow = karooSystemServiceProvider.streamRideState()
 
-        val currentSpeedFlow = karooSystemServiceProvider.streamDataFlow(DataType.Type.SPEED)
-            .mapNotNull { (it as? StreamState.Streaming)?.dataPoint?.singleValue }
-        val currentGradeFlow = karooSystemServiceProvider.streamDataFlow(DataType.Type.ELEVATION_GRADE)
-            .mapNotNull { (it as? StreamState.Streaming)?.dataPoint?.singleValue }
-            .stateIn(scope, SharingStarted.Eagerly, 0.0)
-        val rideStateFlow = karooSystemServiceProvider.streamRideState()
-
-        buildEstimatedPowerFlow(totalWeight, currentSpeedFlow, currentGradeFlow, rideStateFlow, currentTimeMillis)
-            .shareIn(scope, SharingStarted.WhileSubscribed())
-    }
+    return buildEstimatedPowerFlow(totalWeight, currentSpeedFlow, currentGradeFlow, rideStateFlow, currentTimeMillis)
+        .shareIn(scope, SharingStarted.WhileSubscribed())
 }
 
 fun streamPowerPerHour(karooSystemServiceProvider: KarooSystemServiceProvider): Flow<Double?> {
-    val powerFlow = karooSystemServiceProvider.streamDataFlow(DataType.Type.SMOOTHED_1HR_AVERAGE_POWER).map { (it as? StreamState.Streaming)?.dataPoint?.singleValue }
-    val estimatedPowerFlow = streamEstimatedPowerPerHour(karooSystemServiceProvider).map { it as Double? }.onStart { emit(null) }
+    val scope = CoroutineScope(Dispatchers.Default)
+
+    val powerFlow = karooSystemServiceProvider.streamDataFlow(DataType.Type.SMOOTHED_1HR_AVERAGE_POWER)
+        .map { (it as? StreamState.Streaming)?.dataPoint?.singleValue }
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val estimatedPowerFlow = karooSystemServiceProvider.stream<UserProfile>().flatMapLatest { profile ->
+        val totalWeight = profile.weight + 10.0
+        streamEstimatedPowerPerHour(totalWeight, karooSystemServiceProvider)
+            .shareIn(scope, SharingStarted.WhileSubscribed())
+    }.map { it as Double? }.onStart { emit(null) }
 
     return combine(powerFlow, estimatedPowerFlow) { actualPower, estimatedPower ->
         actualPower ?: estimatedPower
