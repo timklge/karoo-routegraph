@@ -61,6 +61,10 @@ import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.LocationViewModelProvider
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
+import de.timklge.karooroutegraph.SurfaceConditionRetrievalService
+import de.timklge.karooroutegraph.TravelTimeEstimationService
+import de.timklge.karooroutegraph.datatypes.streamPowerPerHour
+import de.timklge.karooroutegraph.pois.DistanceToPoiResult
 import de.timklge.karooroutegraph.pois.NearbyPOI
 import de.timklge.karooroutegraph.pois.NearestPoint
 import de.timklge.karooroutegraph.pois.OfflineNearbyPOIProvider
@@ -79,7 +83,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import java.util.Date
 import kotlin.math.roundToInt
+import kotlin.time.DurationUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,6 +103,11 @@ fun NearbyPoiListScreen() {
     val overpassNearbyPOIProvider = koinInject<OverpassPOIProvider>()
     val locationViewModelProvider = koinInject<LocationViewModelProvider>()
     val routeGraphViewModelProvider = koinInject<RouteGraphViewModelProvider>()
+    val travelTimeEstimationService = koinInject<TravelTimeEstimationService>()
+    val surfaceConditionRetrievalService = koinInject<SurfaceConditionRetrievalService>()
+
+    val averagePowerFlow by streamPowerPerHour(karooSystemServiceProvider).collectAsStateWithLifecycle(null)
+    val surfaceConditions by surfaceConditionRetrievalService.flow.collectAsStateWithLifecycle(null)
 
     var maxDistanceFromRoute by remember { mutableDoubleStateOf(1_000.0) }
 
@@ -129,6 +140,7 @@ fun NearbyPoiListScreen() {
     val viewModel by routeGraphViewModelProvider.viewModelFlow.collectAsStateWithLifecycle(null)
     val temporaryPois by karooSystemServiceProvider.streamTemporaryPOIs().collectAsStateWithLifecycle(RouteGraphTemporaryPOIs())
     var nearestPointsOnRouteToFoundPois by remember { mutableStateOf<Map<POI, List<NearestPoint>>>(mapOf()) }
+    val userProfile by karooSystemServiceProvider.stream<UserProfile>().collectAsStateWithLifecycle(null)
 
     LaunchedEffect(viewModel?.knownRoute, pois) {
         val route = viewModel?.knownRoute
@@ -476,7 +488,22 @@ fun NearbyPoiListScreen() {
                                         nearestPointsOnRouteToFoundPois, currentPosition, selectedSort, viewModel?.distanceAlongRoute,
                                         nearestPointAhead)
 
-                                    result?.formatDistance(LocalContext.current, isImperial)
+                                    var resultLabel = result?.formatDistance(LocalContext.current, isImperial)
+
+                                    viewModel?.let { viewModel ->
+                                        val estimatedTravelTime = travelTimeEstimationService.estimateTravelTime(
+                                            routeElevationData = viewModel.sampledElevationData,
+                                            startDistance = viewModel.distanceAlongRoute?.toDouble() ?: 0.0,
+                                            endDistance = (viewModel.distanceAlongRoute?.toDouble() ?: 0.0) + ((result as? DistanceToPoiResult.AheadOnRouteDistance)?.distanceOnRoute ?: 0.0),
+                                            totalWeight = (userProfile?.weight?.toDouble() ?: 70.0) + 10.0,
+                                            lastHourAvgPower = averagePowerFlow,
+                                            surfaceConditions = surfaceConditions ?: emptyList()
+                                        )
+                                        val eta = System.currentTimeMillis() + estimatedTravelTime.toLong(DurationUnit.MILLISECONDS)
+                                        resultLabel += " ⏲ ${android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(eta))}"
+                                    }
+
+                                    resultLabel
                                 }
                             }
 

@@ -38,19 +38,15 @@ class ETADataType(
 ) : DataTypeImpl("karoo-routegraph", "eta") {
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun startStream(emitter: Emitter<StreamState>) {
-        data class StreamState(val state: RouteGraphViewModel, val riderWeight: Float, val averageHourPower: Double?, val averageSpeedPerHour: Double?, val surfaceConditions: List<SurfaceConditionSegment>?)
+        data class StreamState(val state: RouteGraphViewModel, val riderWeight: Float, val averageHourPower: Double?, val surfaceConditions: List<SurfaceConditionSegment>?)
 
         val job = CoroutineScope(Dispatchers.Default).launch {
-            val averagePowerFlow = karooSystemProvider.streamDataFlow(DataType.Type.SMOOTHED_1HR_AVERAGE_POWER).map { (it as? io.hammerhead.karooext.models.StreamState.Streaming)?.dataPoint?.singleValue }
+            val averagePowerFlow = streamPowerPerHour( karooSystemProvider)
             val surfaceConditionFlow = surfaceConditionRetrievalService.flow
-            val averageEstimatedPowerFlow = karooSystemProvider.stream<UserProfile>().flatMapLatest { profile ->
-                val totalWeight = profile.weight + 10.0
-                streamEstimatedPowerPerHour(totalWeight, karooSystemProvider).map { it as Double? }.onStart { emit(null) }
-            }
 
-            combine(viewModelProvider.viewModelFlow, karooSystemProvider.stream<UserProfile>(), averagePowerFlow, averageEstimatedPowerFlow, surfaceConditionFlow) { viewModel, userProfile, averagePower, averageEstimatedPower, surfaceConditions ->
-                StreamState(viewModel, userProfile.weight, averagePower, averageEstimatedPower, surfaceConditions)
-            }.throttle(20_000L).collect { (state, riderWeight, averagePower, averageEstimatedPower, surfaceConditions) ->
+            combine(viewModelProvider.viewModelFlow, karooSystemProvider.stream<UserProfile>(), averagePowerFlow, surfaceConditionFlow) { viewModel, userProfile, averagePower, surfaceConditions ->
+                StreamState(viewModel, userProfile.weight, averagePower, surfaceConditions)
+            }.throttle(20_000L).collect { (state, riderWeight, averagePower, surfaceConditions) ->
                 val currentDistanceAlongRoute = state.distanceAlongRoute?.toDouble()
                 val currentRouteLength = state.routeDistance?.toDouble()
                 val totalWeight = riderWeight + 10.0f
@@ -65,7 +61,7 @@ class ETADataType(
                     startDistance = currentDistanceAlongRoute,
                     endDistance = currentRouteLength,
                     totalWeight = totalWeight.toDouble(),
-                    lastHourAvgPower = averageEstimatedPower ?: averagePower,
+                    lastHourAvgPower = averagePower,
                     surfaceConditions = surfaceConditions ?: emptyList()
                 )
                 val estimatedArrivalTimeInUnixMs = System.currentTimeMillis() + estimatedTravelTime.toLong(DurationUnit.MILLISECONDS)

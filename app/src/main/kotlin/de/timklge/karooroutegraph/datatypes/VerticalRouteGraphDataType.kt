@@ -61,7 +61,6 @@ import de.timklge.karooroutegraph.streamUserProfile
 import de.timklge.karooroutegraph.throttle
 import io.hammerhead.karooext.extension.DataTypeImpl
 import io.hammerhead.karooext.internal.ViewEmitter
-import io.hammerhead.karooext.models.DataType
 import io.hammerhead.karooext.models.ShowCustomStreamState
 import io.hammerhead.karooext.models.Symbol
 import io.hammerhead.karooext.models.UpdateGraphicConfig
@@ -75,10 +74,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import java.util.Date
 import java.util.Locale
@@ -180,8 +176,7 @@ class VerticalRouteGraphDataType(
                           val settings: RouteGraphSettings,
                           val isVisible: Boolean,
                           val radarLaneIsVisible: Boolean,
-                          val averagePowerLastHour: Double? = null,
-                          val averageEstimatedPowerLastHour: Double? = null)
+                          val averagePowerLastHour: Double? = null)
 
     data class TextDrawCommand(val x: Float, val y: Float, val text: String, val paint: Paint, val importance: Int = 10,
                                /** If set, draws this text over the original text */
@@ -212,10 +207,7 @@ class VerticalRouteGraphDataType(
         val flow = if (config.preview){
             previewFlow()
         } else {
-            val averageEstimatedPowerFlow = karooSystemServiceProvider.stream<UserProfile>().flatMapLatest { profile ->
-                val totalWeight = profile.weight + 10.0
-                streamEstimatedPowerPerHour(totalWeight, karooSystemServiceProvider).map { it as Double? }.onStart { emit(null) }
-            }
+            val averagePowerFlow = streamPowerPerHour( karooSystemServiceProvider)
 
             combine(
                 viewModelProvider.viewModelFlow,
@@ -225,8 +217,7 @@ class VerticalRouteGraphDataType(
                 karooSystemServiceProvider.karooSystemService.streamDatatypeIsVisible(dataTypeId),
                 karooSystemServiceProvider.streamRadarSwimLaneIsVisible(),
                 surfaceConditionRetrievalService.flow,
-                karooSystemServiceProvider.streamDataFlow(DataType.Type.SMOOTHED_1HR_AVERAGE_POWER).map { (it as? io.hammerhead.karooext.models.StreamState.Streaming)?.dataPoint?.singleValue }.throttle(10_000),
-                averageEstimatedPowerFlow.throttle(10_000),
+                averagePowerFlow.throttle(10_000),
             ) { data ->
                 val viewModel = data[0] as RouteGraphViewModel
                 val displayViewModel = data[1] as RouteGraphDisplayViewModel
@@ -237,14 +228,13 @@ class VerticalRouteGraphDataType(
                 @Suppress("UNCHECKED_CAST")
                 val surfaceConditions = data[6] as List<SurfaceConditionRetrievalService.SurfaceConditionSegment>?
                 val averagePowerFlow = data[7] as Double?
-                val averageEstimatedPowerLastHour = data[8] as Double?
 
-                StreamData(viewModel, displayViewModel, surfaceConditions, profile, settings, isVisible, radarLaneIsVisible, averagePowerFlow, averageEstimatedPowerLastHour)
+                StreamData(viewModel, displayViewModel, surfaceConditions, profile, settings, isVisible, radarLaneIsVisible, averagePowerFlow)
             }
         }
 
         val viewJob = CoroutineScope(Dispatchers.Default).launch {
-            flow.throttle(1_000L).filter { it.isVisible }.collect { (viewModel, displayViewModel, surfaceConditions, userProfile, settings, _, radarLaneIsVisibleValue, averagePower, averageEstimatedPowerLastHour) ->
+            flow.throttle(1_000L).filter { it.isVisible }.collect { (viewModel, displayViewModel, surfaceConditions, userProfile, settings, _, radarLaneIsVisibleValue, averagePower) ->
                 val bitmap = createBitmap(config.viewSize.first, config.viewSize.second)
 
                 val canvas = Canvas(bitmap)
@@ -690,7 +680,7 @@ class VerticalRouteGraphDataType(
                                         startDistance = viewModel.distanceAlongRoute.toDouble(),
                                         endDistance = nearestPoint.distanceFromRouteStart.toDouble(),
                                         totalWeight = userProfile.weight + 10.0,
-                                        lastHourAvgPower = averageEstimatedPowerLastHour ?: averagePower,
+                                        lastHourAvgPower = averagePower,
                                         surfaceConditions = surfaceConditions ?: emptyList()
                                     )
                                     val eta = System.currentTimeMillis() + estimatedTravelTime.toLong(DurationUnit.MILLISECONDS)
