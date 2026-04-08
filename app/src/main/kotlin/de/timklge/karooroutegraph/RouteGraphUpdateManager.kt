@@ -500,7 +500,7 @@ class RouteGraphUpdateManager(
                                 offlineNearbyPOIProvider.requestNearbyPOIs(
                                     poiSettings.autoAddPoiCategories.map { it.osmTag }.flatten(),
                                     listOf(currentLocation),
-                                    2_000,
+                                    settings.poiDistanceToRouteMaxMeters.toInt() * 4,
                                     200
                                 ).forEach { poi ->
                                     val symbol = Symbol.POI(
