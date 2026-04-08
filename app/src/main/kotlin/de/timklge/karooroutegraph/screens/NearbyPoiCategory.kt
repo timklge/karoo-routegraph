@@ -17,7 +17,7 @@ enum class NearbyPoiCategory(val labelRes: Int, val osmTag: List<Pair<String, St
     SHELTER(R.string.category_shelter, listOf("amenity" to "shelter"), Symbol.POI.Types.REST_STOP),
     CAMPING_SITE(R.string.category_camping_site, listOf("tourism" to "camp_site"), Symbol.POI.Types.CAMPING),
     HOTEL(R.string.category_hotel, listOf("tourism" to "hotel"), Symbol.POI.Types.LODGING),
-    TRAIN_STATION(R.string.category_train_station, listOf("railway" to "station"), Symbol.POI.Types.TRANSIT_CENTER),
+    TRAIN_STATION(R.string.category_train_station, listOf("railway" to "station", "railway" to "halt"), Symbol.POI.Types.TRANSIT_CENTER),
     WASTE_BASKET(R.string.category_waste_basket, listOf("amenity" to "waste_basket"), Symbol.POI.Types.GENERIC),
     BENCH(R.string.category_bench, listOf("amenity" to "bench"), Symbol.POI.Types.GENERIC),
     BIKE_SHOP(R.string.category_bike_shop, listOf("shop" to "bicycle"), Symbol.POI.Types.BIKE_SHOP),
