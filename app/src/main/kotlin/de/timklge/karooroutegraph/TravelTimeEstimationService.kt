@@ -109,6 +109,7 @@ class TravelTimeEstimationService {
      * @param totalWeight combined weight of rider + bike (kg)
      * @param lastHourAvgPower average power output over the last hour in watts (if known).
      * @param surfaceConditions known surface conditions along the route where the road is not smooth pavement
+     * @param finalSegmentLength length of an additional off-route final segment (in meters), for which 20 km/h is expected
      */
     fun estimateTravelTime(
         routeElevationData: SampledElevationData?,
@@ -116,7 +117,8 @@ class TravelTimeEstimationService {
         endDistance: Double,
         totalWeight: Double,
         lastHourAvgPower: Double? = null,
-        surfaceConditions: List<SurfaceConditionRetrievalService.SurfaceConditionSegment> = emptyList()
+        surfaceConditions: List<SurfaceConditionRetrievalService.SurfaceConditionSegment> = emptyList(),
+        finalSegmentLength: Double? = null
     ): Duration {
         require(totalWeight > 0) { "totalWeight must be positive" }
 
@@ -135,7 +137,11 @@ class TravelTimeEstimationService {
         if (elevations == null || interval == null || elevations.size < 2) {
             val crr   = getCrrForSegment(startDistance, endDistance, surfaceConditions)
             val speed = solveSpeedFromPower(effectivePower, 0.0, totalWeight, crr)
-            return ((endDistance - startDistance) / speed).seconds
+            var timeSeconds = (endDistance - startDistance) / speed
+            if (finalSegmentLength != null && finalSegmentLength > 0.0) {
+                timeSeconds += finalSegmentLength / (20.0 / 3.6)
+            }
+            return timeSeconds.seconds
         }
 
         var totalTimeSeconds = 0.0
@@ -164,6 +170,12 @@ class TravelTimeEstimationService {
         if (totalTimeSeconds == 0.0) {
             val speed = solveSpeedFromPower(effectivePower, 0.0, totalWeight, CRR_PAVEMENT)
             totalTimeSeconds = (endDistance - startDistance) / speed
+        }
+
+        // Add time for the off-route final segment at 20 km/h
+        if (finalSegmentLength != null && finalSegmentLength > 0.0) {
+            val finalSegmentSpeedMs = 20.0 / 3.6
+            totalTimeSeconds += finalSegmentLength / finalSegmentSpeedMs
         }
 
         return totalTimeSeconds.seconds

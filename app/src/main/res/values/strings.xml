@@ -163,4 +163,10 @@
     <string name="auto_add_pois_to_map">Automatically add POIs to map</string>
     <string name="auto_add_to_elevation_profile_and_minimap">Automatically add POIs to elevation profile and minimap</string>
     <string name="select_categories">Select categories</string>
+    <string name="open_at_eta">🟢 Open</string>
+    <string name="closed_at_eta">🔴 Closed</string>
+    <string name="open_at">🟢 Open at %1s</string>
+    <string name="closed_at">🔴 Closed at %1s</string>
+    <string name="open_now">🟢 Now open</string>
+    <string name="closed_now">🔴 Now closed</string>
 </resources>

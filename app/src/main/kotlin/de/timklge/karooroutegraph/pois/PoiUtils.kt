@@ -76,7 +76,7 @@ sealed class DistanceToPoiResult : Comparable<DistanceToPoiResult> {
                         ))
 
                         if (elevationMetersRemaining != null && elevationMetersRemaining > 0) {
-                            append(" ↗ ${
+                            append(" ↗\u00A0${
                                 distanceToString(
                                     elevationMetersRemaining.toFloat(),
                                     isImperial,

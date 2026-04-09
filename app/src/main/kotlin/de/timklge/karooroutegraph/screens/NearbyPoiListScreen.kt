@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -47,6 +48,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.Hyphens
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -64,6 +69,7 @@ import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.SurfaceConditionRetrievalService
 import de.timklge.karooroutegraph.TravelTimeEstimationService
 import de.timklge.karooroutegraph.datatypes.streamPowerPerHour
+import de.timklge.karooroutegraph.isOpen
 import de.timklge.karooroutegraph.pois.DistanceToPoiResult
 import de.timklge.karooroutegraph.pois.NearbyPOI
 import de.timklge.karooroutegraph.pois.NearestPoint
@@ -126,7 +132,8 @@ fun NearbyPoiListScreen() {
     var mappedPois by remember { mutableStateOf(emptyList<NearbyPOISymbol>()) }
 
     var showOpeningHoursDialog by remember { mutableStateOf(false) }
-    var openingHoursText by remember { mutableStateOf("") }
+    var openingHoursDialogEta by remember { mutableStateOf<Long?>(null) }
+    var openingHoursTags by remember { mutableStateOf(mapOf<String, String>()) }
 
     var isImperial by remember { mutableStateOf(false)}
 
@@ -453,6 +460,7 @@ fun NearbyPoiListScreen() {
             } else {
                 items(pois) { poi ->
                     var showContextMenu by remember { mutableStateOf(false) }
+                    var eta: Long? = null
 
                     Row(
                         modifier = Modifier
@@ -469,41 +477,66 @@ fun NearbyPoiListScreen() {
                             )
 
                             val distanceLabel = currentPosition?.let {
+                                buildAnnotatedString {
                                 if (selectedSort == PoiSortOption.LINEAR_DISTANCE) {
                                     val distanceMeters = linearDistanceToPoi(poi)
 
                                     distanceMeters?.let { distance ->
-                                        formatDistance(
-                                            distance,
-                                            isImperial
-                                        )
+                                        append(formatDistance(distance, isImperial))
                                     }
+
+                                    eta = System.currentTimeMillis()
                                 } else {
                                     val nearestPoints = nearestPointsOnRouteToFoundPois.entries.find { it.key.symbol == poi.poi }?.value
                                     val nearestPointAhead = nearestPoints?.sortedBy { point -> point.distanceFromRouteStart }?.firstOrNull { point ->
                                         point.distanceFromRouteStart >= (viewModel?.distanceAlongRoute ?: 0.0f)
                                     }
 
-                                    val result = distanceToPoi(poi.poi, viewModel?.sampledElevationData,
+                                    val result = if (viewModel?.distanceAlongRoute != null) distanceToPoi(poi.poi, viewModel?.sampledElevationData,
                                         nearestPointsOnRouteToFoundPois, currentPosition, selectedSort, viewModel?.distanceAlongRoute,
-                                        nearestPointAhead)
+                                        nearestPointAhead) else null
 
-                                    var resultLabel = result?.formatDistance(LocalContext.current, isImperial)
+                                    append(result?.formatDistance(LocalContext.current, isImperial) ?: "")
 
-                                    viewModel?.let { viewModel ->
-                                        val estimatedTravelTime = travelTimeEstimationService.estimateTravelTime(
-                                            routeElevationData = viewModel.sampledElevationData,
-                                            startDistance = viewModel.distanceAlongRoute?.toDouble() ?: 0.0,
-                                            endDistance = (viewModel.distanceAlongRoute?.toDouble() ?: 0.0) + ((result as? DistanceToPoiResult.AheadOnRouteDistance)?.distanceOnRoute ?: 0.0),
+                                    val estimatedTravelTime = result?.let {
+                                        travelTimeEstimationService.estimateTravelTime(
+                                            routeElevationData = viewModel?.sampledElevationData,
+                                            startDistance = viewModel?.distanceAlongRoute?.toDouble() ?: 0.0,
+                                            endDistance = (viewModel?.distanceAlongRoute?.toDouble() ?: 0.0) + ((result as? DistanceToPoiResult.AheadOnRouteDistance)?.distanceOnRoute ?: 0.0),
                                             totalWeight = (userProfile?.weight?.toDouble() ?: 70.0) + 10.0,
                                             lastHourAvgPower = averagePowerFlow,
-                                            surfaceConditions = surfaceConditions ?: emptyList()
+                                            surfaceConditions = surfaceConditions ?: emptyList(),
+                                            finalSegmentLength = (result as? DistanceToPoiResult.AheadOnRouteDistance)?.distanceFromPointOnRoute
                                         )
-                                        val eta = System.currentTimeMillis() + estimatedTravelTime.toLong(DurationUnit.MILLISECONDS)
-                                        resultLabel += " ⏲ ${android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(eta))}"
+                                    }
+                                    eta = System.currentTimeMillis() + (estimatedTravelTime?.toLong(DurationUnit.MILLISECONDS) ?: 0)
+                                }
+
+                                viewModel?.let { viewModel ->
+                                    if (viewModel.distanceAlongRoute != null){
+                                        append(" ⏲\u00A0${android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(eta))}")
                                     }
 
-                                    resultLabel
+                                    val openingHours = poi.element.tags["opening_hours"]
+                                    val isOpenAtEta = openingHours?.let {
+                                        try {
+                                            isOpen(eta, openingHours)
+                                        } catch (e: Exception) {
+                                            Log.e(KarooRouteGraphExtension.TAG, "Failed to parse opening hours for POI ${poi.element.id}", e)
+                                            null
+                                        }
+                                    }
+
+                                    isOpenAtEta?.let {
+                                        val statusText = " " + if (isOpenAtEta) {
+                                            stringResource(R.string.open_at_eta)
+                                        } else {
+                                            stringResource(R.string.closed_at_eta)
+                                        }
+
+                                        append(statusText.uppercase())
+                                    }
+                                }
                                 }
                             }
 
@@ -553,8 +586,14 @@ fun NearbyPoiListScreen() {
                                             coroutineScope.launch {
                                                 delay(100) // fixme delay to ensure the menu closes before saving
 
+                                                val openingHours = poi.element.tags["opening_hours"]
+                                                val addedMap = if (openingHours != null) mapOf(poi.poi.id to openingHours) else mapOf()
+
                                                 karooSystemServiceProvider.saveTemporaryPOIs {
-                                                    it.copy(poisByOsmId = it.poisByOsmId + (poi.element.id to poi.poi))
+                                                    it.copy(
+                                                        poisByOsmId = it.poisByOsmId + (poi.element.id to poi.poi),
+                                                        poiIdOpeningHours = it.poiIdOpeningHours + addedMap
+                                                    )
                                                 }
                                             }
                                         },
@@ -572,7 +611,10 @@ fun NearbyPoiListScreen() {
                                             showContextMenu = false
                                             coroutineScope.launch {
                                                 karooSystemServiceProvider.saveTemporaryPOIs {
-                                                    it.copy(poisByOsmId = it.poisByOsmId - poi.element.id)
+                                                    it.copy(
+                                                        poisByOsmId = it.poisByOsmId - poi.element.id,
+                                                        poiIdOpeningHours = it.poiIdOpeningHours - poi.poi.id
+                                                    )
                                                 }
                                             }
                                         },
@@ -590,7 +632,8 @@ fun NearbyPoiListScreen() {
                                         text = { Text(stringResource(R.string.show_info)) },
                                         onClick = {
                                             showContextMenu = false
-                                            openingHoursText = poi.element.tags.map { (k, v) -> "$k=$v" }.joinToString("\r\n")
+                                            openingHoursTags = poi.element.tags
+                                            openingHoursDialogEta = eta
                                             showOpeningHoursDialog = true
                                         },
                                         leadingIcon = {
@@ -634,8 +677,83 @@ fun NearbyPoiListScreen() {
                 Column(modifier = Modifier
                     .padding(16.dp)
                     .verticalScroll(scrollState)) {
-                    Text(text = openingHoursText, style = MaterialTheme.typography.bodyMedium)
-                    Spacer(modifier = Modifier.width(8.dp))
+
+                    val openingHours = openingHoursTags["opening_hours"]
+                    val isOpen = openingHours?.let {
+                        try {
+                            isOpen(openingHoursDialogEta ?: System.currentTimeMillis(), it)
+                        } catch (e: Exception) {
+                            Log.e(KarooRouteGraphExtension.TAG, "Failed to parse opening hours for dialog", e)
+                            null
+                        }
+                    }
+
+                    val sortedEntries = openingHoursTags.entries
+                        .sortedWith(compareBy { if (it.key == "opening_hours") 0 else 1 })
+
+                    if (isOpen != null){
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Text(
+                                text = "Status",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .weight(0.35f)
+                                    .padding(end = 8.dp)
+                            )
+                            val arrivalTime = android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(openingHoursDialogEta ?: System.currentTimeMillis()))
+                            Text(
+                                text = if (isOpen){
+                                    if (openingHoursDialogEta != null){
+                                        stringResource(R.string.open_at, arrivalTime)
+                                    } else {
+                                        stringResource(R.string.open_now, arrivalTime)
+                                    }
+                                } else {
+                                    if (openingHoursDialogEta != null) {
+                                        stringResource(R.string.closed_at, arrivalTime)
+                                    } else {
+                                        stringResource(R.string.closed_now, arrivalTime)
+                                    }
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(0.65f)
+                            )
+                        }
+                    }
+
+                    sortedEntries.forEach { (key, value) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Text(
+                                text = key.replaceFirstChar { it.uppercase() },
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    hyphens = Hyphens.Auto,
+                                    lineBreak = LineBreak.Paragraph
+                                ),
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .weight(0.35f)
+                                    .padding(end = 8.dp)
+                            )
+                            Text(
+                                text = value,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(0.65f)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
                     Button(onClick = { showOpeningHoursDialog = false }) {
                         Text(stringResource(R.string.ok))
                     }
