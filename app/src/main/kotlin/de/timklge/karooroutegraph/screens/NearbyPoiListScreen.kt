@@ -513,7 +513,7 @@ fun NearbyPoiListScreen() {
                                 }
 
                                 viewModel?.let { viewModel ->
-                                    if (viewModel.distanceAlongRoute != null){
+                                    if (selectedSort == PoiSortOption.AHEAD_ON_ROUTE && viewModel?.distanceAlongRoute != null){
                                         append(" ⏲\u00A0${android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(eta))}")
                                     }
 

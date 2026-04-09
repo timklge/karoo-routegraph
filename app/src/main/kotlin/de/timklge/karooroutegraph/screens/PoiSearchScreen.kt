@@ -365,7 +365,7 @@ fun PoiSearchScreen() {
                                 }
 
                                 viewModel?.let { vm ->
-                                    val estimatedTravelTime = if (vm.distanceAlongRoute != null) {
+                                    val estimatedTravelTime = if (selectedSort == PoiSortOption.AHEAD_ON_ROUTE && vm.distanceAlongRoute != null) {
                                         travelTimeEstimationService.estimateTravelTime(
                                             routeElevationData = vm.sampledElevationData,
                                             startDistance = vm.distanceAlongRoute.toDouble(),
