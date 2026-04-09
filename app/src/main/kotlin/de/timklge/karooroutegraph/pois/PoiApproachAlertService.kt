@@ -8,7 +8,9 @@ import de.timklge.karooroutegraph.LocationViewModelProvider
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphViewModel
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
+import de.timklge.karooroutegraph.screens.NearbyPoiCategory
 import de.timklge.karooroutegraph.screens.PoiSortOption
+import de.timklge.karooroutegraph.screens.RouteGraphPoiSettings
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.throttle
 import io.hammerhead.karooext.models.HardwareType
@@ -23,6 +25,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -96,24 +99,49 @@ class PoiApproachAlertService(
         }
 
         alertScheduleJob = CoroutineScope(Dispatchers.IO).launch {
-            data class StreamData(
-                val settings: RouteGraphSettings,
-                val viewModel: RouteGraphViewModel,
-                val currentPosition: Point?,
-                val profile: UserProfile
-            )
+            val lastAlertTriggeredAt: MutableMap<Symbol.POI, Instant> = mutableMapOf()
 
-            combine(karooSystemServiceProvider.streamSettings(), viewModelProvider.viewModelFlow, locationViewModelProvider.viewModelFlow, karooSystemServiceProvider.stream<UserProfile>()) { settings, viewModel, currentPosition, profile ->
-                StreamData(settings, viewModel, currentPosition, profile)
+            // Combine base flows
+            val baseFlow = combine(
+                karooSystemServiceProvider.streamSettings(),
+                viewModelProvider.viewModelFlow,
+                locationViewModelProvider.viewModelFlow,
+                karooSystemServiceProvider.stream<UserProfile>()
+            ) { settings, viewModel, currentPosition, profile ->
+                Quad(settings, viewModel, currentPosition, profile)
             }
+
+            // Combine with profile name and settings
+            val fullFlow = combine(
+                baseFlow,
+                karooSystemServiceProvider.streamActiveKarooProfileName(),
+                karooSystemServiceProvider.streamViewSettings()
+            ) { base, profileName, globalPoiSettings ->
+                Triple(base, profileName, globalPoiSettings)
+            }
+
+            fullFlow
             .throttle(5_000L)
-            .filter { streamData ->
-                streamData.settings.poiApproachAlertAtDistance != null && streamData.settings.poiApproachAlertAtDistance != 0.0
-            }.collect { streamData ->
-                val settings = streamData.settings
-                val viewModel = streamData.viewModel
-                val currentPosition = streamData.currentPosition
-                val isImperial = streamData.profile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
+            .collect { triple ->
+                val (base, profileName, globalPoiSettings) = triple
+                val poiSettings = if (profileName != null) {
+                    try {
+                        karooSystemServiceProvider.streamProfileViewSettings(profileName).first()
+                    } catch (e: Exception) {
+                        globalPoiSettings
+                    }
+                } else {
+                    globalPoiSettings
+                }
+
+                if (poiSettings.alertPoiCategories.isEmpty() || poiSettings.alertDistanceMeters <= 0.0) {
+                    return@collect
+                }
+
+                val settings = base.first
+                val viewModel = base.second
+                val currentPosition = base.third
+                val isImperial = base.fourth.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
 
                 val currentTime = Instant.now()
                 val checkForPoiApproachAlertsAfter = currentTime.minus(settings.poiApproachAlertReminderIntervalSeconds.toLong(), ChronoUnit.SECONDS)
@@ -123,11 +151,23 @@ class PoiApproachAlertService(
                 if (distanceAlongRoute != null && viewModel.isOnRoute == true) {
                     viewModel.poiDistances?.forEach { (poi, points) ->
                         val lastAlertShownForPoi = lastAlertTriggeredAt[poi.symbol]
+
+                        // Check if this POI's category is in the alert categories
+                        val poiCategory = NearbyPoiCategory.entries.find { cat ->
+                            cat.hhType.equals(poi.symbol.type, ignoreCase = true)
+                        }
+
+                        val matchesAlertCategory = poiCategory in poiSettings.alertPoiCategories
+
+                        if (!matchesAlertCategory) {
+                            return@forEach
+                        }
+
                         val pointsAhead = points.filter { it.distanceFromRouteStart >= distanceAlongRoute }
                         val nearestPointInRange = pointsAhead.find {
                             val alongRoute = it.distanceFromRouteStart - distanceAlongRoute
 
-                            alongRoute <= (settings.poiApproachAlertAtDistance ?: 500.0) && alongRoute >= 20.0 && it.distanceFromRouteStart > (settings.poiApproachAlertAtDistance ?: 500.0)
+                            alongRoute <= poiSettings.alertDistanceMeters && alongRoute >= 20.0 && it.distanceFromRouteStart > poiSettings.alertDistanceMeters
                         }
 
                         if (nearestPointInRange == null && lastAlertShownForPoi != null) {
@@ -152,8 +192,14 @@ class PoiApproachAlertService(
                         }
                     }
                 }
-
             }
         }
     }
+
+    private data class Quad<A, B, C, D>(
+        val first: A,
+        val second: B,
+        val third: C,
+        val fourth: D
+    )
 }

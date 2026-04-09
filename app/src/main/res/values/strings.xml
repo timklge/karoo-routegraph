@@ -158,4 +158,12 @@
     <string name="ride_profile">Ride Profile</string>
     <string name="current_profile">Current profile: %1$s</string>
     <string name="unnamed_profile">Unnamed profile</string>
+
+    <!-- POI Alert settings -->
+    <string name="poi_alert_settings">POI Approach Alerts</string>
+    <string name="enable_poi_alerts">Enable POI approach alerts</string>
+    <string name="alert_categories">Alert categories</string>
+    <string name="select_alert_categories">Select alert categories</string>
+    <string name="alert_distance">Alert distance</string>
+    <string name="only_for_selected_categories">Only trigger alerts for selected categories</string>
 </resources>

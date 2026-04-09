@@ -109,6 +109,12 @@ fun PointsOfInterestScreen(
     var poiApproachAlertAtDistance by remember { mutableDoubleStateOf(500.0) }
     var currentProfileName by remember { mutableStateOf<String?>(null) }
 
+    // Alert-specific POI settings
+    var enablePoiAlerts by remember { mutableStateOf(false) }
+    var alertPoiCategories by remember { mutableStateOf(emptySet<NearbyPoiCategory>()) }
+    var alertDistanceMeters by remember { mutableDoubleStateOf(500.0) }
+    var showAlertCategoriesDialog by remember { mutableStateOf(false) }
+
     suspend fun updateSettings(){
         karooSystemServiceProvider.saveSettings { settings ->
             settings.copy(
@@ -125,7 +131,9 @@ fun PointsOfInterestScreen(
                 enableOfflinePoiStorage = enableOfflinePoiStorage,
                 autoAddPoisToMap = autoAddPoisToMap,
                 autoAddPoiCategories = autoAddPoiCategories,
-                autoAddToElevationProfileAndMinimap = autoAddToElevationProfileAndMinimap
+                autoAddToElevationProfileAndMinimap = autoAddToElevationProfileAndMinimap,
+                alertPoiCategories = alertPoiCategories,
+                alertDistanceMeters = alertDistanceMeters
             )
         }
     }
@@ -153,6 +161,9 @@ fun PointsOfInterestScreen(
                 autoAddPoisToMap = settings.autoAddPoisToMap
                 autoAddPoiCategories = settings.autoAddPoiCategories
                 autoAddToElevationProfileAndMinimap = settings.autoAddToElevationProfileAndMinimap
+                alertPoiCategories = settings.alertPoiCategories
+                alertDistanceMeters = settings.alertDistanceMeters
+                enablePoiAlerts = settings.alertPoiCategories.isNotEmpty()
             }
         }
     }
@@ -235,6 +246,84 @@ fun PointsOfInterestScreen(
                             onConfirm = { newCategories ->
                                 autoAddPoiCategories = newCategories
                                 showAutoAddPoiCategoriesDialog = false
+                                coroutineScope.launch { updatePoiSettings() }
+                            }
+                        )
+                    }
+
+                    // POI Approach Alerts section
+                    HorizontalDivider()
+                    Text(
+                        text = stringResource(R.string.poi_alert_settings),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Switch(checked = enablePoiAlerts, onCheckedChange = {
+                            enablePoiAlerts = it
+                            if (it && alertPoiCategories.isEmpty()) {
+                                // If enabling with no categories selected, open category selector
+                                showAlertCategoriesDialog = true
+                            } else {
+                                coroutineScope.launch { updatePoiSettings() }
+                            }
+                        })
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(stringResource(R.string.enable_poi_alerts))
+                    }
+
+                    if (enablePoiAlerts) {
+                        FilledTonalButton(
+                            modifier = Modifier.fillMaxWidth().height(40.dp),
+                            onClick = { showAlertCategoriesDialog = true }
+                        ) {
+                            Icon(painter = painterResource(id = R.drawable.bx_info_circle), contentDescription = stringResource(R.string.select_alert_categories), modifier = Modifier.size(24.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.select_alert_categories))
+                        }
+
+                        val alertDistanceOptions = arrayOf(200.0, 500.0, 1_000.0, 2_000.0, 5_000.0)
+                        val selectedAlertDistanceIndex = alertDistanceOptions.indexOf(alertDistanceMeters)
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.alert_distance))
+                            Slider(
+                                value = selectedAlertDistanceIndex.toFloat(),
+                                onValueChange = { idx ->
+                                    val newIndex = idx.roundToInt().coerceIn(alertDistanceOptions.indices)
+                                    alertDistanceMeters = alertDistanceOptions[newIndex]
+                                    coroutineScope.launch { updatePoiSettings() }
+                                },
+                                valueRange = 0f..(alertDistanceOptions.size - 1).toFloat(),
+                                steps = alertDistanceOptions.size - 2,
+                                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp),
+                            )
+                            Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                alertDistanceOptions.forEach { distance ->
+                                    val label = if (distance >= 1000.0) "${(distance / 1000.0).toInt()}km" else "${distance.toInt()}m"
+                                    Text(label, style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
+
+                        if (alertPoiCategories.isEmpty()) {
+                            Text(
+                                text = stringResource(R.string.only_for_selected_categories),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    if (showAlertCategoriesDialog) {
+                        CategorySelectionDialog(
+                            initialCategories = alertPoiCategories,
+                            onDismiss = { showAlertCategoriesDialog = false },
+                            onConfirm = { newCategories ->
+                                alertPoiCategories = newCategories
+                                enablePoiAlerts = newCategories.isNotEmpty()
+                                showAlertCategoriesDialog = false
                                 coroutineScope.launch { updatePoiSettings() }
                             }
                         )
