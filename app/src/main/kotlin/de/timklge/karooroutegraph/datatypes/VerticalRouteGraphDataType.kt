@@ -53,6 +53,7 @@ import de.timklge.karooroutegraph.distanceIsZero
 import de.timklge.karooroutegraph.distanceToString
 import de.timklge.karooroutegraph.getInclineIndicatorColor
 import de.timklge.karooroutegraph.getSurfaceConditionPaints
+import de.timklge.karooroutegraph.getTimeUntilNextChange
 import de.timklge.karooroutegraph.isOpen
 import de.timklge.karooroutegraph.pois.NearestPoint
 import de.timklge.karooroutegraph.pois.POI
@@ -696,16 +697,33 @@ class VerticalRouteGraphDataType(
                                         try {
                                             isOpen(eta, openingHours)
                                         } catch (e: Exception) {
-                                            Log.e(KarooRouteGraphExtension.TAG, "Failed to parse opening hours for POI ${poi.symbol.id}", e)
+                                            Log.e(TAG, "Failed to parse opening hours for POI ${poi.symbol.id}", e)
+                                            null
+                                        }
+                                    }
+
+                                    val timeUntilNextChange = openingHours?.let {
+                                        try {
+                                            getTimeUntilNextChange(eta, openingHours)
+                                        } catch (e: Exception) {
+                                            Log.e(TAG, "Failed to determine if POI is closing soon for POI ${poi.symbol.id}", e)
                                             null
                                         }
                                     }
 
                                     isOpenAtEta?.let {
                                         val statusText = " " + if (isOpenAtEta) {
-                                            context.getString(R.string.open_at_eta)
+                                            if (timeUntilNextChange == null || timeUntilNextChange > 60 * 60 * 1000) {
+                                                context.getString(R.string.open_at_eta)
+                                            } else {
+                                                context.getString(R.string.open_closing_soon, android.text.format.DateFormat.getTimeFormat(applicationContext).format(Date(eta + timeUntilNextChange)).toString())
+                                            }
                                         } else {
-                                            context.getString(R.string.closed_at_eta)
+                                            if (timeUntilNextChange == null || timeUntilNextChange > 60 * 60 * 1000) {
+                                                context.getString(R.string.closed_at_eta)
+                                            } else {
+                                                context.getString(R.string.closed_opening_soon, android.text.format.DateFormat.getTimeFormat(applicationContext).format(Date(eta + timeUntilNextChange)).toString())
+                                            }
                                         }
 
                                         distanceStr += " ${statusText.uppercase()}"

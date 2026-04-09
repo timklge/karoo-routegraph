@@ -1,5 +1,6 @@
 package de.timklge.karooroutegraph.screens
 
+import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,6 +52,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mapbox.geojson.Point
 import com.mapbox.turf.TurfConstants
 import com.mapbox.turf.TurfMeasurement
+import de.timklge.karooroutegraph.KarooRouteGraphExtension
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.LocationViewModelProvider
 import de.timklge.karooroutegraph.R
@@ -58,6 +60,8 @@ import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.SurfaceConditionRetrievalService
 import de.timklge.karooroutegraph.TravelTimeEstimationService
 import de.timklge.karooroutegraph.datatypes.streamPowerPerHour
+import de.timklge.karooroutegraph.getTimeUntilNextChange
+import de.timklge.karooroutegraph.isOpen
 import de.timklge.karooroutegraph.pois.DistanceToPoiResult
 import de.timklge.karooroutegraph.pois.NearestPoint
 import de.timklge.karooroutegraph.pois.NominatimProvider
@@ -377,9 +381,47 @@ fun PoiSearchScreen() {
                                         )
                                     } else null
 
+                                    val estimatedArrivalTime = System.currentTimeMillis() + (estimatedTravelTime?.toLong(DurationUnit.MILLISECONDS) ?: 0)
+
                                     if (estimatedTravelTime != null) {
-                                        val estimatedArrivalTime = System.currentTimeMillis() + estimatedTravelTime.toLong(DurationUnit.MILLISECONDS)
                                         append(" ⏲\u00A0${android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(estimatedArrivalTime))}")
+                                    }
+
+                                    val openingHours = temporaryPois.poiIdOpeningHours[symbol.id]
+                                    val isOpenAtEta = openingHours?.let {
+                                        try {
+                                            isOpen(estimatedArrivalTime, openingHours)
+                                        } catch (e: Exception) {
+                                            Log.e(KarooRouteGraphExtension.TAG, "Failed to parse opening hours for POI ${symbol.id}", e)
+                                            null
+                                        }
+                                    }
+
+                                    val timeUntilNextChange = openingHours?.let {
+                                        try {
+                                            getTimeUntilNextChange(estimatedArrivalTime, openingHours)
+                                        } catch (e: Exception) {
+                                            Log.e(KarooRouteGraphExtension.TAG, "Failed to determine if POI is closing soon for POI ${symbol.id}", e)
+                                            null
+                                        }
+                                    }
+
+                                    isOpenAtEta?.let {
+                                        val statusText = " " + if (isOpenAtEta) {
+                                            if (timeUntilNextChange == null || timeUntilNextChange > 60 * 60 * 1000) {
+                                                stringResource(R.string.open_at_eta)
+                                            } else {
+                                                stringResource(R.string.open_closing_soon, android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(estimatedArrivalTime + timeUntilNextChange)).toString())
+                                            }
+                                        } else {
+                                            if (timeUntilNextChange == null || timeUntilNextChange > 60 * 60 * 1000) {
+                                                stringResource(R.string.closed_at_eta)
+                                            } else {
+                                                stringResource(R.string.closed_opening_soon, android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(estimatedArrivalTime + timeUntilNextChange)).toString())
+                                            }
+                                        }
+
+                                        append(statusText.uppercase())
                                     }
                                 }
                             }.takeIf { it.isNotEmpty() }

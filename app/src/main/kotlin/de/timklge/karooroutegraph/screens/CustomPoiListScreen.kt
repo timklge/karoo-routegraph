@@ -45,6 +45,7 @@ import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.SurfaceConditionRetrievalService
 import de.timklge.karooroutegraph.TravelTimeEstimationService
 import de.timklge.karooroutegraph.datatypes.streamPowerPerHour
+import de.timklge.karooroutegraph.getTimeUntilNextChange
 import de.timklge.karooroutegraph.isOpen
 import de.timklge.karooroutegraph.pois.DistanceToPoiResult
 import de.timklge.karooroutegraph.pois.distanceToPoi
@@ -301,11 +302,28 @@ fun CustomPoiListScreen() {
                                     }
                                 }
 
+                                val timeUntilNextChange = openingHours?.let {
+                                    try {
+                                        getTimeUntilNextChange(estimatedArrivalTime, openingHours)
+                                    } catch (e: Exception) {
+                                        Log.e(KarooRouteGraphExtension.TAG, "Failed to determine if POI is closing soon for POI ${poiId}", e)
+                                        null
+                                    }
+                                }
+
                                 isOpenAtEta?.let {
                                     val statusText = " " + if (isOpenAtEta) {
-                                        stringResource(R.string.open_at_eta)
+                                        if (timeUntilNextChange == null || timeUntilNextChange > 60 * 60 * 1000) {
+                                            stringResource(R.string.open_at_eta)
+                                        } else {
+                                            stringResource(R.string.open_closing_soon, android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(estimatedArrivalTime + timeUntilNextChange)).toString())
+                                        }
                                     } else {
-                                        stringResource(R.string.closed_at_eta)
+                                        if (timeUntilNextChange == null || timeUntilNextChange > 60 * 60 * 1000) {
+                                            stringResource(R.string.closed_at_eta)
+                                        } else {
+                                            stringResource(R.string.closed_opening_soon, android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(estimatedArrivalTime + timeUntilNextChange)).toString())
+                                        }
                                     }
 
                                     append(statusText.uppercase())
