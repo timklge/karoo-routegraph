@@ -134,6 +134,7 @@ class RouteGraphUpdateManager(
         var knownClimbs: List<Climb>? = null
         var knownIncidentWarningShown = false
         var poiDistances: Map<POI, List<NearestPoint>>? = null
+        var knownOpeningHours: Map<POI, String> = emptyMap()
         var lastKnownPositionAlongRoute: Double? = null
         var lastAutoAddedPoisByOsmId: Map<Long, Symbol.POI> = emptyMap()
         var lastAutoAddedPoisRequestedAtPosition: Point? = null
@@ -631,6 +632,7 @@ class RouteGraphUpdateManager(
                         isOnRoute = currentDistanceAlongRoute != null,
                         knownRoute = knownRoute,
                         poiDistances = poiDistances,
+                        knownPoiOpeningHours = temporaryPOIs.poiIdOpeningHours,
                         sampledElevationData = sampledElevationData,
                         climbs = knownClimbs,
                         isImperial = isImperial,

@@ -62,7 +62,7 @@ class ETADataType(
                     endDistance = currentRouteLength,
                     totalWeight = totalWeight.toDouble(),
                     lastHourAvgPower = averagePower,
-                    surfaceConditions = surfaceConditions ?: emptyList()
+                    surfaceConditions = surfaceConditions ?: emptyList(),
                 )
                 val estimatedArrivalTimeInUnixMs = System.currentTimeMillis() + estimatedTravelTime.toLong(DurationUnit.MILLISECONDS)
 

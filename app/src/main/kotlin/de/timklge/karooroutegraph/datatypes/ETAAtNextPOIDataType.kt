@@ -70,6 +70,7 @@ class ETAAtNextPOIDataType(
 
                 val nextPoi = poisAheadSorted?.firstOrNull()
                 val targetDistanceFromRouteStart = nextPoi?.second?.distanceFromRouteStart?.toDouble() ?: routeDistance
+                val targetFinalSegmentLength = nextPoi?.second?.distanceFromPointOnRoute?.toDouble()
 
                 val estimatedTravelTime = travelTimeEstimationService.estimateTravelTime(
                     routeElevationData = state.sampledElevationData,
@@ -77,7 +78,8 @@ class ETAAtNextPOIDataType(
                     endDistance = targetDistanceFromRouteStart,
                     totalWeight = totalWeight.toDouble(),
                     lastHourAvgPower = averagePower,
-                    surfaceConditions = surfaceConditions ?: emptyList()
+                    surfaceConditions = surfaceConditions ?: emptyList(),
+                    finalSegmentLength = targetFinalSegmentLength
                 )
                 val estimatedArrivalTimeInUnixMs = System.currentTimeMillis() + estimatedTravelTime.toLong(DurationUnit.MILLISECONDS)
 

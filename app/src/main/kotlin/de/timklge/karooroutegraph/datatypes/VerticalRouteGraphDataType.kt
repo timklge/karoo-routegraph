@@ -12,6 +12,8 @@ import android.util.Log
 import androidx.annotation.DrawableRes
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.createBitmap
@@ -33,6 +35,7 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import de.timklge.karooroutegraph.ClimbCategory
+import de.timklge.karooroutegraph.KarooRouteGraphExtension
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.R
@@ -50,6 +53,7 @@ import de.timklge.karooroutegraph.distanceIsZero
 import de.timklge.karooroutegraph.distanceToString
 import de.timklge.karooroutegraph.getInclineIndicatorColor
 import de.timklge.karooroutegraph.getSurfaceConditionPaints
+import de.timklge.karooroutegraph.isOpen
 import de.timklge.karooroutegraph.pois.NearestPoint
 import de.timklge.karooroutegraph.pois.POI
 import de.timklge.karooroutegraph.pois.POIActivity
@@ -217,7 +221,7 @@ class VerticalRouteGraphDataType(
                 karooSystemServiceProvider.karooSystemService.streamDatatypeIsVisible(dataTypeId),
                 karooSystemServiceProvider.streamRadarSwimLaneIsVisible(),
                 surfaceConditionRetrievalService.flow,
-                averagePowerFlow.throttle(10_000),
+                averagePowerFlow.throttle(15_000),
             ) { data ->
                 val viewModel = data[0] as RouteGraphViewModel
                 val displayViewModel = data[1] as RouteGraphDisplayViewModel
@@ -681,10 +685,31 @@ class VerticalRouteGraphDataType(
                                         endDistance = nearestPoint.distanceFromRouteStart.toDouble(),
                                         totalWeight = userProfile.weight + 10.0,
                                         lastHourAvgPower = averagePower,
-                                        surfaceConditions = surfaceConditions ?: emptyList()
+                                        surfaceConditions = surfaceConditions ?: emptyList(),
+                                        finalSegmentLength = nearestPoint.distanceFromPointOnRoute.toDouble()
                                     )
                                     val eta = System.currentTimeMillis() + estimatedTravelTime.toLong(DurationUnit.MILLISECONDS)
-                                    distanceStr += " ⏲ ${android.text.format.DateFormat.getTimeFormat(applicationContext).format(Date(eta))}"
+                                    distanceStr += " ⏲\u00A0${android.text.format.DateFormat.getTimeFormat(applicationContext).format(Date(eta))}"
+
+                                    val openingHours = viewModel.knownPoiOpeningHours[poi.symbol.id]
+                                    val isOpenAtEta = openingHours?.let {
+                                        try {
+                                            isOpen(eta, openingHours)
+                                        } catch (e: Exception) {
+                                            Log.e(KarooRouteGraphExtension.TAG, "Failed to parse opening hours for POI ${poi.symbol.id}", e)
+                                            null
+                                        }
+                                    }
+
+                                    isOpenAtEta?.let {
+                                        val statusText = " " + if (isOpenAtEta) {
+                                            context.getString(R.string.open_at_eta)
+                                        } else {
+                                            context.getString(R.string.closed_at_eta)
+                                        }
+
+                                        distanceStr += " ${statusText.uppercase()}"
+                                    }
                                 }
 
                                 if (distanceStr.isNotEmpty()) {

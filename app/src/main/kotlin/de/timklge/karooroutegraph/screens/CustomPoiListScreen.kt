@@ -1,5 +1,6 @@
 package de.timklge.karooroutegraph.screens
 
+import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -36,10 +37,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import de.timklge.karooroutegraph.KarooRouteGraphExtension
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.LocationViewModelProvider
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
+import de.timklge.karooroutegraph.SurfaceConditionRetrievalService
+import de.timklge.karooroutegraph.TravelTimeEstimationService
+import de.timklge.karooroutegraph.datatypes.streamPowerPerHour
+import de.timklge.karooroutegraph.isOpen
+import de.timklge.karooroutegraph.pois.DistanceToPoiResult
 import de.timklge.karooroutegraph.pois.distanceToPoi
 import de.timklge.karooroutegraph.pois.getStartAndEndPoiIfNone
 import de.timklge.karooroutegraph.pois.processPoiName
@@ -53,6 +60,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import java.util.Date
+import kotlin.time.DurationUnit
 
 enum class PoiSortOption(val displayNameRes: Int) {
     LINEAR_DISTANCE(R.string.sort_linear_distance),
@@ -74,6 +83,14 @@ fun CustomPoiListScreen() {
     val karooSystemServiceProvider = koinInject<KarooSystemServiceProvider>()
     val viewModelProvider = koinInject<RouteGraphViewModelProvider>()
     val locationViewModelProvider = koinInject<LocationViewModelProvider>()
+    val temporaryPois by karooSystemServiceProvider.streamTemporaryPOIs().collectAsStateWithLifecycle(null)
+
+    val travelTimeEstimationService = koinInject<TravelTimeEstimationService>()
+    val surfaceConditionRetrievalService = koinInject<SurfaceConditionRetrievalService>()
+
+    val averagePowerFlow by streamPowerPerHour(karooSystemServiceProvider).collectAsStateWithLifecycle(null)
+    val surfaceConditions by surfaceConditionRetrievalService.flow.collectAsStateWithLifecycle(null)
+    val userProfile by karooSystemServiceProvider.stream<UserProfile>().collectAsStateWithLifecycle(null)
 
     var localPois by remember { mutableStateOf<List<DisplayedCustomPoi.Local>>(listOf()) }
     var globalPois by remember { mutableStateOf<List<DisplayedCustomPoi.Global>>(listOf()) }
@@ -119,7 +136,7 @@ fun CustomPoiListScreen() {
             .collect { isImperial = it }
     }
 
-    val routeGraphViewModel by viewModelProvider.viewModelFlow.collectAsStateWithLifecycle(null)
+    val viewModel by viewModelProvider.viewModelFlow.collectAsStateWithLifecycle(null)
     val currentPosition by locationViewModelProvider.viewModelFlow.collectAsStateWithLifecycle(null)
     val settings by karooSystemServiceProvider.streamSettings().collectAsStateWithLifecycle(null)
 
@@ -127,10 +144,10 @@ fun CustomPoiListScreen() {
 
     val additionalPois by remember {
         derivedStateOf {
-            val route = routeGraphViewModel?.knownRoute
+            val route = viewModel?.knownRoute
             val allPois = (localPois + globalPois + tempPois).map { it.poi }
 
-            getStartAndEndPoiIfNone(route, allPois, settings, context, routeGraphViewModel?.navigatingToDestination == true)
+            getStartAndEndPoiIfNone(route, allPois, settings, context, viewModel?.navigatingToDestination == true)
         }
     }
 
@@ -142,7 +159,7 @@ fun CustomPoiListScreen() {
         val settings = karooSystemServiceProvider.streamViewSettings().first()
         val savedSort = settings.poiSortOptionForCustomPois
 
-        if (routeGraphViewModel?.knownRoute == null && savedSort == PoiSortOption.AHEAD_ON_ROUTE) {
+        if (viewModel?.knownRoute == null && savedSort == PoiSortOption.AHEAD_ON_ROUTE) {
             selectedSort = PoiSortOption.LINEAR_DISTANCE
         } else {
             selectedSort = savedSort
@@ -159,10 +176,10 @@ fun CustomPoiListScreen() {
                     addAll(additionalPois.mapIndexed { index, poi -> DisplayedCustomPoi.Additional(index.toLong(), poi.symbol) })
 
                     // If not on route but have a last known position along the route, add it as POI to navigate to
-                    if (routeGraphViewModel?.lastKnownPositionOnMainRoute != null && routeGraphViewModel?.routeDistance == null) {
+                    if (viewModel?.lastKnownPositionOnMainRoute != null && viewModel?.routeDistance == null) {
                         val lastKnownPositionAlongRoute = Symbol.POI(
-                            lat = routeGraphViewModel!!.lastKnownPositionOnMainRoute!!.latitude(),
-                            lng = routeGraphViewModel!!.lastKnownPositionOnMainRoute!!.longitude(),
+                            lat = viewModel!!.lastKnownPositionOnMainRoute!!.latitude(),
+                            lng = viewModel!!.lastKnownPositionOnMainRoute!!.longitude(),
                             name = "Last known position along route", // Will be translated in UI
                             id = "last_known_position",
                         )
@@ -170,8 +187,8 @@ fun CustomPoiListScreen() {
                     }
                 }
 
-                poiList.filter { displayedCustomPoi -> distanceToPoi(displayedCustomPoi.poi, routeGraphViewModel?.sampledElevationData, routeGraphViewModel?.poiDistances, currentPosition, selectedSort, routeGraphViewModel?.distanceAlongRoute) != null }.sortedBy { displayedCustomPoi ->
-                    distanceToPoi(displayedCustomPoi.poi, routeGraphViewModel?.sampledElevationData, routeGraphViewModel?.poiDistances, currentPosition, selectedSort, routeGraphViewModel?.distanceAlongRoute)
+                poiList.filter { displayedCustomPoi -> distanceToPoi(displayedCustomPoi.poi, viewModel?.sampledElevationData, viewModel?.poiDistances, currentPosition, selectedSort, viewModel?.distanceAlongRoute) != null }.sortedBy { displayedCustomPoi ->
+                    distanceToPoi(displayedCustomPoi.poi, viewModel?.sampledElevationData, viewModel?.poiDistances, currentPosition, selectedSort, viewModel?.distanceAlongRoute)
                 }
             } ?: run {
                 // Include additionalPois even when currentPosition is null
@@ -182,7 +199,7 @@ fun CustomPoiListScreen() {
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
-            val routeLoaded = routeGraphViewModel?.knownRoute != null
+            val routeLoaded = viewModel?.knownRoute != null
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -251,14 +268,53 @@ fun CustomPoiListScreen() {
                         overflow = TextOverflow.Ellipsis
                     )
 
-                    val distanceLabel = currentPosition?.let {
-                        val distanceResult = distanceToPoi(displayedCustomPoi.poi, routeGraphViewModel?.sampledElevationData,
-                            routeGraphViewModel?.poiDistances, it, selectedSort, routeGraphViewModel?.distanceAlongRoute)
+                    val distanceLabel = buildString {
+                        currentPosition?.let {
+                            val distanceResult = distanceToPoi(displayedCustomPoi.poi, viewModel?.sampledElevationData,
+                                viewModel?.poiDistances, it, selectedSort, viewModel?.distanceAlongRoute)
 
-                        distanceResult?.formatDistance(LocalContext.current, isImperial)
+                            append(distanceResult?.formatDistance(LocalContext.current, isImperial))
+
+                            viewModel?.let { viewModel ->
+                                val estimatedTravelTime = if (viewModel.distanceAlongRoute != null) travelTimeEstimationService.estimateTravelTime(
+                                    routeElevationData = viewModel.sampledElevationData,
+                                    startDistance = viewModel.distanceAlongRoute.toDouble(),
+                                    endDistance = viewModel.distanceAlongRoute.toDouble() + ((distanceResult as? DistanceToPoiResult.AheadOnRouteDistance)?.distanceOnRoute ?: 0.0),
+                                    totalWeight = (userProfile?.weight?.toDouble() ?: 70.0) + 10.0,
+                                    lastHourAvgPower = averagePowerFlow,
+                                    surfaceConditions = surfaceConditions ?: emptyList(),
+                                    finalSegmentLength = (distanceResult as? DistanceToPoiResult.AheadOnRouteDistance)?.distanceFromPointOnRoute
+                                ) else null
+                                val estimatedArrivalTime = estimatedTravelTime?.let { System.currentTimeMillis() + estimatedTravelTime.toLong(DurationUnit.MILLISECONDS) } ?: System.currentTimeMillis()
+                                if (estimatedTravelTime != null) {
+                                    append(" ⏲\u00A0${android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(estimatedArrivalTime))}")
+                                }
+
+                                val poiId = displayedCustomPoi.poi.id
+                                val openingHours = temporaryPois?.poiIdOpeningHours?.get(poiId)
+                                val isOpenAtEta = openingHours?.let {
+                                    try {
+                                        isOpen(estimatedArrivalTime, openingHours)
+                                    } catch (e: Exception) {
+                                        Log.e(KarooRouteGraphExtension.TAG, "Failed to parse opening hours for POI ${poiId}", e)
+                                        null
+                                    }
+                                }
+
+                                isOpenAtEta?.let {
+                                    val statusText = " " + if (isOpenAtEta) {
+                                        stringResource(R.string.open_at_eta)
+                                    } else {
+                                        stringResource(R.string.closed_at_eta)
+                                    }
+
+                                    append(statusText.uppercase())
+                                }
+                            }
+                        }
                     }
 
-                    if (distanceLabel != null){
+                    if (distanceLabel.isNotEmpty()){
                         Text(
                             text = distanceLabel,
                             style = MaterialTheme.typography.bodyMedium,
