@@ -570,6 +570,9 @@ class RouteGraphUpdateManager(
                     temporaryPOIs.poisByOsmId
                 }
                 val tempPoiSymbols = poiSum.map { (_, poi) -> POI(poi) }
+                val offlineNearbyPois = lastAutoAddedPoisByOsmId.values.map { symbol ->
+                    POI(symbol = symbol, type = PoiType.POI)
+                }
                 val localPois = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.pois.orEmpty().map { symbol ->
                     POI(
                         symbol = symbol,
@@ -584,6 +587,7 @@ class RouteGraphUpdateManager(
                     addAll(tempPoiSymbols)
                     addAll(globalPois)
                     addAll(localPois)
+                    addAll(offlineNearbyPois)
 
                     addAll(
                         getStartAndEndPoiIfNone(

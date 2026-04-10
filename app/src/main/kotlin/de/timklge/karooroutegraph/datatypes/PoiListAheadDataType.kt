@@ -50,6 +50,8 @@ class PoiListAheadDataType(
             viewModelProvider.viewModelFlow.collect { state ->
                 val currentDistanceAlongRoute = state.distanceAlongRoute
 
+                Log.d(TAG, "PoiListAhead: distanceAlongRoute=$currentDistanceAlongRoute, poiDistances size=${state.poiDistances?.size}")
+
                 if (currentDistanceAlongRoute == null || state.poiDistances.isNullOrEmpty()) {
                     poisAheadFlow.update { emptyList() }
                     emitter.onNext(StreamState.NotAvailable)
@@ -57,14 +59,18 @@ class PoiListAheadDataType(
                 }
 
                 val poiDistances = state.poiDistances.entries.flatMap { (poi, list) ->
+                    Log.d(TAG, "PoiListAhead: POI=${poi.symbol.name}, type=${poi.type}, points=${list.size}")
                     list.map { distance -> poi to distance }
                 }
 
                 // Filter to only POIs ahead of current position
                 val poisAhead = poiDistances.filter { (poi, distance) ->
-                    poi.type != PoiType.INCIDENT &&
-                    distance.distanceFromRouteStart - currentDistanceAlongRoute > 0
+                    val diff = distance.distanceFromRouteStart - currentDistanceAlongRoute
+                    Log.d(TAG, "PoiListAhead: ${poi.symbol.name} diff=${diff}m, type=${poi.type}")
+                    poi.type != PoiType.INCIDENT && diff > 0
                 }
+
+                Log.d(TAG, "PoiListAhead: poisAhead count=${poisAhead.size}")
 
                 // Sort by distance along route (nearest first) and take top 5
                 val poisAheadSorted = poisAhead
