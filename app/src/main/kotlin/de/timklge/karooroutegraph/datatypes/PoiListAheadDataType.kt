@@ -1,7 +1,22 @@
 package de.timklge.karooroutegraph.datatypes
 
 import android.content.Context
+import android.content.res.Configuration
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
 import android.util.Log
+import androidx.compose.ui.unit.DpSize
+import androidx.core.graphics.createBitmap
+import androidx.glance.GlanceModifier
+import androidx.glance.Image
+import androidx.glance.ImageProvider
+import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
+import androidx.glance.appwidget.GlanceRemoteViews
+import androidx.glance.layout.Box
+import androidx.glance.layout.fillMaxSize
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
@@ -18,6 +33,7 @@ import io.hammerhead.karooext.internal.Emitter
 import io.hammerhead.karooext.internal.ViewEmitter
 import io.hammerhead.karooext.models.DataPoint
 import io.hammerhead.karooext.models.DataType
+import io.hammerhead.karooext.models.ShowCustomStreamState
 import io.hammerhead.karooext.models.StreamState
 import io.hammerhead.karooext.models.UpdateGraphicConfig
 import io.hammerhead.karooext.models.ViewConfig
@@ -39,8 +55,9 @@ data class PoiAheadEntry(
 
 /**
  * Data field that shows the next 5 POIs ahead on the route.
- * Fetches POIs independently from the offline database.
+ * Renders as a graphical view with Canvas drawing.
  */
+@OptIn(ExperimentalGlanceRemoteViewsApi::class)
 class PoiListAheadDataType(
     private val karooSystem: KarooSystemService,
     private val viewModelProvider: RouteGraphViewModelProvider,
@@ -53,6 +70,12 @@ class PoiListAheadDataType(
     private var viewJob: Job? = null
     private val poisAheadFlow = MutableStateFlow<List<PoiAheadEntry>>(emptyList())
     private var lastPoiDistances: Map<POI, List<NearestPoint>>? = null
+    private val glance = GlanceRemoteViews()
+
+    private fun isNightMode(): Boolean {
+        val nightModeFlags = applicationContext.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        return nightModeFlags == Configuration.UI_MODE_NIGHT_YES
+    }
 
     override fun startStream(emitter: Emitter<StreamState>) {
         streamJob = CoroutineScope(Dispatchers.Default).launch {
@@ -62,8 +85,6 @@ class PoiListAheadDataType(
             viewModelProvider.viewModelFlow.collect { state ->
                 val currentDistanceAlongRoute = state.distanceAlongRoute
                 val routeLineString = state.knownRoute
-
-                Log.d(TAG, "PoiListAhead: distance=$currentDistanceAlongRoute, route=${routeLineString != null}")
 
                 if (currentDistanceAlongRoute == null || routeLineString == null) {
                     poisAheadFlow.update { emptyList() }
@@ -76,9 +97,11 @@ class PoiListAheadDataType(
                 val offlinePois = offlineNearbyPOIProvider.requestNearbyPOIs(
                     allCategories,
                     routeLineString.coordinates(),
-                    1000, // 1km radius
+                    1000,
                     200
                 )
+
+                Log.d(TAG, "PoiListAhead: fetched ${offlinePois.size} offline POIs")
 
                 val poiSymbols = offlinePois.map { poi ->
                     val poiName = poi.tags["name"]
@@ -96,8 +119,6 @@ class PoiListAheadDataType(
                         type = PoiType.POI
                     )
                 }
-
-                Log.d(TAG, "PoiListAhead: fetched ${poiSymbols.size} offline POIs")
 
                 // Calculate distances
                 val poiDistances = calculatePoiDistances(
@@ -145,26 +166,96 @@ class PoiListAheadDataType(
     }
 
     override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
+        Log.d(TAG, "Starting POI list ahead view with $emitter")
+
         val configJob = CoroutineScope(Dispatchers.Default).launch {
-            emitter.onNext(UpdateGraphicConfig())
+            emitter.onNext(UpdateGraphicConfig(showHeader = false))
+            emitter.onNext(ShowCustomStreamState("", null))
             awaitCancellation()
         }
 
         viewJob = CoroutineScope(Dispatchers.Default).launch {
+            val width = config.viewSize.first
+            val height = config.viewSize.second
+
+            if (width <= 0 || height <= 0) {
+                awaitCancellation()
+                return@launch
+            }
+
+            val nightMode = isNightMode()
+            val backgroundColor = if (nightMode) Color.BLACK else Color.WHITE
+            val textColor = if (nightMode) Color.WHITE else Color.BLACK
+            val secondaryColor = if (nightMode) Color.LTGRAY else Color.DKGRAY
+
+            val namePaint = Paint().apply {
+                color = textColor
+                textSize = 28f
+                typeface = Typeface.DEFAULT
+                isAntiAlias = true
+            }
+
+            val distancePaint = Paint().apply {
+                color = secondaryColor
+                textSize = 26f
+                typeface = Typeface.DEFAULT
+                isAntiAlias = true
+                textAlign = Paint.Align.RIGHT
+            }
+
+            val emptyPaint = Paint().apply {
+                color = secondaryColor
+                textSize = 28f
+                typeface = Typeface.DEFAULT
+                isAntiAlias = true
+                textAlign = Paint.Align.CENTER
+            }
+
             poisAheadFlow.collect { pois ->
-                val displayText = if (pois.isEmpty()) {
-                    "No POIs ahead"
+                val bitmap = createBitmap(width, height)
+                val canvas = Canvas(bitmap)
+
+                // Clear background
+                canvas.drawColor(backgroundColor)
+
+                if (pois.isEmpty()) {
+                    canvas.drawText("No POIs ahead", width / 2f, height / 2f, emptyPaint)
                 } else {
-                    pois.joinToString("\n") { entry ->
+                    val lineHeight = 36f
+                    val startY = 30f
+                    val nameX = 10f
+                    val distanceX = (width - 10).toFloat()
+
+                    pois.forEachIndexed { index, entry ->
+                        val y = startY + index * lineHeight
+
                         val distanceText = if (entry.distanceMeters >= 1000) {
                             "%.1f km".format(entry.distanceMeters / 1000.0)
                         } else {
                             "${entry.distanceMeters.roundToInt()} m"
                         }
-                        "${entry.name}  $distanceText"
+
+                        // Truncate name if too long
+                        val maxWidth = width - 100f
+                        var displayName = entry.name
+                        if (namePaint.measureText(displayName) > maxWidth) {
+                            while (namePaint.measureText("$displayName…") > maxWidth && displayName.length > 1) {
+                                displayName = displayName.dropLast(1)
+                            }
+                            displayName = "$displayName…"
+                        }
+
+                        canvas.drawText(displayName, nameX, y, namePaint)
+                        canvas.drawText(distanceText, distanceX, y, distancePaint)
                     }
                 }
-                emitter.onNext(io.hammerhead.karooext.models.ShowCustomStreamState(displayText, null))
+
+                val result = glance.compose(context, DpSize.Unspecified) {
+                    Box(modifier = GlanceModifier.fillMaxSize()) {
+                        Image(ImageProvider(bitmap), "POI List", modifier = GlanceModifier.fillMaxSize())
+                    }
+                }
+                emitter.updateView(result.remoteViews)
             }
         }
 
