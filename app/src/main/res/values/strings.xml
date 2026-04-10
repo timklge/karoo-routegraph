@@ -116,6 +116,11 @@
     <string name="category_convenience">Convenience Store</string>
     <string name="category_bakery">Bakery</string>
     <string name="category_camping_site">Camping Site</string>
+    <string name="category_hotel">Hotel</string>
+    <string name="category_train_station">Train Station</string>
+    <string name="category_waste_basket">Waste Basket</string>
+    <string name="category_bench">Bench</string>
+    <string name="category_bike_shop">Bike Shop</string>
     <string name="category_attraction">Attraction</string>
     <string name="category_viewpoint">Viewpoint</string>
     <string name="category_beach">Beach</string>
@@ -153,7 +158,6 @@
     <string name="auto_add_pois_to_map">Automatically add POIs to map</string>
     <string name="auto_add_to_elevation_profile_and_minimap">Automatically add POIs to elevation profile and minimap</string>
     <string name="select_categories">Select categories</string>
-<<<<<<< HEAD
 
     <!-- Profile-specific POI settings -->
     <string name="ride_profile">Ride Profile</string>
