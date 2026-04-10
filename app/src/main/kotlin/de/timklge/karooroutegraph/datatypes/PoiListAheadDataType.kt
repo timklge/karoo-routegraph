@@ -5,9 +5,10 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.graphics.Rect
-import android.graphics.RectF
 import android.graphics.Typeface
 import android.util.Log
 import androidx.appcompat.content.res.AppCompatResources
@@ -59,10 +60,6 @@ data class PoiAheadEntry(
     val iconRes: Int
 )
 
-/**
- * Data field that shows the next 5 POIs ahead on the route.
- * Renders as a graphical view with Canvas drawing.
- */
 @OptIn(ExperimentalGlanceRemoteViewsApi::class)
 class PoiListAheadDataType(
     private val karooSystem: KarooSystemService,
@@ -154,7 +151,7 @@ class PoiListAheadDataType(
                     }
 
                 poisAheadFlow.update { entries }
-                Log.d(TAG, "PoiListAhead: ${entries.size} POIs ahead")
+                Log.d(TAG, "PoiListAhead: ${entries.size} POIs ahead: ${entries.map { "${it.name} (${it.iconRes})" }}")
 
                 val firstDist = entries.firstOrNull()?.distanceMeters ?: 0.0
                 emitter.onNext(StreamState.Streaming(
@@ -168,7 +165,7 @@ class PoiListAheadDataType(
     }
 
     override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
-        Log.d(TAG, "Starting POI list ahead view with $emitter")
+        Log.d(TAG, "Starting POI list ahead view size=${config.viewSize.first}x${config.viewSize.second}")
 
         val configJob = CoroutineScope(Dispatchers.Default).launch {
             emitter.onNext(UpdateGraphicConfig(showHeader = false))
@@ -190,6 +187,20 @@ class PoiListAheadDataType(
             val textColor = if (nightMode) Color.WHITE else Color.BLACK
             val secondaryColor = if (nightMode) Color.LTGRAY else Color.DKGRAY
 
+            // Icon paint - invert for light mode (like RouteGraphDataType does)
+            val iconPaint = Paint().apply {
+                if (!nightMode) {
+                    colorFilter = ColorMatrixColorFilter(
+                        ColorMatrix().apply { set(floatArrayOf(
+                            -1f,  0f,  0f, 0f, 255f,
+                            0f, -1f,  0f, 0f, 255f,
+                            0f,  0f, -1f, 0f, 255f,
+                            0f,  0f,  0f, 1f,   0f
+                        )) }
+                    )
+                }
+            }
+
             val namePaint = Paint().apply {
                 color = textColor
                 textSize = 30f
@@ -199,8 +210,8 @@ class PoiListAheadDataType(
 
             val distancePaint = Paint().apply {
                 color = secondaryColor
-                textSize = 26f
-                typeface = Typeface.DEFAULT
+                textSize = 28f
+                typeface = Typeface.DEFAULT_BOLD
                 isAntiAlias = true
                 textAlign = Paint.Align.RIGHT
             }
@@ -213,8 +224,13 @@ class PoiListAheadDataType(
                 textAlign = Paint.Align.CENTER
             }
 
-            val iconSize = 28
-            val iconLeft = 4f
+            val iconSize = 32
+            val iconLeft = 6f
+            val nameX = iconLeft + iconSize + 8f
+            val distanceX = (width - 6).toFloat()
+            val nameMaxWidth = distanceX - nameX - 16f
+            val itemHeight = 64f
+            val startY = 8f
 
             poisAheadFlow.collect { pois ->
                 val bitmap = createBitmap(width, height)
@@ -225,22 +241,21 @@ class PoiListAheadDataType(
                 if (pois.isEmpty()) {
                     canvas.drawText("No POIs ahead", width / 2f, height / 2f, emptyPaint)
                 } else {
-                    val startY = 16f
-                    val itemHeight = 72f
-                    val nameX = iconLeft + iconSize + 6f
-                    val nameMaxWidth = width - iconSize - 20f - 100f
-                    val distanceX = (width - 8).toFloat()
-
                     pois.forEachIndexed { index, entry ->
                         val itemTop = startY + index * itemHeight
                         val iconTop = (itemTop + (itemHeight - iconSize) / 2).toInt()
 
                         // Draw icon
-                        val icon = AppCompatResources.getDrawable(context, entry.iconRes)
-                        if (icon != null) {
+                        val iconDrawable = AppCompatResources.getDrawable(context, entry.iconRes)
+                        Log.d(TAG, "Icon res=${entry.iconRes} for '${entry.name}', drawable=${iconDrawable != null}")
+                        if (iconDrawable != null) {
                             val iconRect = Rect(iconLeft.toInt(), iconTop, iconLeft.toInt() + iconSize, iconTop + iconSize)
-                            val iconBitmap = icon.toBitmap(iconSize, iconSize)
-                            canvas.drawBitmap(iconBitmap, null, iconRect, null)
+                            val iconBitmap = iconDrawable.toBitmap(iconSize, iconSize)
+                            canvas.drawBitmap(iconBitmap, null, iconRect, iconPaint)
+                        } else {
+                            // Fallback: draw a small circle as placeholder
+                            val placeholderPaint = Paint().apply { color = textColor; style = Paint.Style.FILL }
+                            canvas.drawCircle(iconLeft + iconSize / 2f, iconTop + iconSize / 2f, 6f, placeholderPaint)
                         }
 
                         // Calculate distance text
@@ -250,43 +265,34 @@ class PoiListAheadDataType(
                             "${entry.distanceMeters.roundToInt()} m"
                         }
 
-                        // Draw name (wrap to 2 lines if needed)
-                        val lineHeight = namePaint.fontMetrics.let { it.bottom - it.top }
+                        // Draw name (max 2 lines)
+                        val textBaseline = itemTop + 22f
                         var displayName = entry.name
-                        var lineCount = 0
-                        var currentY = itemTop + lineHeight * 0.2f
 
                         if (namePaint.measureText(displayName) > nameMaxWidth) {
-                            // Split into two lines at word boundary
+                            // Find split point at word boundary
                             val words = displayName.split(" ")
                             var line1 = ""
                             var line2 = ""
                             for (word in words) {
-                                val testLine = if (line1.isEmpty()) word else "$line1 $word"
-                                if (namePaint.measureText(testLine) <= nameMaxWidth && line2.isEmpty()) {
-                                    line1 = testLine
+                                val test = if (line1.isEmpty()) word else "$line1 $word"
+                                if (namePaint.measureText(test) <= nameMaxWidth && line2.isEmpty()) {
+                                    line1 = test
                                 } else {
-                                    val testLine2 = if (line2.isEmpty()) word else "$line2 $word"
-                                    if (namePaint.measureText(testLine2) <= nameMaxWidth) {
-                                        if (line2.isEmpty()) line2 = word
-                                        else line2 = "$line2 $word"
-                                    } else {
-                                        break
-                                    }
+                                    if (line2.isEmpty()) line2 = word
+                                    else line2 = "$line2 $word"
                                 }
                             }
-                            lineCount = if (line2.isNotEmpty()) 2 else 1
-                            displayName = line1
-                            
-                            canvas.drawText(line1, nameX, currentY, namePaint)
+
+                            canvas.drawText(line1, nameX, textBaseline, namePaint)
                             if (line2.isNotEmpty()) {
-                                canvas.drawText(line2, nameX, currentY + lineHeight, namePaint)
+                                canvas.drawText(line2, nameX, textBaseline + 30f, namePaint)
                             }
                         } else {
-                            canvas.drawText(displayName, nameX, currentY, namePaint)
+                            canvas.drawText(displayName, nameX, textBaseline, namePaint)
                         }
 
-                        // Draw distance text, vertically aligned
+                        // Draw distance - vertically centered
                         canvas.drawText(distanceText, distanceX, itemTop + itemHeight / 2 + 10f, distancePaint)
                     }
                 }
