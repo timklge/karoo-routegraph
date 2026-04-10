@@ -253,22 +253,21 @@ fun PointsOfInterestScreen(
                     }
 
                     // POI Approach Alerts section
-                    HorizontalDivider()
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     Text(
                         text = stringResource(R.string.poi_alert_settings),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 8.dp)
+                        modifier = Modifier.padding(bottom = 4.dp)
                     )
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Switch(checked = enablePoiAlerts, onCheckedChange = {
                             enablePoiAlerts = it
-                            if (it && alertPoiCategories.isEmpty()) {
-                                // If enabling with no categories selected, open category selector
+                            val needsCategorySelection = it && alertPoiCategories.isEmpty()
+                            coroutineScope.launch { updatePoiSettings() }
+                            if (needsCategorySelection) {
                                 showAlertCategoriesDialog = true
-                            } else {
-                                coroutineScope.launch { updatePoiSettings() }
                             }
                         })
                         Spacer(modifier = Modifier.width(10.dp))
@@ -329,6 +328,9 @@ fun PointsOfInterestScreen(
                             }
                         )
                     }
+
+                    // Max POI distance to route section (global settings)
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
                     if (showDownloadPoisDialog) {
                         val downloadedPbfs by streamPbfDownloadStore(ctx).collectAsStateWithLifecycle(listOf())
