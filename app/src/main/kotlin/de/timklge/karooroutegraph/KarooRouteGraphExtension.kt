@@ -18,6 +18,7 @@ import de.timklge.karooroutegraph.datatypes.minimap.MinimapDataType
 import de.timklge.karooroutegraph.datatypes.minimap.MinimapViewModelProvider
 import de.timklge.karooroutegraph.incidents.IncidentsResponse
 import de.timklge.karooroutegraph.pois.NearbyPOIPbfDownloadService
+import de.timklge.karooroutegraph.pois.OfflineNearbyPOIProvider
 import de.timklge.karooroutegraph.pois.PoiApproachAlertService
 import de.timklge.karooroutegraph.screens.RouteGraphPoiSettings
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
@@ -66,6 +67,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     private val routeGraphUpdateManager: RouteGraphUpdateManager by inject()
     private val autoAddedPOIsViewModelProvider: AutoAddedPOIsViewModelProvider by inject()
     private val travelTimeEstimationService: TravelTimeEstimationService by inject()
+    private val offlineNearbyPOIProvider: OfflineNearbyPOIProvider by inject()
 
     override val types by lazy {
         listOf(
@@ -77,7 +79,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
             PoiButtonDataType(karooSystem.karooSystemService, applicationContext),
             ETAAtNextPOIDataType(karooSystem, routeGraphViewModelProvider, travelTimeEstimationService, surfaceConditionRetrievalService),
             ETADataType(karooSystem, routeGraphViewModelProvider, travelTimeEstimationService, surfaceConditionRetrievalService),
-            PoiListAheadDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, applicationContext)
+            PoiListAheadDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, karooSystem, offlineNearbyPOIProvider, applicationContext)
         )
     }
 

@@ -619,6 +619,7 @@ class RouteGraphUpdateManager(
                         val offlinePois = lastAutoAddedPoisByOsmId.values.map { symbol ->
                             POI(symbol = symbol, type = PoiType.POI)
                         }
+                        Log.d(TAG, "Offline POIs count: ${offlinePois.size}")
                         val updatedOfflinePoiDistances = if (offlinePois.isNotEmpty()) {
                             calculatePoiDistances(
                                 routeLineString,
@@ -633,6 +634,11 @@ class RouteGraphUpdateManager(
                             "${key.symbol.name} (${key.symbol.type}): $value"
                         }.joinToString(", ")
                         Log.d(TAG, "POI distances: $poiDistancesDebug")
+
+                        val offlineDebug = updatedOfflinePoiDistances.map { (key, value) ->
+                            "${key.symbol.name}: $value"
+                        }.joinToString(", ")
+                        Log.d(TAG, "Offline POI distances: $offlineDebug")
 
                         offlinePoiDistances = updatedOfflinePoiDistances
                     }
