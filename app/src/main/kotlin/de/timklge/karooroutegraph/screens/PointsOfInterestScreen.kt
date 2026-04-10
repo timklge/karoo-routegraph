@@ -197,6 +197,29 @@ fun PointsOfInterestScreen(
                         Text(stringResource(R.string.enable_offline_poi_storage))
                     }
 
+                    val poiDistanceOptions = arrayOf(200.0, 500.0, 1_000.0, 2_000.0, 5_000.0)
+                    val selectedPoiDistanceIndex = poiDistanceOptions.indexOf(poiDistanceToRouteMaxMeters)
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.max_poi_distance))
+                        Slider(
+                            value = selectedPoiDistanceIndex.toFloat(),
+                            onValueChange = { idx ->
+                                val newIndex = idx.roundToInt().coerceIn(poiDistanceOptions.indices)
+                                poiDistanceToRouteMaxMeters = poiDistanceOptions[newIndex]
+                                coroutineScope.launch { updateSettings() }
+                            },
+                            valueRange = 0f..(poiDistanceOptions.size - 1).toFloat(),
+                            steps = poiDistanceOptions.size - 2,
+                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp),
+                        )
+                        Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                            poiDistanceOptions.forEach { distance ->
+                                val label = if (distance >= 1000.0) "${(distance / 1000.0).toInt()}km" else "${distance.toInt()}m"
+                                Text(label, style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+
                     if (enableOfflinePoiStorage) {
                         FilledTonalButton(
                             modifier = Modifier.fillMaxWidth().height(40.dp),
@@ -430,29 +453,6 @@ fun PointsOfInterestScreen(
                                         Text(stringResource(R.string.close))
                                     }
                                 }
-                            }
-                        }
-                    }
-
-                    val poiDistanceOptions = arrayOf(200.0, 500.0, 1_000.0, 2_000.0, 5_000.0)
-                    val selectedPoiDistanceIndex = poiDistanceOptions.indexOf(poiDistanceToRouteMaxMeters)
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.max_poi_distance))
-                        Slider(
-                            value = selectedPoiDistanceIndex.toFloat(),
-                            onValueChange = { idx ->
-                                val newIndex = idx.roundToInt().coerceIn(poiDistanceOptions.indices)
-                                poiDistanceToRouteMaxMeters = poiDistanceOptions[newIndex]
-                                coroutineScope.launch { updateSettings() }
-                            },
-                            valueRange = 0f..(poiDistanceOptions.size - 1).toFloat(),
-                            steps = poiDistanceOptions.size - 2,
-                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp),
-                        )
-                        Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                            poiDistanceOptions.forEach { distance ->
-                                val label = if (distance >= 1000.0) "${(distance / 1000.0).toInt()}km" else "${distance.toInt()}m"
-                                Text(label, style = MaterialTheme.typography.labelSmall)
                             }
                         }
                     }
