@@ -101,7 +101,7 @@ class NearbyPOIPbfDownloadService(
                     okHttpClient.newCall(request).execute().use { response ->
                         val responseBody = response.body
 
-                        if (!response.isSuccessful || responseBody == null) {
+                        if (!response.isSuccessful) {
                             Log.e(KarooRouteGraphExtension.TAG, "Failed to download PBF: HTTP ${response.code}")
                             updatePbfDownloadStoreStatus(context, nextPbfToDownload.countryKey, PbfDownloadStatus.DOWNLOAD_FAILED)
                             return@use
@@ -114,7 +114,7 @@ class NearbyPOIPbfDownloadService(
                         val outputFile = getPoiFile(nextPbfToDownload.countryKey)
                         val outputStream = FileOutputStream(outputFile)
 
-                        val buffer = ByteArray(4096)
+                        val buffer = ByteArray(8192)
                         var total: Long = 0
                         var count: Int
                         var lastProgressUpdate = 0.0f
@@ -130,6 +130,8 @@ class NearbyPOIPbfDownloadService(
                                     updatePbfDownloadStoreStatus(context, nextPbfToDownload.countryKey, PbfDownloadStatus.PENDING, progress)
                                     lastProgressUpdate = progress
                                 }
+                            } else {
+                                updatePbfDownloadStoreStatus(context, nextPbfToDownload.countryKey, PbfDownloadStatus.PENDING, 0.0f)
                             }
                         }
 

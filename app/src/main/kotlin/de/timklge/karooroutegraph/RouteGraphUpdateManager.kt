@@ -3,7 +3,6 @@ package de.timklge.karooroutegraph
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import androidx.compose.ui.res.stringResource
 import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
 import com.mapbox.turf.TurfConstants
@@ -137,6 +136,7 @@ class RouteGraphUpdateManager(
         var knownClimbs: List<Climb>? = null
         var knownIncidentWarningShown = false
         var poiDistances: Map<POI, List<NearestPoint>>? = null
+        var knownOpeningHours: Map<POI, String> = emptyMap()
         var lastKnownPositionAlongRoute: Double? = null
         var lastAutoAddedPoisByOsmId: Map<Long, Symbol.POI> = emptyMap()
         var lastAutoAddedPoisRequestedAtPosition: Point? = null
@@ -299,7 +299,8 @@ class RouteGraphUpdateManager(
                     true
                 } else false
 
-                if (onRoute) {
+                val shouldUpdateClimbs = onRoute && (routeChanged || (newClimbs?.size ?: 0) > (knownClimbs?.size ?: 0))
+                if (shouldUpdateClimbs) {
                     knownClimbs = newClimbs
                 }
 
@@ -520,7 +521,7 @@ class RouteGraphUpdateManager(
                                 offlineNearbyPOIProvider.requestNearbyPOIs(
                                     poiSettings.autoAddPoiCategories.map { it.osmTag }.flatten(),
                                     listOf(currentLocation),
-                                    2_000,
+                                    settings.poiDistanceToRouteMaxMeters.toInt() * 4,
                                     200
                                 ).forEach { poi ->
                                     val poiName = poi.tags["name"]
@@ -654,6 +655,7 @@ class RouteGraphUpdateManager(
                         isOnRoute = currentDistanceAlongRoute != null,
                         knownRoute = knownRoute,
                         poiDistances = poiDistances,
+                        knownPoiOpeningHours = temporaryPOIs.poiIdOpeningHours,
                         sampledElevationData = sampledElevationData,
                         climbs = knownClimbs,
                         isImperial = isImperial,

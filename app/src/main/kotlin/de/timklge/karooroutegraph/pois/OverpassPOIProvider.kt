@@ -18,6 +18,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.io.ByteArrayInputStream
 import java.net.URLEncoder
+import java.nio.charset.Charset
 import java.util.Locale
 import java.util.zip.GZIPInputStream
 
@@ -72,7 +73,7 @@ class OverpassPOIProvider(
             @Suppress("BlockingMethodInNonBlockingContext")
             val requestBody = "data=${URLEncoder.encode(requestBodyDataPart, "UTF-8")}".encodeToByteArray()
 
-            Log.d(KarooRouteGraphExtension.Companion.TAG, "Http request to ${url}... with body: ${requestBodyDataPart}")
+            Log.d(KarooRouteGraphExtension.Companion.TAG, "Http request to ${url}... with body: $requestBodyDataPart")
 
             val listenerId = karooSystemServiceProvider.karooSystemService.addConsumer(
                 OnHttpResponse.MakeHttpRequest(
@@ -114,10 +115,16 @@ class OverpassPOIProvider(
                             error(completeEvent.error ?: "Unknown error")
                         }
 
+                        if (completeEvent.statusCode == 504) error("Overpass API is overloaded (HTTP 504), please try again later or use the offline POI download option")
+
+                        if (completeEvent.statusCode == 429) error("Overpass API rate limit exceeded (HTTP 429), please try again later or use the offline POI download option")
+
+                        if (completeEvent.statusCode in 500..599) error("Overpass API server error (HTTP ${completeEvent.statusCode}), please try again later or use the offline POI download option")
+
                         val response = try {
                             jsonWithUnknownKeys.decodeFromString(OverpassResponse.serializer(), responseString)
                         } catch (e: Exception) {
-                            Log.e(KarooRouteGraphExtension.Companion.TAG, "Failed to parse response: ${completeEvent.body}", e)
+                            Log.e(KarooRouteGraphExtension.Companion.TAG, "Failed to parse response (status ${completeEvent.statusCode}): $responseString", e)
                             throw e
                         }
 

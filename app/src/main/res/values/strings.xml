@@ -153,6 +153,7 @@
     <string name="auto_add_pois_to_map">Automatically add POIs to map</string>
     <string name="auto_add_to_elevation_profile_and_minimap">Automatically add POIs to elevation profile and minimap</string>
     <string name="select_categories">Select categories</string>
+<<<<<<< HEAD
 
     <!-- Profile-specific POI settings -->
     <string name="ride_profile">Ride Profile</string>
@@ -166,4 +167,10 @@
     <string name="select_alert_categories">Select alert categories</string>
     <string name="alert_distance">Alert distance</string>
     <string name="only_for_selected_categories">Only trigger alerts for selected categories</string>
+    <string name="open_at_eta">🟢 Open</string>
+    <string name="closed_at_eta">🔴 Closed</string>
+    <string name="open_at">🟢 Open at %1s</string>
+    <string name="closed_at">🔴 Closed at %1s</string>
+    <string name="open_now">🟢 Now open</string>
+    <string name="closed_now">🔴 Now closed</string>
 </resources>

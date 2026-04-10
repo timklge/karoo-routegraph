@@ -12,6 +12,7 @@ import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.models.DataType
 import io.hammerhead.karooext.models.KarooEvent
 import io.hammerhead.karooext.models.OnStreamState
+import io.hammerhead.karooext.models.RideState
 import io.hammerhead.karooext.models.StreamState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -264,6 +265,8 @@ class KarooSystemServiceProvider(private val context: Context) {
                 }
             }
     }
+
+    fun streamRideState(): Flow<RideState> = stream<RideState>()
 
     inline fun<reified T : KarooEvent> stream(): Flow<T> {
         return callbackFlow {

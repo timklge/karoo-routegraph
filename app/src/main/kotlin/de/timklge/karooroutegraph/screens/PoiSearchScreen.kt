@@ -55,6 +55,10 @@ import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.LocationViewModelProvider
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
+import de.timklge.karooroutegraph.SurfaceConditionRetrievalService
+import de.timklge.karooroutegraph.TravelTimeEstimationService
+import de.timklge.karooroutegraph.datatypes.streamPowerPerHour
+import de.timklge.karooroutegraph.pois.DistanceToPoiResult
 import de.timklge.karooroutegraph.pois.NearestPoint
 import de.timklge.karooroutegraph.pois.NominatimProvider
 import de.timklge.karooroutegraph.pois.OsmPlace
@@ -70,6 +74,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import java.util.Date
+import kotlin.time.DurationUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -92,6 +98,12 @@ fun PoiSearchScreen() {
     val nominatimProvider = koinInject<NominatimProvider>()
     val locationViewModelProvider = koinInject<LocationViewModelProvider>()
     val routeGraphViewModelProvider = koinInject<RouteGraphViewModelProvider>()
+    val travelTimeEstimationService = koinInject<TravelTimeEstimationService>()
+    val surfaceConditionRetrievalService = koinInject<SurfaceConditionRetrievalService>()
+
+    val averagePowerFlow by streamPowerPerHour(karooSystemServiceProvider).collectAsStateWithLifecycle(null)
+    val surfaceConditions by surfaceConditionRetrievalService.flow.collectAsStateWithLifecycle(null)
+    val userProfile by karooSystemServiceProvider.stream<UserProfile>().collectAsStateWithLifecycle(null)
 
     var maxDistanceFromRoute by remember { mutableDoubleStateOf(1_000.0) }
 
@@ -353,15 +365,38 @@ fun PoiSearchScreen() {
                         )
 
                         val distanceLabel = currentPosition?.let {
-                            if (selectedSort == PoiSortOption.LINEAR_DISTANCE) {
-                                val distanceMeters = linearDistanceToPoi(poi)
-                                distanceMeters?.let { distance ->
-                                    formatDistance(distance, isImperial)
+                            buildString {
+                                val distanceResult = if (selectedSort == PoiSortOption.LINEAR_DISTANCE) {
+                                    val distanceMeters = linearDistanceToPoi(poi)
+                                    distanceMeters?.let { distance ->
+                                        append(formatDistance(distance, isImperial))
+                                    }
+                                    null
+                                } else {
+                                    val result = distanceToPoi(symbol, viewModel?.sampledElevationData, nearestPointsOnRouteToFoundPois, currentPosition, selectedSort, viewModel?.distanceAlongRoute)
+                                    append(result?.formatDistance(LocalContext.current, isImperial) ?: "")
+                                    result
                                 }
-                            } else {
-                                val result = distanceToPoi(symbol, viewModel?.sampledElevationData, nearestPointsOnRouteToFoundPois, currentPosition, selectedSort, viewModel?.distanceAlongRoute)
-                                result?.formatDistance(LocalContext.current, isImperial)
-                            }
+
+                                viewModel?.let { vm ->
+                                    val estimatedTravelTime = if (selectedSort == PoiSortOption.AHEAD_ON_ROUTE && vm.distanceAlongRoute != null) {
+                                        travelTimeEstimationService.estimateTravelTime(
+                                            routeElevationData = vm.sampledElevationData,
+                                            startDistance = vm.distanceAlongRoute.toDouble(),
+                                            endDistance = vm.distanceAlongRoute.toDouble() + ((distanceResult as? DistanceToPoiResult.AheadOnRouteDistance)?.distanceOnRoute ?: 0.0),
+                                            totalWeight = (userProfile?.weight?.toDouble() ?: 70.0) + 10.0,
+                                            lastHourAvgPower = averagePowerFlow,
+                                            surfaceConditions = surfaceConditions ?: emptyList(),
+                                            finalSegmentLength = (distanceResult as? DistanceToPoiResult.AheadOnRouteDistance)?.distanceFromPointOnRoute
+                                        )
+                                    } else null
+
+                                    if (estimatedTravelTime != null) {
+                                        val estimatedArrivalTime = System.currentTimeMillis() + estimatedTravelTime.toLong(DurationUnit.MILLISECONDS)
+                                        append(" ⏲\u00A0${android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(estimatedArrivalTime))}")
+                                    }
+                                }
+                            }.takeIf { it.isNotEmpty() }
                         }
 
                         if (distanceLabel != null){
