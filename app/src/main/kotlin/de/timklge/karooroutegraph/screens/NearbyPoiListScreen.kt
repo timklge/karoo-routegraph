@@ -69,6 +69,7 @@ import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.SurfaceConditionRetrievalService
 import de.timklge.karooroutegraph.TravelTimeEstimationService
 import de.timklge.karooroutegraph.datatypes.streamPowerPerHour
+import de.timklge.karooroutegraph.getTimeUntilNextChange
 import de.timklge.karooroutegraph.isOpen
 import de.timklge.karooroutegraph.pois.DistanceToPoiResult
 import de.timklge.karooroutegraph.pois.NearbyPOI
@@ -513,7 +514,7 @@ fun NearbyPoiListScreen() {
                                 }
 
                                 viewModel?.let { viewModel ->
-                                    if (selectedSort == PoiSortOption.AHEAD_ON_ROUTE && viewModel?.distanceAlongRoute != null){
+                                    if (selectedSort == PoiSortOption.AHEAD_ON_ROUTE && viewModel.distanceAlongRoute != null){
                                         append(" ⏲\u00A0${android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(eta))}")
                                     }
 
@@ -526,12 +527,31 @@ fun NearbyPoiListScreen() {
                                             null
                                         }
                                     }
+                                    val timeUntilNextChange = openingHours?.let {
+                                        try {
+                                            val nextChange = getTimeUntilNextChange(eta, openingHours)
+
+                                            nextChange
+                                        } catch (e: Exception) {
+                                            Log.e(KarooRouteGraphExtension.TAG, "Failed to determine if POI is closing soon for POI ${poi.element.id}", e)
+
+                                            null
+                                        }
+                                    }
 
                                     isOpenAtEta?.let {
                                         val statusText = " " + if (isOpenAtEta) {
-                                            stringResource(R.string.open_at_eta)
+                                            if (timeUntilNextChange == null || timeUntilNextChange > 60 * 60 * 1000) {
+                                                stringResource(R.string.open_at_eta)
+                                            } else {
+                                                stringResource(R.string.open_closing_soon, android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(eta + timeUntilNextChange)).toString())
+                                            }
                                         } else {
-                                            stringResource(R.string.closed_at_eta)
+                                            if (timeUntilNextChange == null || timeUntilNextChange > 60 * 60 * 1000) {
+                                                stringResource(R.string.closed_at_eta)
+                                            } else {
+                                                stringResource(R.string.closed_opening_soon, android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(eta + timeUntilNextChange)).toString())
+                                            }
                                         }
 
                                         append(statusText.uppercase())
@@ -679,11 +699,21 @@ fun NearbyPoiListScreen() {
                     .verticalScroll(scrollState)) {
 
                     val openingHours = openingHoursTags["opening_hours"]
+                    val currentEta = openingHoursDialogEta ?: System.currentTimeMillis()
                     val isOpen = openingHours?.let {
                         try {
-                            isOpen(openingHoursDialogEta ?: System.currentTimeMillis(), it)
+                            isOpen(currentEta, it)
                         } catch (e: Exception) {
                             Log.e(KarooRouteGraphExtension.TAG, "Failed to parse opening hours for dialog", e)
+                            null
+                        }
+                    }
+
+                    val timeUntilNextChange = openingHours?.let {
+                        try {
+                            getTimeUntilNextChange(currentEta, openingHours)
+                        } catch (e: Exception) {
+                            Log.e(KarooRouteGraphExtension.TAG, "Failed to determine closing time for dialog", e)
                             null
                         }
                     }
@@ -706,16 +736,20 @@ fun NearbyPoiListScreen() {
                                     .weight(0.35f)
                                     .padding(end = 8.dp)
                             )
-                            val arrivalTime = android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(openingHoursDialogEta ?: System.currentTimeMillis()))
+                            val arrivalTime = android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(currentEta))
                             Text(
                                 text = if (isOpen){
-                                    if (openingHoursDialogEta != null){
+                                    if (timeUntilNextChange != null && timeUntilNextChange <= 60 * 60 * 1000) {
+                                        stringResource(R.string.open_closing_soon, android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(currentEta + timeUntilNextChange)).toString())
+                                    } else if (openingHoursDialogEta != null){
                                         stringResource(R.string.open_at, arrivalTime)
                                     } else {
                                         stringResource(R.string.open_now, arrivalTime)
                                     }
                                 } else {
-                                    if (openingHoursDialogEta != null) {
+                                    if (timeUntilNextChange != null && timeUntilNextChange <= 60 * 60 * 1000) {
+                                        stringResource(R.string.closed_opening_soon, android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(currentEta + timeUntilNextChange)).toString())
+                                    } else if (openingHoursDialogEta != null) {
                                         stringResource(R.string.closed_at, arrivalTime)
                                     } else {
                                         stringResource(R.string.closed_now, arrivalTime)
