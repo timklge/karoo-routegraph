@@ -6,10 +6,13 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.Typeface
 import android.util.Log
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.compose.ui.unit.DpSize
 import androidx.core.graphics.createBitmap
+import androidx.core.graphics.drawable.toBitmap
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
@@ -20,6 +23,7 @@ import androidx.glance.layout.fillMaxSize
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
+import de.timklge.karooroutegraph.datatypes.minimap.mapPoiToIcon
 import de.timklge.karooroutegraph.pois.NearestPoint
 import de.timklge.karooroutegraph.pois.NearbyPOI
 import de.timklge.karooroutegraph.pois.OfflineNearbyPOIProvider
@@ -50,7 +54,8 @@ import kotlin.math.roundToInt
 
 data class PoiAheadEntry(
     val name: String,
-    val distanceMeters: Double
+    val distanceMeters: Double,
+    val iconRes: Int
 )
 
 /**
@@ -144,9 +149,11 @@ class PoiListAheadDataType(
                     .take(5)
                     .map { (poi, distance) ->
                         val dist = distance.distanceFromRouteStart - currentDistanceAlongRoute
+                        val iconRes = mapPoiToIcon(poi.symbol.type)
                         PoiAheadEntry(
                             name = poi.symbol.name ?: "Unnamed POI",
-                            distanceMeters = dist.toDouble()
+                            distanceMeters = dist.toDouble(),
+                            iconRes = iconRes
                         )
                     }
 
@@ -190,14 +197,14 @@ class PoiListAheadDataType(
 
             val namePaint = Paint().apply {
                 color = textColor
-                textSize = 28f
-                typeface = Typeface.DEFAULT
+                textSize = 34f
+                typeface = Typeface.DEFAULT_BOLD
                 isAntiAlias = true
             }
 
             val distancePaint = Paint().apply {
                 color = secondaryColor
-                textSize = 26f
+                textSize = 30f
                 typeface = Typeface.DEFAULT
                 isAntiAlias = true
                 textAlign = Paint.Align.RIGHT
@@ -205,13 +212,14 @@ class PoiListAheadDataType(
 
             val emptyPaint = Paint().apply {
                 color = secondaryColor
-                textSize = 28f
+                textSize = 34f
                 typeface = Typeface.DEFAULT
                 isAntiAlias = true
                 textAlign = Paint.Align.CENTER
             }
 
             poisAheadFlow.collect { pois ->
+                val iconSize = 28f
                 val bitmap = createBitmap(width, height)
                 val canvas = Canvas(bitmap)
 
@@ -221,9 +229,10 @@ class PoiListAheadDataType(
                 if (pois.isEmpty()) {
                     canvas.drawText("No POIs ahead", width / 2f, height / 2f, emptyPaint)
                 } else {
-                    val lineHeight = 36f
-                    val startY = 30f
-                    val nameX = 10f
+                    val lineHeight = 42f
+                    val startY = 36f
+                    val iconPadding = 4f
+                    val nameX = iconSize + iconPadding + 4f
                     val distanceX = (width - 10).toFloat()
 
                     pois.forEachIndexed { index, entry ->
@@ -235,8 +244,17 @@ class PoiListAheadDataType(
                             "${entry.distanceMeters.roundToInt()} m"
                         }
 
+                        // Draw icon
+                        val icon = AppCompatResources.getDrawable(applicationContext, entry.iconRes)
+                        val iconY = (y - iconSize).toInt()
+                        val iconRect = Rect(4, iconY, 4 + iconSize.toInt(), iconY + iconSize.toInt())
+                        val iconBitmap = icon?.toBitmap(iconSize.toInt(), iconSize.toInt())
+                        if (iconBitmap != null) {
+                            canvas.drawBitmap(iconBitmap, null, iconRect, null)
+                        }
+
                         // Truncate name if too long
-                        val maxWidth = width - 100f
+                        val maxWidth = width - iconSize - iconPadding - 100f
                         var displayName = entry.name
                         if (namePaint.measureText(displayName) > maxWidth) {
                             while (namePaint.measureText("$displayName…") > maxWidth && displayName.length > 1) {
@@ -247,6 +265,9 @@ class PoiListAheadDataType(
 
                         canvas.drawText(displayName, nameX, y, namePaint)
                         canvas.drawText(distanceText, distanceX, y, distancePaint)
+
+                        // Move icon rect down for next iteration
+                        iconRect.offset(0, lineHeight.toInt())
                     }
                 }
 
