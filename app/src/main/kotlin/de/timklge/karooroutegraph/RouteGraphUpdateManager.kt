@@ -136,6 +136,7 @@ class RouteGraphUpdateManager(
         var knownClimbs: List<Climb>? = null
         var knownIncidentWarningShown = false
         var poiDistances: Map<POI, List<NearestPoint>>? = null
+        var offlinePoiDistances: Map<POI, List<NearestPoint>>? = null
         var knownOpeningHours: Map<POI, String> = emptyMap()
         var lastKnownPositionAlongRoute: Double? = null
         var lastAutoAddedPoisByOsmId: Map<Long, Symbol.POI> = emptyMap()
@@ -570,9 +571,6 @@ class RouteGraphUpdateManager(
                     temporaryPOIs.poisByOsmId
                 }
                 val tempPoiSymbols = poiSum.map { (_, poi) -> POI(poi) }
-                val offlineNearbyPois = lastAutoAddedPoisByOsmId.values.map { symbol ->
-                    POI(symbol = symbol, type = PoiType.POI)
-                }
                 val localPois = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.pois.orEmpty().map { symbol ->
                     POI(
                         symbol = symbol,
@@ -587,7 +585,6 @@ class RouteGraphUpdateManager(
                     addAll(tempPoiSymbols)
                     addAll(globalPois)
                     addAll(localPois)
-                    addAll(offlineNearbyPois)
 
                     addAll(
                         getStartAndEndPoiIfNone(
@@ -619,10 +616,25 @@ class RouteGraphUpdateManager(
                         )
                         poiDistances = updatedPoiDistances
 
+                        val offlinePois = lastAutoAddedPoisByOsmId.values.map { symbol ->
+                            POI(symbol = symbol, type = PoiType.POI)
+                        }
+                        val updatedOfflinePoiDistances = if (offlinePois.isNotEmpty()) {
+                            calculatePoiDistances(
+                                routeLineString,
+                                offlinePois,
+                                settings.poiDistanceToRouteMaxMeters
+                            )
+                        } else {
+                            emptyMap()
+                        }
+
                         val poiDistancesDebug = updatedPoiDistances.map { (key, value) ->
                             "${key.symbol.name} (${key.symbol.type}): $value"
                         }.joinToString(", ")
                         Log.d(TAG, "POI distances: $poiDistancesDebug")
+
+                        offlinePoiDistances = updatedOfflinePoiDistances
                     }
                     knownRoute = routeLineString
                 }
@@ -659,6 +671,7 @@ class RouteGraphUpdateManager(
                         isOnRoute = currentDistanceAlongRoute != null,
                         knownRoute = knownRoute,
                         poiDistances = poiDistances,
+                        offlinePoiDistances = offlinePoiDistances,
                         knownPoiOpeningHours = temporaryPOIs.poiIdOpeningHours,
                         sampledElevationData = sampledElevationData,
                         climbs = knownClimbs,

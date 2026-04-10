@@ -47,14 +47,15 @@ class PoiListAheadDataType(
         streamJob = CoroutineScope(Dispatchers.Default).launch {
             viewModelProvider.viewModelFlow.collect { state ->
                 val currentDistanceAlongRoute = state.distanceAlongRoute
+                val offlinePoiDistances = state.offlinePoiDistances
 
-                if (currentDistanceAlongRoute == null || state.poiDistances.isNullOrEmpty()) {
+                if (currentDistanceAlongRoute == null || offlinePoiDistances.isNullOrEmpty()) {
                     poisAheadFlow.update { emptyList() }
                     emitter.onNext(StreamState.NotAvailable)
                     return@collect
                 }
 
-                val poiDistances = state.poiDistances.entries.flatMap { (poi, list) ->
+                val poiDistances = offlinePoiDistances.entries.flatMap { (poi, list) ->
                     list.map { distance -> poi to distance }
                 }
 
