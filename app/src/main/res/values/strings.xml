@@ -18,6 +18,8 @@
     <string name="minimap_night_mode">Dark mode at night</string>
     <string name="poi_button">POI Button</string>
     <string name="poi_button_description">Button to quickly open the POI list</string>
+    <string name="poi_list_ahead">POIs Ahead</string>
+    <string name="poi_list_ahead_description">Shows distance to next POI ahead on route</string>
     <string name="no_route">No route loaded</string>
 
     <!-- MainScreen strings -->

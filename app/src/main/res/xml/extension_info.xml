@@ -62,4 +62,11 @@
         icon="@drawable/trip"
         typeId="poiButton" />
 
+    <DataType
+        description="@string/poi_list_ahead_description"
+        displayName="@string/poi_list_ahead"
+        graphical="false"
+        icon="@drawable/trip"
+        typeId="poilistahead" />
+
 </ExtensionInfo>
