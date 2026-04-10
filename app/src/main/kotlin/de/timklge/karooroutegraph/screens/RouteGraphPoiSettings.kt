@@ -16,6 +16,7 @@ data class RouteGraphPoiSettings(
     val autoAddPoisToMap: Boolean = false,
     val alertPoiCategories: Set<NearbyPoiCategory> = emptySet(),
     val alertDistanceMeters: Double = 500.0,
+    val enablePoiAlerts: Boolean = false,
 ){
     companion object {
         val defaultSettings = Json.encodeToString(RouteGraphPoiSettings())

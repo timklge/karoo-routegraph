@@ -134,7 +134,7 @@ class PoiApproachAlertService(
                     globalPoiSettings
                 }
 
-                if (poiSettings.alertPoiCategories.isEmpty() || poiSettings.alertDistanceMeters <= 0.0) {
+                if (!poiSettings.enablePoiAlerts || poiSettings.alertPoiCategories.isEmpty() || poiSettings.alertDistanceMeters <= 0.0) {
                     return@collect
                 }
 

@@ -106,6 +106,7 @@ fun PointsOfInterestScreen(
     var showAutoAddPoiCategoriesDialog by remember { mutableStateOf(false) }
     var showDownloadPoisDialog by remember { mutableStateOf(false) }
     var poiDistanceToRouteMaxMeters by remember { mutableDoubleStateOf(1000.0) }
+    var poiApproachAlertAtDistance by remember { mutableDoubleStateOf(500.0) }
     var currentProfileName by remember { mutableStateOf<String?>(null) }
 
     // Alert-specific POI settings
@@ -117,7 +118,8 @@ fun PointsOfInterestScreen(
     suspend fun updateSettings(){
         karooSystemServiceProvider.saveSettings { settings ->
             settings.copy(
-                poiDistanceToRouteMaxMeters = poiDistanceToRouteMaxMeters
+                poiDistanceToRouteMaxMeters = poiDistanceToRouteMaxMeters,
+                poiApproachAlertAtDistance = poiApproachAlertAtDistance
             )
         }
     }
@@ -131,7 +133,8 @@ fun PointsOfInterestScreen(
                 autoAddPoiCategories = autoAddPoiCategories,
                 autoAddToElevationProfileAndMinimap = autoAddToElevationProfileAndMinimap,
                 alertPoiCategories = alertPoiCategories,
-                alertDistanceMeters = alertDistanceMeters
+                alertDistanceMeters = alertDistanceMeters,
+                enablePoiAlerts = enablePoiAlerts
             )
         }
     }
@@ -146,6 +149,7 @@ fun PointsOfInterestScreen(
     LaunchedEffect(Unit) {
         karooSystemServiceProvider.streamSettings().collect { settings ->
             poiDistanceToRouteMaxMeters = settings.poiDistanceToRouteMaxMeters
+            poiApproachAlertAtDistance = settings.poiApproachAlertAtDistance ?: 500.0
         }
     }
 
@@ -160,7 +164,7 @@ fun PointsOfInterestScreen(
                 autoAddToElevationProfileAndMinimap = settings.autoAddToElevationProfileAndMinimap
                 alertPoiCategories = settings.alertPoiCategories
                 alertDistanceMeters = settings.alertDistanceMeters
-                enablePoiAlerts = settings.alertPoiCategories.isNotEmpty()
+                enablePoiAlerts = settings.enablePoiAlerts
             }
         }
     }
@@ -449,6 +453,33 @@ fun PointsOfInterestScreen(
                         Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                             poiDistanceOptions.forEach { distance ->
                                 val label = if (distance >= 1000.0) "${(distance / 1000.0).toInt()}km" else "${distance.toInt()}m"
+                                Text(label, style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+
+                    val poiApproachAlertOptions = arrayOf(0.0, 200.0, 500.0, 1_000.0, 2_000.0, 5_000.0)
+                    val selectedApproachAlertIndex = poiApproachAlertOptions.indexOf(poiApproachAlertAtDistance)
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.poi_approach_alert_distance))
+                        Slider(
+                            value = selectedApproachAlertIndex.toFloat(),
+                            onValueChange = { idx ->
+                                val newIndex = idx.roundToInt().coerceIn(poiApproachAlertOptions.indices)
+                                poiApproachAlertAtDistance = poiApproachAlertOptions[newIndex]
+                                coroutineScope.launch { updateSettings() }
+                            },
+                            valueRange = 0f..(poiApproachAlertOptions.size - 1).toFloat(),
+                            steps = poiApproachAlertOptions.size - 2,
+                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp),
+                        )
+                        Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                            poiApproachAlertOptions.forEach { distance ->
+                                val label = when {
+                                    distance == 0.0 -> stringResource(R.string.distance_off)
+                                    distance >= 1000.0 -> "${(distance / 1000.0).toInt()}km"
+                                    else -> "${distance.toInt()}m"
+                                }
                                 Text(label, style = MaterialTheme.typography.labelSmall)
                             }
                         }
