@@ -65,7 +65,7 @@
     <DataType
         description="@string/poi_list_ahead_description"
         displayName="@string/poi_list_ahead"
-        graphical="false"
+        graphical="true"
         icon="@drawable/trip"
         typeId="poilistahead" />
 

@@ -20,12 +20,20 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+data class PoiAheadEntry(
+    val name: String,
+    val distanceMeters: Double
+)
+
 /**
- * Data field that shows POIs ahead on the route.
- * Displays the nearest POI ahead with its name and distance.
+ * Data field that shows the next 5 POIs ahead on the route.
+ * Displays as a multi-line text view with POI name and distance.
  */
 class PoiListAheadDataType(
     private val karooSystem: KarooSystemService,
@@ -35,7 +43,7 @@ class PoiListAheadDataType(
 
     private var streamJob: Job? = null
     private var viewJob: Job? = null
-    private var lastPoiDisplayText: String? = null
+    private val poisAheadFlow = MutableStateFlow<List<PoiAheadEntry>>(emptyList())
 
     override fun startStream(emitter: Emitter<StreamState>) {
         streamJob = CoroutineScope(Dispatchers.Default).launch {
@@ -43,7 +51,7 @@ class PoiListAheadDataType(
                 val currentDistanceAlongRoute = state.distanceAlongRoute
 
                 if (currentDistanceAlongRoute == null || state.poiDistances.isNullOrEmpty()) {
-                    lastPoiDisplayText = null
+                    poisAheadFlow.update { emptyList() }
                     emitter.onNext(StreamState.NotAvailable)
                     return@collect
                 }
@@ -58,33 +66,26 @@ class PoiListAheadDataType(
                     distance.distanceFromRouteStart - currentDistanceAlongRoute > 0
                 }
 
-                // Sort by distance along route (nearest first)
-                val poisAheadSorted = poisAhead.sortedBy { (_, distance) ->
-                    distance.distanceFromRouteStart
+                // Sort by distance along route (nearest first) and take top 5
+                val poisAheadSorted = poisAhead
+                    .sortedBy { (_, distance) -> distance.distanceFromRouteStart }
+                    .take(5)
+
+                val entries = poisAheadSorted.map { (poi, distance) ->
+                    val dist = distance.distanceFromRouteStart - currentDistanceAlongRoute
+                    PoiAheadEntry(
+                        name = poi.symbol.name ?: "Unnamed POI",
+                        distanceMeters = dist.toDouble()
+                    )
                 }
 
-                val nextPoi = poisAheadSorted.firstOrNull()
+                poisAheadFlow.update { entries }
 
-                if (nextPoi != null) {
-                    val nextPoiDistance = nextPoi.second.distanceFromRouteStart - currentDistanceAlongRoute
-                    val distanceMeters = nextPoiDistance.toDouble()
-
-                    val poiName = nextPoi.first.symbol.name ?: "POI"
-                    val distanceKm = distanceMeters / 1000.0
-                    lastPoiDisplayText = if (distanceKm >= 1.0) {
-                        "$poiName: %.1f km".format(distanceKm)
-                    } else {
-                        "$poiName: ${distanceMeters.roundToInt()} m"
-                    }
-
-                    // Emit a dummy value to keep the stream alive
-                    emitter.onNext(StreamState.Streaming(
-                        DataPoint(dataTypeId, mapOf(DataType.Field.SINGLE to distanceMeters))
-                    ))
-                } else {
-                    lastPoiDisplayText = null
-                    emitter.onNext(StreamState.NotAvailable)
-                }
+                // Emit a dummy value to keep the stream alive
+                val firstDist = entries.firstOrNull()?.distanceMeters ?: 0.0
+                emitter.onNext(StreamState.Streaming(
+                    DataPoint(dataTypeId, mapOf(DataType.Field.SINGLE to firstDist))
+                ))
             }
         }
         emitter.setCancellable {
@@ -101,15 +102,20 @@ class PoiListAheadDataType(
         }
 
         viewJob = CoroutineScope(Dispatchers.Default).launch {
-            // Poll for display text updates
-            while (true) {
-                val text = lastPoiDisplayText
-                if (text != null) {
-                    emitter.onNext(ShowCustomStreamState(text, null))
+            poisAheadFlow.collect { pois ->
+                val displayText = if (pois.isEmpty()) {
+                    "No POIs ahead"
                 } else {
-                    emitter.onNext(ShowCustomStreamState("", null))
+                    pois.joinToString("\n") { entry ->
+                        val distanceText = if (entry.distanceMeters >= 1000) {
+                            "%.1f km".format(entry.distanceMeters / 1000.0)
+                        } else {
+                            "${entry.distanceMeters.roundToInt()} m"
+                        }
+                        "${entry.name}  $distanceText"
+                    }
                 }
-                kotlinx.coroutines.delay(1000)
+                emitter.onNext(ShowCustomStreamState(displayText, null))
             }
         }
 
