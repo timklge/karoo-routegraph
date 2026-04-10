@@ -116,11 +116,6 @@
     <string name="category_convenience">Convenience Store</string>
     <string name="category_bakery">Bakery</string>
     <string name="category_camping_site">Camping Site</string>
-    <string name="category_hotel">Hotel</string>
-    <string name="category_train_station">Train Station</string>
-    <string name="category_waste_basket">Waste Basket</string>
-    <string name="category_bench">Bench</string>
-    <string name="category_bike_shop">Bike Shop</string>
     <string name="category_attraction">Attraction</string>
     <string name="category_viewpoint">Viewpoint</string>
     <string name="category_beach">Beach</string>
