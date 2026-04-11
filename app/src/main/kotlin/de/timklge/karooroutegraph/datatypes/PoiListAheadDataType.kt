@@ -189,14 +189,14 @@ class PoiListAheadDataType(
 
             val namePaint = Paint().apply {
                 color = textColor
-                textSize = 30f
+                textSize = 36f
                 typeface = Typeface.DEFAULT_BOLD
                 isAntiAlias = true
             }
 
             val distancePaint = Paint().apply {
                 color = secondaryColor
-                textSize = 28f
+                textSize = 34f
                 typeface = Typeface.DEFAULT_BOLD
                 isAntiAlias = true
                 textAlign = Paint.Align.RIGHT
@@ -204,18 +204,18 @@ class PoiListAheadDataType(
 
             val emptyPaint = Paint().apply {
                 color = secondaryColor
-                textSize = 30f
+                textSize = 36f
                 typeface = Typeface.DEFAULT
                 isAntiAlias = true
                 textAlign = Paint.Align.CENTER
             }
 
-            val iconSize = 32
+            val iconSize = 44
             val iconLeft = 6f
             val nameX = iconLeft + iconSize + 8f
             val distanceX = (width - 6).toFloat()
             val nameMaxWidth = distanceX - nameX - 16f
-            val itemHeight = 64f
+            val itemHeight = 80f
             val startY = 8f
 
             poisAheadFlow.collect { pois ->
@@ -253,7 +253,7 @@ class PoiListAheadDataType(
                         }
 
                         // Draw name (max 2 lines)
-                        val textBaseline = itemTop + 22f
+                        val textBaseline = itemTop + 28f
                         var displayName = entry.name
 
                         if (namePaint.measureText(displayName) > nameMaxWidth) {
@@ -273,14 +273,14 @@ class PoiListAheadDataType(
 
                             canvas.drawText(line1, nameX, textBaseline, namePaint)
                             if (line2.isNotEmpty()) {
-                                canvas.drawText(line2, nameX, textBaseline + 30f, namePaint)
+                                canvas.drawText(line2, nameX, textBaseline + 36f, namePaint)
                             }
                         } else {
                             canvas.drawText(displayName, nameX, textBaseline, namePaint)
                         }
 
                         // Draw distance - vertically centered
-                        canvas.drawText(distanceText, distanceX, itemTop + itemHeight / 2 + 10f, distancePaint)
+                        canvas.drawText(distanceText, distanceX, itemTop + itemHeight / 2 + 12f, distancePaint)
                     }
                 }
 
