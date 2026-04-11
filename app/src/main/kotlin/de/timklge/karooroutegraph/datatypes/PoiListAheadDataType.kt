@@ -5,8 +5,6 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.ColorMatrix
-import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.Typeface
@@ -14,7 +12,7 @@ import android.util.Log
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.compose.ui.unit.DpSize
 import androidx.core.graphics.createBitmap
-import androidx.core.graphics.drawable.toBitmap
+import androidx.core.graphics.drawable.DrawableCompat
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
@@ -187,20 +185,7 @@ class PoiListAheadDataType(
             val backgroundColor = if (nightMode) Color.BLACK else Color.WHITE
             val textColor = if (nightMode) Color.WHITE else Color.BLACK
             val secondaryColor = if (nightMode) Color.LTGRAY else Color.DKGRAY
-
-            // Icon paint - invert for light mode (like RouteGraphDataType does)
-            val iconPaint = Paint().apply {
-                if (!nightMode) {
-                    colorFilter = ColorMatrixColorFilter(
-                        ColorMatrix().apply { set(floatArrayOf(
-                            -1f,  0f,  0f, 0f, 255f,
-                            0f, -1f,  0f, 0f, 255f,
-                            0f,  0f, -1f, 0f, 255f,
-                            0f,  0f,  0f, 1f,   0f
-                        )) }
-                    )
-                }
-            }
+            val iconColor = if (nightMode) Color.WHITE else Color.BLACK
 
             val namePaint = Paint().apply {
                 color = textColor
@@ -239,19 +224,13 @@ class PoiListAheadDataType(
 
                 canvas.drawColor(backgroundColor)
 
-                // Pre-load all icon bitmaps once
-                val iconCache = mutableMapOf<Int, Bitmap?>()
-                pois.forEach { entry ->
-                    if (!iconCache.containsKey(entry.iconRes)) {
-                        val drawable = AppCompatResources.getDrawable(context, entry.iconRes)
-                        val iconBitmap = drawable?.let {
-                            val b = createBitmap(iconSize, iconSize, Bitmap.Config.ARGB_8888)
-                            val c = Canvas(b)
-                            it.setBounds(0, 0, iconSize, iconSize)
-                            it.draw(c)
-                            b
-                        }
-                        iconCache[entry.iconRes] = iconBitmap
+                // Draw icon at given position with tint
+                fun drawIcon(canvas: Canvas, iconRes: Int, left: Int, top: Int, size: Int) {
+                    val drawable = AppCompatResources.getDrawable(context, iconRes)?.mutate()
+                    if (drawable != null) {
+                        DrawableCompat.setTint(drawable, iconColor)
+                        drawable.setBounds(left, top, left + size, top + size)
+                        drawable.draw(canvas)
                     }
                 }
 
@@ -263,16 +242,8 @@ class PoiListAheadDataType(
                         val iconTop = (itemTop + (itemHeight - iconSize) / 2).toInt()
                         val iconLeftPos = iconLeft.toInt()
 
-                        // Draw icon from cache
-                        val cachedIcon = iconCache[entry.iconRes]
-                        if (cachedIcon != null) {
-                            val iconRect = Rect(iconLeftPos, iconTop, iconLeftPos + iconSize, iconTop + iconSize)
-                            canvas.drawBitmap(cachedIcon, null, iconRect, iconPaint)
-                        } else {
-                            // Fallback: draw a small circle as placeholder
-                            val placeholderPaint = Paint().apply { color = textColor; style = Paint.Style.FILL }
-                            canvas.drawCircle(iconLeftPos + iconSize / 2f, iconTop + iconSize / 2f, 8f, placeholderPaint)
-                        }
+                        // Draw icon
+                        drawIcon(canvas, entry.iconRes, iconLeftPos, iconTop, iconSize)
 
                         // Calculate distance text
                         val distanceText = if (entry.distanceMeters >= 1000) {
