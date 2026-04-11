@@ -143,6 +143,7 @@ class PoiListAheadDataType(
                     .map { (poi, distance) ->
                         val dist = distance.distanceFromRouteStart - currentDistanceAlongRoute
                         val iconRes = mapPoiToIcon(poi.symbol.type)
+                        Log.d(TAG, "PoiListAhead type='${poi.symbol.type}' name='${poi.symbol.name}' iconRes=$iconRes")
                         PoiAheadEntry(
                             name = poi.symbol.name ?: "Unnamed POI",
                             distanceMeters = dist.toDouble(),
@@ -233,10 +234,26 @@ class PoiListAheadDataType(
             val startY = 8f
 
             poisAheadFlow.collect { pois ->
-                val bitmap = createBitmap(width, height)
+                val bitmap = createBitmap(width, height, Bitmap.Config.ARGB_8888)
                 val canvas = Canvas(bitmap)
 
                 canvas.drawColor(backgroundColor)
+
+                // Pre-load all icon bitmaps once
+                val iconCache = mutableMapOf<Int, Bitmap?>()
+                pois.forEach { entry ->
+                    if (!iconCache.containsKey(entry.iconRes)) {
+                        val drawable = AppCompatResources.getDrawable(context, entry.iconRes)
+                        val iconBitmap = drawable?.let {
+                            val b = createBitmap(iconSize, iconSize, Bitmap.Config.ARGB_8888)
+                            val c = Canvas(b)
+                            it.setBounds(0, 0, iconSize, iconSize)
+                            it.draw(c)
+                            b
+                        }
+                        iconCache[entry.iconRes] = iconBitmap
+                    }
+                }
 
                 if (pois.isEmpty()) {
                     canvas.drawText("No POIs ahead", width / 2f, height / 2f, emptyPaint)
@@ -244,18 +261,17 @@ class PoiListAheadDataType(
                     pois.forEachIndexed { index, entry ->
                         val itemTop = startY + index * itemHeight
                         val iconTop = (itemTop + (itemHeight - iconSize) / 2).toInt()
+                        val iconLeftPos = iconLeft.toInt()
 
-                        // Draw icon
-                        val iconDrawable = AppCompatResources.getDrawable(context, entry.iconRes)
-                        Log.d(TAG, "Icon res=${entry.iconRes} for '${entry.name}', drawable=${iconDrawable != null}")
-                        if (iconDrawable != null) {
-                            val iconRect = Rect(iconLeft.toInt(), iconTop, iconLeft.toInt() + iconSize, iconTop + iconSize)
-                            val iconBitmap = iconDrawable.toBitmap(iconSize, iconSize)
-                            canvas.drawBitmap(iconBitmap, null, iconRect, iconPaint)
+                        // Draw icon from cache
+                        val cachedIcon = iconCache[entry.iconRes]
+                        if (cachedIcon != null) {
+                            val iconRect = Rect(iconLeftPos, iconTop, iconLeftPos + iconSize, iconTop + iconSize)
+                            canvas.drawBitmap(cachedIcon, null, iconRect, iconPaint)
                         } else {
                             // Fallback: draw a small circle as placeholder
                             val placeholderPaint = Paint().apply { color = textColor; style = Paint.Style.FILL }
-                            canvas.drawCircle(iconLeft + iconSize / 2f, iconTop + iconSize / 2f, 6f, placeholderPaint)
+                            canvas.drawCircle(iconLeftPos + iconSize / 2f, iconTop + iconSize / 2f, 8f, placeholderPaint)
                         }
 
                         // Calculate distance text
