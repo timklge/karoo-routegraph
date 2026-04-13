@@ -13,9 +13,6 @@
     <string name="etapoi_description">Estimated arrival time at next POI</string>
     <string name="eta">ETA</string>
     <string name="eta_description">Estimated time of arrival at end of route</string>
-    <string name="minimap">Minimap</string>
-    <string name="minimap_description">Secondary map display (with route and POIs)</string>
-    <string name="minimap_night_mode">Dark mode at night</string>
     <string name="poi_button">POI Button</string>
     <string name="poi_button_description">Button to quickly open the POI list</string>
     <string name="poi_list_ahead">POIs Ahead</string>
@@ -46,21 +43,12 @@
     <string name="never">Never</string>
 
     <string name="points_of_interest_poi">Points of Interest</string>
-    <string name="show_poi_labels">Show POI labels on minimap</string>
     <string name="manage_pois">Manage POIs</string>
     <string name="open_poi_menu">Open POI menu</string>
     <string name="manage_pois_description">Manage POIs</string>
     <string name="max_poi_distance">Max POI distance from route:</string>
     <string name="poi_approach_alert_distance">POI approach alert distance:</string>
     <string name="distance_off">Off</string>
-    <string name="traffic_incidents">Traffic Incidents</string>
-    <string name="enable_traffic_incident_reporting">Enable traffic incident reporting</string>
-    <string name="requires_here_maps_api">Requires HERE Maps API Key</string>
-    <string name="here_maps_api_key">HERE Maps API Key</string>
-    <string name="test_api_key">Test API Key</string>
-    <string name="testing_api_key">Testing API key…</string>
-    <string name="api_key_valid">API key is valid. %1$d incidents reported in the center of Berlin (updated at %2$s)</string>
-    <string name="api_key_error">Error testing API key. Check if your key is valid.</string>
     <string name="ok">OK</string>
     <string name="back">Back</string>
     <string name="welcome_title">Welcome to karoo-routegraph!</string>
@@ -89,11 +77,6 @@
     <!-- POI Alert strings -->
     <string name="poi_approach">POI Approach</string>
     <string name="poi_in_distance">%1$s in %2$s</string>
-
-    <!-- Traffic Incident Alert strings -->
-    <string name="incidents">Incidents</string>
-    <string name="traffic_incidents_found">%1$d traffic incidents along route</string>
-    <string name="failed_to_request_incidents">Failed to request incidents</string>
 
     <!-- POI Sort Options -->
     <string name="sort_linear_distance">Linear distance</string>
@@ -144,7 +127,6 @@
     <string name="close">Close</string>
     <string name="enable_offline_poi_storage">Enable offline POI storage</string>
     <string name="auto_add_pois_to_map">Automatically add POIs to map</string>
-    <string name="auto_add_to_elevation_profile_and_minimap">Automatically add POIs to elevation profile and minimap</string>
     <string name="select_categories">Select categories</string>
 
     <!-- Profile-specific POI settings -->

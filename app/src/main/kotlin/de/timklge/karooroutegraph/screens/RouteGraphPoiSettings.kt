@@ -11,7 +11,6 @@ data class RouteGraphPoiSettings(
     val poiCategoriesForNearbyPois: Set<NearbyPoiCategory> = emptySet(),
     val poiSortOptionForSearchedPois: PoiSortOption = PoiSortOption.AHEAD_ON_ROUTE,
     val autoAddPoiCategories: Set<NearbyPoiCategory> = emptySet(),
-    val autoAddToElevationProfileAndMinimap: Boolean = false,
     val enableOfflinePoiStorage: Boolean = false,
     val autoAddPoisToMap: Boolean = false,
     val alertPoiCategories: Set<NearbyPoiCategory> = emptySet(),

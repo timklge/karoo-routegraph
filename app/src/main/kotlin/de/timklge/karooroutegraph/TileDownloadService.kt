@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
-import de.timklge.karooroutegraph.datatypes.minimap.MinimapViewModelProvider
 import io.hammerhead.karooext.models.HttpResponseState
 import io.hammerhead.karooext.models.OnHttpResponse
 import kotlinx.coroutines.CoroutineScope
@@ -27,7 +26,6 @@ import java.time.Instant
 
 class TileDownloadService(
     private val karooSystemServiceProvider: KarooSystemServiceProvider,
-    private val minimapViewModelProvider: MinimapViewModelProvider,
     context: Context,
 ) {
     data class CachedTile(val lastAccessed: Instant, val bitmap: Bitmap)
@@ -67,10 +65,6 @@ class TileDownloadService(
                         gcCache() // Clean up memory cache before adding new item
                         inMemoryCache[tile] = CachedTile(Instant.now(), fetchedBitmap)
                         Log.d(KarooRouteGraphExtension.TAG, "Fetched tile ${tile}, saved to file and added to memory cache")
-                    }
-
-                    minimapViewModelProvider.update {
-                        it.copy(lastTileDownloadedAt = Instant.now())
                     }
                 } catch (e: Exception) {
                     Log.e(KarooRouteGraphExtension.TAG, "Error downloading tile $tile", e)

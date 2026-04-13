@@ -1,6 +1,5 @@
 package de.timklge.karooroutegraph
 
-import de.timklge.karooroutegraph.datatypes.minimap.MinimapZoomLevel
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -70,9 +69,7 @@ sealed class ZoomLevel {
 }
 
 data class RouteGraphDisplayViewModel(val zoomLevel: ZoomLevel = ZoomLevel.CompleteRoute,
-                                      val verticalZoomLevel: ZoomLevel = ZoomLevel.CompleteRoute,
-                                      val minimapZoomLevel: MinimapZoomLevel = MinimapZoomLevel.FAR,
-                                      val minimapWidth: Int? = null, val minimapHeight: Int? = null,)
+                                      val verticalZoomLevel: ZoomLevel = ZoomLevel.CompleteRoute)
 
 class RouteGraphDisplayViewModelProvider {
     private val observableStateFlow = MutableStateFlow(RouteGraphDisplayViewModel())

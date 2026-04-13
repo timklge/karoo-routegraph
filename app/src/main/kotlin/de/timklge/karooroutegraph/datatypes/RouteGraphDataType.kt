@@ -34,13 +34,12 @@ import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.SparseElevationData
 import de.timklge.karooroutegraph.SurfaceConditionRetrievalService
 import de.timklge.karooroutegraph.ZoomLevel
-import de.timklge.karooroutegraph.datatypes.minimap.ChangeZoomLevelAction
-import de.timklge.karooroutegraph.datatypes.minimap.mapPoiToIcon
+import de.timklge.karooroutegraph.datatypes.utils.ChangeZoomLevelAction
+import de.timklge.karooroutegraph.datatypes.utils.mapPoiToIcon
 import de.timklge.karooroutegraph.getInclineIndicatorColor
 import de.timklge.karooroutegraph.getSurfaceConditionPaints
 import de.timklge.karooroutegraph.pois.NearestPoint
 import de.timklge.karooroutegraph.pois.POI
-import de.timklge.karooroutegraph.pois.PoiType
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.streamDatatypeIsVisible
 import de.timklge.karooroutegraph.streamSettings
@@ -145,17 +144,7 @@ class RouteGraphDataType(
                     strokeWidth = 6f
                 }
 
-                val incidentPaint = Paint().apply {
-                    color = applicationContext.getColor(R.color.eleRed)
-                    style = Paint.Style.STROKE
-                    strokeWidth = 6f
-                }
-
                 val poiLinePaintDashed = Paint(poiLinePaint).apply {
-                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(15f, 10f), 0f)
-                }
-
-                val incidentLinePaintDashed = Paint(incidentPaint).apply {
                     pathEffect = android.graphics.DashPathEffect(floatArrayOf(15f, 10f), 0f)
                 }
 
@@ -611,7 +600,7 @@ class RouteGraphDataType(
                             canvas.drawLine(pixelsFromLeft, if (drawLabel) currentPOI.bottom else graphBounds.top,
                                 pixelsFromLeft, graphBounds.bottom, backgroundStrokePaintDashed)
                             canvas.drawLine(pixelsFromLeft, if (drawLabel) currentPOI.bottom else graphBounds.top,
-                                pixelsFromLeft, graphBounds.bottom, if (poi.type == PoiType.INCIDENT) incidentLinePaintDashed else poiLinePaintDashed)
+                                pixelsFromLeft, graphBounds.bottom, poiLinePaintDashed)
 
                             if (config.gridSize.first > 30){
                                 canvas.drawRoundRect(currentPOIBottomIcon, 5f, 5f, backgroundFillPaint)

@@ -23,7 +23,7 @@ import androidx.glance.layout.fillMaxSize
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
-import de.timklge.karooroutegraph.datatypes.minimap.mapPoiToIcon
+import de.timklge.karooroutegraph.datatypes.utils.mapPoiToIcon
 import de.timklge.karooroutegraph.pois.NearestPoint
 import de.timklge.karooroutegraph.pois.NearbyPOI
 import de.timklge.karooroutegraph.pois.OfflineNearbyPOIProvider

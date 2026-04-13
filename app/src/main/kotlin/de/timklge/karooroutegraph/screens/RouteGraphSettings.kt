@@ -6,11 +6,8 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 data class RouteGraphSettings(
-    val showPOILabelsOnMinimap: Boolean = false,
     val welcomeDialogAccepted: Boolean = false,
-    val enableTrafficIncidentReporting: Boolean = false,
     val showNavigateButtonOnGraphs: Boolean = true,
-    val hereMapsApiKey: String = "",
     val poiDistanceToRouteMaxMeters: Double = 500.0,
     val poiApproachAlertAtDistance: Double? = 500.0,
     val poiApproachAlertReminderIntervalSeconds: Int = 300,
@@ -18,7 +15,6 @@ data class RouteGraphSettings(
     val onlyHighlightClimbsAtZoomLevel: Int? = 1, // null means "Never"
     val shiftForRadarSwimLane: Boolean = true,
     val indicateSurfaceConditionsOnGraph: Boolean = false,
-    val minimapNightMode: Boolean = true,
     val showEtaOnVerticalRouteGraph: Boolean = true,
     val showRemainingElevationOnVerticalRouteGraph: Boolean = true,
     val showRemainingDistanceOnVerticalRouteGraph: Boolean = true,

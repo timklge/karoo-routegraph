@@ -1,9 +1,6 @@
 package de.timklge.karooroutegraph
 
 import android.util.Log
-import androidx.core.content.ContextCompat
-import com.mapbox.geojson.LineString
-import com.mapbox.geojson.Point
 import de.timklge.karooroutegraph.datatypes.DistanceToNextPOIDataType
 import de.timklge.karooroutegraph.datatypes.ETAAtNextPOIDataType
 import de.timklge.karooroutegraph.datatypes.ETADataType
@@ -12,9 +9,6 @@ import de.timklge.karooroutegraph.datatypes.PoiButtonDataType
 import de.timklge.karooroutegraph.datatypes.PoiListAheadDataType
 import de.timklge.karooroutegraph.datatypes.RouteGraphDataType
 import de.timklge.karooroutegraph.datatypes.VerticalRouteGraphDataType
-import de.timklge.karooroutegraph.datatypes.minimap.MinimapDataType
-import de.timklge.karooroutegraph.datatypes.minimap.MinimapViewModelProvider
-import de.timklge.karooroutegraph.incidents.IncidentsResponse
 import de.timklge.karooroutegraph.pois.NearbyPOIPbfDownloadService
 import de.timklge.karooroutegraph.pois.OfflineNearbyPOIProvider
 import de.timklge.karooroutegraph.pois.PoiApproachAlertService
@@ -25,12 +19,10 @@ import io.hammerhead.karooext.extension.KarooExtension
 import io.hammerhead.karooext.internal.Emitter
 import io.hammerhead.karooext.models.DataType
 import io.hammerhead.karooext.models.HardwareType
-import io.hammerhead.karooext.models.HidePolyline
 import io.hammerhead.karooext.models.HideSymbols
 import io.hammerhead.karooext.models.MapEffect
 import io.hammerhead.karooext.models.OnLocationChanged
 import io.hammerhead.karooext.models.OnMapZoomLevel
-import io.hammerhead.karooext.models.ShowPolyline
 import io.hammerhead.karooext.models.ShowSymbols
 import io.hammerhead.karooext.models.StreamState
 import io.hammerhead.karooext.models.Symbol
@@ -53,7 +45,6 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
     private val karooSystem: KarooSystemServiceProvider by inject()
     private val routeGraphViewModelProvider: RouteGraphViewModelProvider by inject()
-    private val minimapViewModelProvider: MinimapViewModelProvider by inject()
     private val displayViewModelProvider: RouteGraphDisplayViewModelProvider by inject()
     private val tileDownloadService: TileDownloadService by inject()
     private val locationViewModelProvider: LocationViewModelProvider by inject()
@@ -73,7 +64,6 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
             VerticalRouteGraphDataType(routeGraphViewModelProvider, displayViewModelProvider, karooSystem, surfaceConditionRetrievalService, travelTimeEstimationService, applicationContext),
             DistanceToNextPOIDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, applicationContext),
             ElevationToNextPOIDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, applicationContext),
-            MinimapDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, displayViewModelProvider, minimapViewModelProvider, tileDownloadService, locationViewModelProvider, applicationContext, surfaceConditionRetrievalService),
             PoiButtonDataType(karooSystem.karooSystemService, applicationContext),
             ETAAtNextPOIDataType(karooSystem, routeGraphViewModelProvider, travelTimeEstimationService, surfaceConditionRetrievalService),
             ETADataType(karooSystem, routeGraphViewModelProvider, travelTimeEstimationService, surfaceConditionRetrievalService),
@@ -97,8 +87,6 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         }
     }
 
-    private var lastDrawnIncidentSymbols = mutableSetOf<Symbol>()
-    private var lastDrawnIncidentPolylines = mutableSetOf<String>()
     private var lastDrawnTemporaryPOIs = setOf<Symbol.POI>()
 
     override fun startMap(emitter: Emitter<MapEffect>) {
@@ -106,16 +94,8 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
         Log.d(TAG, "Starting map effect")
 
-        emitter.onNext(HideSymbols(lastDrawnIncidentSymbols.map { it.id }))
-        lastDrawnIncidentSymbols.clear()
-
         emitter.onNext(HideSymbols(lastDrawnTemporaryPOIs.map { it.id }))
         lastDrawnTemporaryPOIs = setOf()
-
-        lastDrawnIncidentPolylines.forEach {
-            emitter.onNext(HidePolyline(it))
-        }
-        lastDrawnIncidentPolylines.clear()
 
         mapScope.launch {
             data class TemporaryAndAutoAddedPOIs(
@@ -161,70 +141,6 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         }
 
         mapScope.launch {
-            var lastKnownIncidents: IncidentsResponse? = null
-
-            routeGraphViewModelProvider.viewModelFlow.collect {
-                val incidents = it.incidents
-                if (incidents != lastKnownIncidents) {
-                    lastKnownIncidents = incidents
-
-                    emitter.onNext(HideSymbols(lastDrawnIncidentSymbols.map { it.id }))
-                    lastDrawnIncidentSymbols.clear()
-
-                    emitter.onNext(HideSymbols(lastDrawnIncidentPolylines.toList()))
-                    lastDrawnIncidentPolylines.clear()
-
-                    val incidentSymbols = incidents?.results?.mapNotNull { incident ->
-                        val id = "incident-${incident.incidentDetails?.id}"
-                        val points = incident.location?.shape?.links?.flatMap { link -> link.points ?: emptyList() }
-
-                        // Average of points
-                        val lat = points?.mapNotNull { point -> point.lat }?.average()
-                        val lng = points?.mapNotNull { point -> point.lng }?.average()
-
-                        if (lat != null && lng != null){
-                            Symbol.POI(id, lat, lng, type = Symbol.POI.Types.CAUTION, incident.incidentDetails?.description?.value ?: "Unknown incident")
-                        } else {
-                            null
-                        }
-                    } ?: emptyList()
-
-                    val incidentPolylines = incidents?.results?.flatMap { incident ->
-                        val id = "incident-${incident.incidentDetails?.id}"
-                        val lines = incident.location?.shape?.links?.map { link -> link.points ?: emptyList() }
-
-                        lines?.mapIndexedNotNull { index, it ->
-                            val points = it.mapNotNull { point ->
-                                if (point.lat != null && point.lng != null) {
-                                    Point.fromLngLat(point.lng, point.lat)
-                                } else {
-                                    null
-                                }
-                            }
-
-                            if (points.isNotEmpty()) {
-                                "${id}_${index}" to LineString.fromLngLats(points).toPolyline(5)
-                            } else {
-                                null
-                            }
-                        } ?: emptyList()
-                    } ?: emptyList()
-
-                    Log.d(TAG, "Drawing incident symbols: ${incidentSymbols.size}")
-                    emitter.onNext(ShowSymbols(incidentSymbols))
-
-                    Log.d(TAG, "Drawing incident polylines: ${incidentPolylines.size}")
-                    incidentPolylines.forEach { (id, polyline) ->
-                        emitter.onNext(ShowPolyline(id, polyline, ContextCompat.getColor(applicationContext, R.color.eleRed), 10))
-                    }
-
-                    lastDrawnIncidentSymbols = incidentSymbols.toMutableSet()
-                    lastDrawnIncidentPolylines = incidentPolylines.map { it.first }.toMutableSet()
-                }
-            }
-        }
-
-        mapScope.launch {
             val zoomLevelFlow = karooSystem.stream<OnMapZoomLevel>()
             val locationFlow = karooSystem.stream<OnLocationChanged>()
             val distanceToDestinationFlow = karooSystem.streamDataFlow(DataType.Type.DISTANCE_TO_DESTINATION)
@@ -253,7 +169,6 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         }
 
         emitter.setCancellable {
-            emitter.onNext(HideSymbols(lastDrawnIncidentSymbols.map { it.id }))
             emitter.onNext(HideSymbols(lastDrawnTemporaryPOIs.map { it.id }))
 
             Log.d(TAG, "Stopping map effect")

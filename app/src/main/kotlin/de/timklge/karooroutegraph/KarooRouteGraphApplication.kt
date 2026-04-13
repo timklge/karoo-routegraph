@@ -1,8 +1,6 @@
 package de.timklge.karooroutegraph
 
 import android.app.Application
-import de.timklge.karooroutegraph.datatypes.minimap.MinimapViewModelProvider
-import de.timklge.karooroutegraph.incidents.HereMapsIncidentProvider
 import de.timklge.karooroutegraph.pois.NearbyPOIPbfDownloadService
 import de.timklge.karooroutegraph.pois.NominatimProvider
 import de.timklge.karooroutegraph.pois.OfflineNearbyPOIProvider
@@ -21,9 +19,7 @@ val appModule = module {
     singleOf(::RouteGraphDisplayViewModelProvider) { createdAtStart() }
     singleOf(::OverpassPOIProvider) { createdAtStart() }
     singleOf(::NominatimProvider) { createdAtStart() }
-    singleOf(::MinimapViewModelProvider) { createdAtStart() }
     singleOf(::TileDownloadService) { createdAtStart() }
-    singleOf(::HereMapsIncidentProvider) { createdAtStart() }
     singleOf(::LocationViewModelProvider) { createdAtStart() }
     singleOf(::PoiApproachAlertService) { createdAtStart() }
     singleOf(::NearbyPOIPbfDownloadService) { createdAtStart() }

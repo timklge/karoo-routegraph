@@ -47,9 +47,7 @@ enum class ZoomUnit(val stringResource: Int) {
 enum class SettingsScreen {
     MENU,
     ELEVATION_PROFILE,
-    MINIMAP,
     POINTS_OF_INTEREST,
-    TRAFFIC_INCIDENTS,
     PROFILE_SELECTION
 }
 
@@ -61,10 +59,8 @@ data class MenuItem(
 
 val menuItems = listOf(
     MenuItem(SettingsScreen.ELEVATION_PROFILE, R.drawable.menu_spline, R.string.elevation_profile),
-    MenuItem(SettingsScreen.MINIMAP, R.drawable.menu_map, R.string.minimap),
     MenuItem(SettingsScreen.POINTS_OF_INTEREST, R.drawable.menu_poi, R.string.points_of_interest_poi),
-    MenuItem(SettingsScreen.PROFILE_SELECTION, R.drawable.menu_person, R.string.ride_profile),
-    MenuItem(SettingsScreen.TRAFFIC_INCIDENTS, R.drawable.menu_barrier, R.string.traffic_incidents)
+    MenuItem(SettingsScreen.PROFILE_SELECTION, R.drawable.menu_person, R.string.ride_profile)
 )
 
 @Composable
@@ -104,19 +100,8 @@ fun MainScreen(onFinish: () -> Unit) {
                 onBack = { currentScreen = SettingsScreen.MENU }
             )
         }
-        SettingsScreen.MINIMAP -> {
-            MinimapScreen(
-                karooSystemServiceProvider = koinInject(),
-                onBack = { currentScreen = SettingsScreen.MENU }
-            )
-        }
         SettingsScreen.POINTS_OF_INTEREST -> {
             PointsOfInterestScreen(
-                onBack = { currentScreen = SettingsScreen.MENU }
-            )
-        }
-        SettingsScreen.TRAFFIC_INCIDENTS -> {
-            TrafficIncidentsScreen(
                 onBack = { currentScreen = SettingsScreen.MENU }
             )
         }

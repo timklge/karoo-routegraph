@@ -1,4 +1,4 @@
-package de.timklge.karooroutegraph.datatypes.minimap
+package de.timklge.karooroutegraph.datatypes.utils
 
 import android.content.Context
 import android.util.Log

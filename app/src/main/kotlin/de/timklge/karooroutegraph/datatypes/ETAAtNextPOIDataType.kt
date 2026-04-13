@@ -9,7 +9,6 @@ import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.SurfaceConditionRetrievalService
 import de.timklge.karooroutegraph.SurfaceConditionRetrievalService.SurfaceConditionSegment
 import de.timklge.karooroutegraph.TravelTimeEstimationService
-import de.timklge.karooroutegraph.pois.PoiType
 import de.timklge.karooroutegraph.throttle
 import io.hammerhead.karooext.extension.DataTypeImpl
 import io.hammerhead.karooext.internal.Emitter
@@ -60,8 +59,8 @@ class ETAAtNextPOIDataType(
                     }
                 }
 
-                val poisAhead = poiDistances?.filter { (poi, distance) ->
-                    poi.type != PoiType.INCIDENT && distance.distanceFromRouteStart - currentDistanceAlongRoute > 0
+                val poisAhead = poiDistances?.filter { (_, distance) ->
+                    distance.distanceFromRouteStart - currentDistanceAlongRoute > 0
                 }
 
                 val poisAheadSorted = poisAhead?.sortedBy { (_, distance) ->

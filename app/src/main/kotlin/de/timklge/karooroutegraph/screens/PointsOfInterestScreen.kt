@@ -101,7 +101,6 @@ fun PointsOfInterestScreen(
     val nearbyPOIPbfDownloadService = koinInject<NearbyPOIPbfDownloadService>()
     var enableOfflinePoiStorage by remember { mutableStateOf(false) }
     var autoAddPoisToMap by remember { mutableStateOf(false) }
-    var autoAddToElevationProfileAndMinimap by remember { mutableStateOf(false) }
     var autoAddPoiCategories by remember { mutableStateOf(emptySet<NearbyPoiCategory>()) }
     var showAutoAddPoiCategoriesDialog by remember { mutableStateOf(false) }
     var showDownloadPoisDialog by remember { mutableStateOf(false) }
@@ -129,7 +128,6 @@ fun PointsOfInterestScreen(
                 enableOfflinePoiStorage = enableOfflinePoiStorage,
                 autoAddPoisToMap = autoAddPoisToMap,
                 autoAddPoiCategories = autoAddPoiCategories,
-                autoAddToElevationProfileAndMinimap = autoAddToElevationProfileAndMinimap,
                 alertPoiCategories = alertPoiCategories,
                 alertDistanceMeters = alertDistanceMeters,
                 enablePoiAlerts = enablePoiAlerts
@@ -158,7 +156,6 @@ fun PointsOfInterestScreen(
                 enableOfflinePoiStorage = settings.enableOfflinePoiStorage
                 autoAddPoisToMap = settings.autoAddPoisToMap
                 autoAddPoiCategories = settings.autoAddPoiCategories
-                autoAddToElevationProfileAndMinimap = settings.autoAddToElevationProfileAndMinimap
                 alertPoiCategories = settings.alertPoiCategories
                 alertDistanceMeters = settings.alertDistanceMeters
                 enablePoiAlerts = settings.enablePoiAlerts
@@ -237,15 +234,6 @@ fun PointsOfInterestScreen(
                             })
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(stringResource(R.string.auto_add_pois_to_map))
-                        }
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Switch(checked = autoAddToElevationProfileAndMinimap, onCheckedChange = {
-                                autoAddToElevationProfileAndMinimap = it
-                                coroutineScope.launch { updatePoiSettings() }
-                            })
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(stringResource(R.string.auto_add_to_elevation_profile_and_minimap))
                         }
 
                         if (autoAddPoisToMap) {

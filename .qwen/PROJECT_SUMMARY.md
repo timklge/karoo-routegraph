@@ -69,6 +69,7 @@ leisure=swimming_area
 | `ProfileSelectionScreen.kt` | Profile naming UI |
 | `NearbyPoiCategory.kt` | POI category enum matching poi-filter.txt |
 | `NearbyPOIPbfDownloadService.kt` | POI database download from GitHub |
+| `datatypes/PoiListAheadDataType.kt` | POIs Ahead data field for ride views |
 | `osm/extract.sh` | OSM to SQLite extraction script |
 
 ## Completed Features
@@ -91,15 +92,37 @@ leisure=swimming_area
    - Optional custom profile naming
    - **Tested on real Karoo device** - profile switching works correctly
 
-5. **[DONE]** Merged all development branches to `master`
+5. **[DONE]** Merged upstream changes from `timklge/karoo-routegraph`
+   - POI opening hours status display (🟢/🔴)
+   - ETA calculation for nearby POIs
+   - Offline POI fixes for straight route segments
+   - Zoom action inversion
+   - Various bug fixes
+
+6. **[DONE]** POI notification alert settings per profile
+   - Enable/disable toggle
+   - Per-category alert selection (only shows categories selected in auto-add)
+   - Alert distance slider
+   - Uses same offline POI database
+
+7. **[DONE]** POIs Ahead data field for ride views
+   - Shows next 5 POIs ahead on route with icons and distances
+   - Respects profile's auto-add POI category selection
+   - Graphical rendering with Canvas + Glance
+   - Vertically aligned icons, names, and distances
+   - Fixed text overlap prevention with clipRect
+
+8. **[DONE]** Removed Gradient Indicators functionality
+   - Removed GradientChevronsScreen, GradientIndicator, GradientIndicatorFrequency
+   - Removed chevron drawables and related settings
 
 ## Future Enhancements
 - Release signing for production APK (requires keystore setup)
 - Update `pois.fi.db` when OSM data changes or filter is modified
 - Add more country POI databases
-- Profile-specific settings for other features (elevation graph zoom, chevron display, etc.)
+- Consider adding country-specific POI databases based on user location
 
 ---
 
 ## Summary Metadata
-**Update time**: 2026-04-06T14:48:25.669Z
+**Update time**: 2026-04-11T19:30:00.000Z
