@@ -782,18 +782,20 @@ fun NearbyPoiListScreen() {
 fun CategorySelectionDialog(
     initialCategories: Set<NearbyPoiCategory>,
     onDismiss: () -> Unit,
-    onConfirm: (Set<NearbyPoiCategory>) -> Unit
+    onConfirm: (Set<NearbyPoiCategory>) -> Unit,
+    availableCategories: Set<NearbyPoiCategory> = NearbyPoiCategory.entries.toSet()
 ) {
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        val filteredCategories = NearbyPoiCategory.entries.filter { it in availableCategories }
         var tempSelectedCategories by remember { mutableStateOf(initialCategories) }
 
         Card(modifier = Modifier.padding(16.dp)) {
             Column(modifier = Modifier.padding(16.dp)) {
                 LazyColumn(modifier = Modifier.weight(1f)) {
-                    items(NearbyPoiCategory.entries) { category ->
+                    items(filteredCategories) { category ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier

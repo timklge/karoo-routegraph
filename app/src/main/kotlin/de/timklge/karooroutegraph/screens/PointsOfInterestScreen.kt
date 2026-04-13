@@ -345,7 +345,8 @@ fun PointsOfInterestScreen(
                                 enablePoiAlerts = newCategories.isNotEmpty()
                                 showAlertCategoriesDialog = false
                                 coroutineScope.launch { updatePoiSettings() }
-                            }
+                            },
+                            availableCategories = autoAddPoiCategories
                         )
                     }
 
