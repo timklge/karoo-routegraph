@@ -151,7 +151,7 @@
     <string name="miles">mi</string>
 
     <!-- Offline POIs -->
-    <string name="offline_pois">Offline POIs</string>
+    <string name="offline_pois">POIs herunterladen</string>
     <string name="download_pois">POIs herunterladen</string>
     <string name="collapse">Einklappen</string>
     <string name="expand">Ausklappen</string>
