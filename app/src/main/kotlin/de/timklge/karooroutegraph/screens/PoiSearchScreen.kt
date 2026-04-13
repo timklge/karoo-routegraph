@@ -1,6 +1,5 @@
 package de.timklge.karooroutegraph.screens
 
-import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,7 +51,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mapbox.geojson.Point
 import com.mapbox.turf.TurfConstants
 import com.mapbox.turf.TurfMeasurement
-import de.timklge.karooroutegraph.KarooRouteGraphExtension
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.LocationViewModelProvider
 import de.timklge.karooroutegraph.R
@@ -60,8 +58,6 @@ import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.SurfaceConditionRetrievalService
 import de.timklge.karooroutegraph.TravelTimeEstimationService
 import de.timklge.karooroutegraph.datatypes.streamPowerPerHour
-import de.timklge.karooroutegraph.getTimeUntilNextChange
-import de.timklge.karooroutegraph.isOpen
 import de.timklge.karooroutegraph.pois.DistanceToPoiResult
 import de.timklge.karooroutegraph.pois.NearestPoint
 import de.timklge.karooroutegraph.pois.NominatimProvider
@@ -78,8 +74,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
-import java.util.Date
-import kotlin.time.DurationUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -381,7 +375,7 @@ fun PoiSearchScreen() {
                                         )
                                     } else null
 
-                                    val estimatedArrivalTime = System.currentTimeMillis() + (estimatedTravelTime?.toLong(DurationUnit.MILLISECONDS) ?: 0)
+                                    /* val estimatedArrivalTime = System.currentTimeMillis() + (estimatedTravelTime?.toLong(DurationUnit.MILLISECONDS) ?: 0)
 
                                     if (estimatedTravelTime != null) {
                                         append(" ⏲\u00A0${android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(estimatedArrivalTime))}")
@@ -422,7 +416,7 @@ fun PoiSearchScreen() {
                                         }
 
                                         append(statusText.uppercase())
-                                    }
+                                    } */
                                 }
                             }.takeIf { it.isNotEmpty() }
                         }
