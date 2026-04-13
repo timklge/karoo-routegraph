@@ -44,15 +44,6 @@
     <string name="tiles_on_route">%1$d tiles on current route (%2$d missing), %3$d route samples (%4$d gravel).</string>
     <string name="only_highlight_climbs_at_zoom_level">Only highlight climbs at zoom level:</string>
     <string name="never">Never</string>
-    <string name="gradient_chevrons">Gradient chevrons</string>
-    <string name="show_gradient_indicators">Show gradient indicators on map</string>
-    <string name="amount_of_indicators">Amount of indicators:</string>
-
-    <!-- Gradient Indicator Frequency labels -->
-    <string name="gradient_frequency_low">Low</string>
-    <string name="gradient_frequency_medium">Medium</string>
-    <string name="gradient_frequency_high">High</string>
-    <string name="gradient_frequency_max">Max</string>
 
     <string name="points_of_interest_poi">Points of Interest</string>
     <string name="show_poi_labels">Show POI labels on minimap</string>

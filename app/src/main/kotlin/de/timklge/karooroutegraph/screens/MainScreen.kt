@@ -47,7 +47,6 @@ enum class ZoomUnit(val stringResource: Int) {
 enum class SettingsScreen {
     MENU,
     ELEVATION_PROFILE,
-    GRADIENT_CHEVRONS,
     MINIMAP,
     POINTS_OF_INTEREST,
     TRAFFIC_INCIDENTS,
@@ -62,7 +61,6 @@ data class MenuItem(
 
 val menuItems = listOf(
     MenuItem(SettingsScreen.ELEVATION_PROFILE, R.drawable.menu_spline, R.string.elevation_profile),
-    MenuItem(SettingsScreen.GRADIENT_CHEVRONS, R.drawable.menu_chevron, R.string.gradient_chevrons),
     MenuItem(SettingsScreen.MINIMAP, R.drawable.menu_map, R.string.minimap),
     MenuItem(SettingsScreen.POINTS_OF_INTEREST, R.drawable.menu_poi, R.string.points_of_interest_poi),
     MenuItem(SettingsScreen.PROFILE_SELECTION, R.drawable.menu_person, R.string.ride_profile),
@@ -103,11 +101,6 @@ fun MainScreen(onFinish: () -> Unit) {
         }
         SettingsScreen.ELEVATION_PROFILE -> {
             ElevationProfileScreen(
-                onBack = { currentScreen = SettingsScreen.MENU }
-            )
-        }
-        SettingsScreen.GRADIENT_CHEVRONS -> {
-            GradientChevronsScreen(
                 onBack = { currentScreen = SettingsScreen.MENU }
             )
         }

@@ -4,8 +4,6 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
-import com.mapbox.turf.TurfConstants
-import com.mapbox.turf.TurfMeasurement
 import de.timklge.karooroutegraph.datatypes.DistanceToNextPOIDataType
 import de.timklge.karooroutegraph.datatypes.ETAAtNextPOIDataType
 import de.timklge.karooroutegraph.datatypes.ETADataType
@@ -99,19 +97,14 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         }
     }
 
-    private var lastDrawnGradientIndicators = mutableSetOf<GradientIndicator>()
     private var lastDrawnIncidentSymbols = mutableSetOf<Symbol>()
     private var lastDrawnIncidentPolylines = mutableSetOf<String>()
     private var lastDrawnTemporaryPOIs = setOf<Symbol.POI>()
 
     override fun startMap(emitter: Emitter<MapEffect>) {
-        var currentSymbols: MutableSet<GradientIndicator>
-
         val mapScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
         Log.d(TAG, "Starting map effect")
-        emitter.onNext(HideSymbols(lastDrawnGradientIndicators.map { it.id }))
-        lastDrawnGradientIndicators.clear()
 
         emitter.onNext(HideSymbols(lastDrawnIncidentSymbols.map { it.id }))
         lastDrawnIncidentSymbols.clear()
@@ -123,9 +116,6 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
             emitter.onNext(HidePolyline(it))
         }
         lastDrawnIncidentPolylines.clear()
-
-        emitter.onNext(HideSymbols(lastDrawnGradientIndicators.map { "incline-${it.distance}" }))
-        lastDrawnGradientIndicators = mutableSetOf()
 
         mapScope.launch {
             data class TemporaryAndAutoAddedPOIs(
@@ -259,96 +249,10 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 StreamData(settings, location, mapZoom, viewModel, isOnRoute)
             }.throttle(redrawInterval.inWholeMilliseconds).collect { (settings, location, mapZoom, viewModel, isOnRoute) ->
                 Log.d(TAG, "Location: $location, MapZoom: $mapZoom, Settings: $settings, IsOnRoute: $isOnRoute")
-
-                if (settings.showGradientIndicatorsOnMap) {
-                    val boundingBox =
-                        calculateBoundingBox(location.lat, location.lng, mapZoom.zoomLevel)
-                    val mapDiagonal = TurfMeasurement.distance(
-                        Point.fromLngLat(boundingBox.minLng, boundingBox.minLat),
-                        Point.fromLngLat(boundingBox.maxLng, boundingBox.maxLat),
-                        TurfConstants.UNIT_METERS
-                    )
-
-                    Log.d(TAG, "Drawing gradient indicators, Diagonal: $mapDiagonal")
-
-                    val distanceAlongRoute = (viewModel.distanceAlongRoute?.minus(mapDiagonal))?.coerceAtLeast(0.0)?.toFloat() ?: 0.0f
-                    val endDistance = (distanceAlongRoute + mapDiagonal * 2).toFloat()
-
-                    if (viewModel.sampledElevationData != null && viewModel.knownRoute != null) {
-                        Log.d(TAG, "Range: $distanceAlongRoute - $endDistance")
-
-                        val wantedStepInMeters = mapDiagonal.toFloat() / settings.gradientIndicatorFrequency.stepsPerDisplayDiagonal
-
-                        val calculatedSymbols = viewModel.sampledElevationData.getGradientIndicators(viewModel.knownRoute, wantedStepInMeters) { distance ->
-                            distance in distanceAlongRoute..endDistance
-                        }.toMutableSet()
-
-                        val filteredSymbols = buildSet {
-                            calculatedSymbols.forEach { symbol ->
-                                val hasSymbolAtThatLocation = this.any { existingSymbol: GradientIndicator ->
-                                    TurfMeasurement.distance(symbol.position, existingSymbol.position, TurfConstants.UNIT_METERS) < wantedStepInMeters * 0.9
-                                }
-
-                                if (!hasSymbolAtThatLocation) add(symbol)
-                            }
-                        }
-
-                        currentSymbols = filteredSymbols.toMutableSet()
-                    } else {
-                        currentSymbols = mutableSetOf()
-                    }
-
-                    val removedSymbols = lastDrawnGradientIndicators - currentSymbols
-
-                    if (removedSymbols.isNotEmpty()) {
-                        Log.d(TAG, "Removing symbols: $removedSymbols")
-                        emitter.onNext(HideSymbols(removedSymbols.map { it.id }))
-                    }
-
-                    if (currentSymbols.isNotEmpty()) {
-                        Log.d(TAG, "Drawing symbols: $currentSymbols")
-
-                    val icons = currentSymbols.mapNotNull { gradientIndicator ->
-                        val knownRoute = viewModel.knownRoute ?: return@mapNotNull null
-
-                        val position = TurfMeasurement.along(
-                            knownRoute,
-                            gradientIndicator.distance.toDouble(),
-                            TurfConstants.UNIT_METERS
-                        )
-
-                        val nextPosition = TurfMeasurement.along(
-                            viewModel.knownRoute,
-                            gradientIndicator.distance.toDouble() + 10.0,
-                            TurfConstants.UNIT_METERS
-                        )
-
-                        val bearing = TurfMeasurement.bearing(
-                            position,
-                            nextPosition
-                        )
-
-                        Symbol.Icon(
-                            id = gradientIndicator.id,
-                            lat = position.latitude(),
-                            lng = position.longitude(),
-                            iconRes = gradientIndicator.drawableRes,
-                            orientation = bearing.toFloat(),
-                        )
-                    }
-                    emitter.onNext(ShowSymbols(icons))
-                }
-
-                    lastDrawnGradientIndicators = currentSymbols
-                } else {
-                    emitter.onNext(HideSymbols(lastDrawnGradientIndicators.map { it.id }))
-                    lastDrawnGradientIndicators = mutableSetOf()
-                }
             }
         }
 
         emitter.setCancellable {
-            emitter.onNext(HideSymbols(lastDrawnGradientIndicators.map { "incline-${it.distance}" }))
             emitter.onNext(HideSymbols(lastDrawnIncidentSymbols.map { it.id }))
             emitter.onNext(HideSymbols(lastDrawnTemporaryPOIs.map { it.id }))
 
