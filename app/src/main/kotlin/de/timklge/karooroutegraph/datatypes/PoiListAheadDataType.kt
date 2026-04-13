@@ -255,12 +255,19 @@ class PoiListAheadDataType(
                     }
                 }
 
+                // Calculate text center positions
+                val nameMetrics = namePaint.fontMetrics
+                val nameCenterOffset = (nameMetrics.bottom - nameMetrics.top) / 2 - nameMetrics.bottom
+                val distanceMetrics = distancePaint.fontMetrics
+                val distanceCenterOffset = (distanceMetrics.bottom - distanceMetrics.top) / 2 - distanceMetrics.bottom
+
                 if (pois.isEmpty()) {
                     canvas.drawText("No POIs ahead", width / 2f, height / 2f, emptyPaint)
                 } else {
                     pois.forEachIndexed { index, entry ->
                         val itemTop = startY + index * itemHeight
-                        val iconTop = (itemTop + (itemHeight - iconSize) / 2).toInt()
+                        val verticalCenter = itemTop + itemHeight / 2f
+                        val iconTop = (verticalCenter - iconSize / 2f).toInt()
                         val iconLeftPos = iconLeft.toInt()
 
                         // Draw icon
@@ -274,7 +281,7 @@ class PoiListAheadDataType(
                         }
 
                         // Draw name (single line, truncate if too long)
-                        val textBaseline = itemTop + 32f
+                        val nameBaseline = verticalCenter + nameCenterOffset
                         var displayName = entry.name
 
                         // Measure and truncate with ellipsis
@@ -290,11 +297,12 @@ class PoiListAheadDataType(
                         val clipRect = android.graphics.RectF(nameX, itemTop, nameEndX, itemTop + itemHeight)
                         canvas.save()
                         canvas.clipRect(clipRect)
-                        canvas.drawText(displayName, nameX, textBaseline, namePaint)
+                        canvas.drawText(displayName, nameX, nameBaseline, namePaint)
                         canvas.restore()
 
                         // Draw distance - vertically centered
-                        canvas.drawText(distanceText, distanceX, itemTop + itemHeight / 2 + 12f, distancePaint)
+                        val distanceBaseline = verticalCenter + distanceCenterOffset
+                        canvas.drawText(distanceText, distanceX, distanceBaseline, distancePaint)
                     }
                 }
 
