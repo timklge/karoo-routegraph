@@ -234,7 +234,8 @@ class PoiListAheadDataType(
             val iconLeft = 6f
             val nameX = iconLeft + iconSize + 8f
             val distanceX = (width - 6).toFloat()
-            val nameMaxWidth = distanceX - nameX - 16f
+            val nameEndX = distanceX - 120f
+            val nameMaxWidth = nameEndX - nameX
             val itemHeight = 80f
             val startY = 8f
 
@@ -276,14 +277,21 @@ class PoiListAheadDataType(
                         val textBaseline = itemTop + 32f
                         var displayName = entry.name
 
-                        if (namePaint.measureText(displayName) > nameMaxWidth) {
-                            while (namePaint.measureText("$displayName…") > nameMaxWidth && displayName.length > 1) {
-                                displayName = displayName.dropLast(1)
-                            }
+                        // Measure and truncate with ellipsis
+                        val ellipsisWidth = namePaint.measureText("…")
+                        while (displayName.length > 1 && namePaint.measureText(displayName) + ellipsisWidth > nameMaxWidth) {
+                            displayName = displayName.dropLast(1)
+                        }
+                        if (displayName != entry.name) {
                             displayName = "$displayName…"
                         }
 
+                        // Clip to prevent overlap with distance text
+                        val clipRect = android.graphics.RectF(nameX, itemTop, nameEndX, itemTop + itemHeight)
+                        canvas.save()
+                        canvas.clipRect(clipRect)
                         canvas.drawText(displayName, nameX, textBaseline, namePaint)
+                        canvas.restore()
 
                         // Draw distance - vertically centered
                         canvas.drawText(distanceText, distanceX, itemTop + itemHeight / 2 + 12f, distancePaint)
