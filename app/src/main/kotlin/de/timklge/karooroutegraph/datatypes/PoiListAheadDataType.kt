@@ -272,32 +272,18 @@ class PoiListAheadDataType(
                             "${entry.distanceMeters.roundToInt()} m"
                         }
 
-                        // Draw name (max 2 lines)
-                        val textBaseline = itemTop + 28f
+                        // Draw name (single line, truncate if too long)
+                        val textBaseline = itemTop + 32f
                         var displayName = entry.name
 
                         if (namePaint.measureText(displayName) > nameMaxWidth) {
-                            // Find split point at word boundary
-                            val words = displayName.split(" ")
-                            var line1 = ""
-                            var line2 = ""
-                            for (word in words) {
-                                val test = if (line1.isEmpty()) word else "$line1 $word"
-                                if (namePaint.measureText(test) <= nameMaxWidth && line2.isEmpty()) {
-                                    line1 = test
-                                } else {
-                                    if (line2.isEmpty()) line2 = word
-                                    else line2 = "$line2 $word"
-                                }
+                            while (namePaint.measureText("$displayName…") > nameMaxWidth && displayName.length > 1) {
+                                displayName = displayName.dropLast(1)
                             }
-
-                            canvas.drawText(line1, nameX, textBaseline, namePaint)
-                            if (line2.isNotEmpty()) {
-                                canvas.drawText(line2, nameX, textBaseline + 36f, namePaint)
-                            }
-                        } else {
-                            canvas.drawText(displayName, nameX, textBaseline, namePaint)
+                            displayName = "$displayName…"
                         }
+
+                        canvas.drawText(displayName, nameX, textBaseline, namePaint)
 
                         // Draw distance - vertically centered
                         canvas.drawText(distanceText, distanceX, itemTop + itemHeight / 2 + 12f, distancePaint)
