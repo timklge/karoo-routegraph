@@ -31,6 +31,7 @@ import de.timklge.karooroutegraph.pois.POI
 import de.timklge.karooroutegraph.pois.PoiType
 import de.timklge.karooroutegraph.pois.calculatePoiDistances
 import de.timklge.karooroutegraph.screens.NearbyPoiCategory
+import de.timklge.karooroutegraph.screens.RouteGraphPoiSettings
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.DataTypeImpl
 import io.hammerhead.karooext.internal.Emitter
@@ -48,6 +49,8 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -80,8 +83,6 @@ class PoiListAheadDataType(
 
     override fun startStream(emitter: Emitter<StreamState>) {
         streamJob = CoroutineScope(Dispatchers.Default).launch {
-            val allCategories = NearbyPoiCategory.entries.map { it.osmTag }.flatten()
-
             viewModelProvider.viewModelFlow.collect { state ->
                 val currentDistanceAlongRoute = state.distanceAlongRoute
                 val routeLineString = state.knownRoute
@@ -93,8 +94,27 @@ class PoiListAheadDataType(
                     return@collect
                 }
 
+                // Get the active profile's POI categories
+                val profileName = karooSystemServiceProvider.streamActiveKarooProfileName().first()
+                val poiCategories: Set<NearbyPoiCategory> = if (profileName != null) {
+                    try {
+                        karooSystemServiceProvider.streamProfileViewSettings(profileName).first().autoAddPoiCategories
+                    } catch (e: Exception) {
+                        NearbyPoiCategory.entries.toSet()
+                    }
+                } else {
+                    NearbyPoiCategory.entries.toSet()
+                }
+
+                val requestedTags = poiCategories.map { it.osmTag }.flatten()
+                if (requestedTags.isEmpty()) {
+                    poisAheadFlow.update { emptyList() }
+                    emitter.onNext(StreamState.NotAvailable)
+                    return@collect
+                }
+
                 val offlinePois = offlineNearbyPOIProvider.requestNearbyPOIs(
-                    allCategories,
+                    requestedTags,
                     routeLineString.coordinates(),
                     1000,
                     200
