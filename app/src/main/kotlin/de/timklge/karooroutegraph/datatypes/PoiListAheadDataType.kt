@@ -74,6 +74,8 @@ class PoiListAheadDataType(
     private var viewJob: Job? = null
     private val poisAheadFlow = MutableStateFlow<List<PoiAheadEntry>>(emptyList())
     private var lastPoiDistances: Map<POI, List<NearestPoint>>? = null
+    private var cachedRouteKey: String? = null
+    private var cachedPoiDistances: Map<POI, List<NearestPoint>>? = null
     private val glance = GlanceRemoteViews()
 
     private fun isNightMode(): Boolean {
@@ -90,6 +92,8 @@ class PoiListAheadDataType(
                 if (currentDistanceAlongRoute == null || routeLineString == null) {
                     poisAheadFlow.update { emptyList() }
                     lastPoiDistances = null
+                    cachedRouteKey = null
+                    cachedPoiDistances = null
                     emitter.onNext(StreamState.NotAvailable)
                     return@collect
                 }
@@ -138,11 +142,18 @@ class PoiListAheadDataType(
                     )
                 }
 
-                val poiDistances = calculatePoiDistances(
-                    routeLineString,
-                    poiSymbols,
-                    1000.0
-                )
+                val poiDistances = if (cachedRouteKey == routeLineString.hashCode().toString() && cachedPoiDistances != null) {
+                    cachedPoiDistances!!
+                } else {
+                    val distances = calculatePoiDistances(
+                        routeLineString,
+                        poiSymbols,
+                        1000.0
+                    )
+                    cachedRouteKey = routeLineString.hashCode().toString()
+                    cachedPoiDistances = distances
+                    distances
+                }
 
                 lastPoiDistances = poiDistances
 

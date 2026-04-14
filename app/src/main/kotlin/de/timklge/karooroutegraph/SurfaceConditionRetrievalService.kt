@@ -100,6 +100,11 @@ class SurfaceConditionRetrievalService(
 
     private var knownMapfiles = setOf<MapFileInfo>()
 
+    // Cache surface condition results to avoid reprocessing identical route segments
+    // Key: polyline hash, Value: surface condition segments
+    private val surfaceConditionCache = mutableMapOf<String, List<SurfaceConditionSegment>>()
+    private val maxCacheSize = 20 // Keep last 20 routes
+
     private fun hasExternalStoragePermission(): Boolean {
         val readGranted = context.checkCallingOrSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE)
         val writeGranted = context.checkCallingOrSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
@@ -206,6 +211,29 @@ class SurfaceConditionRetrievalService(
         val samples: List<RouteSamplePoint>,
     )
 
+    private data class WayWithGeometry(
+        val tags: List<org.mapsforge.core.model.Tag>,
+        val segments: List<List<Point>>,
+        val bounds: BBox?
+    )
+
+    private data class BBox(
+        val minLon: Double,
+        val minLat: Double,
+        val maxLon: Double,
+        val maxLat: Double
+    ) {
+        fun contains(point: Point): Boolean {
+            return point.longitude() >= minLon && point.longitude() <= maxLon &&
+                    point.latitude() >= minLat && point.latitude() <= maxLat
+        }
+
+        fun intersects(otherMinLon: Double, otherMinLat: Double, otherMaxLon: Double, otherMaxLat: Double): Boolean {
+            return !(otherMinLon > maxLon || otherMaxLon < minLon ||
+                    otherMinLat > maxLat || otherMaxLat < minLat)
+        }
+    }
+
     private fun buildSurfaceConditionSegments(
         routeLength: Double,
         coords: List<RouteSamplePoint>,
@@ -235,24 +263,55 @@ class SurfaceConditionRetrievalService(
                         256
                     ))
 
+                    // Pre-compute way geometry and bounding boxes once per tile (was being recomputed per sample)
+                    val waysWithGeometry = mapReadResult.ways.map { way ->
+                        val segments = way.latLongs.map { seg ->
+                            seg.map { latLong -> Point.fromLngLat(latLong.longitude, latLong.latitude) }
+                        }
+                        val bounds = segments.flatMap { it }.let { points ->
+                            if (points.isEmpty()) null else BBox(
+                                points.minOf { it.longitude() },
+                                points.minOf { it.latitude() },
+                                points.maxOf { it.longitude() },
+                                points.maxOf { it.latitude() }
+                            )
+                        }
+                        WayWithGeometry(way.tags, segments, bounds)
+                    }
+
                     // Process each sample point in this tile
                     for (sample in samples) {
                         val point = Point.fromLngLat(sample.latLong.longitude, sample.latLong.latitude)
 
-                        // Get the closest way to the sample point
-                        val closestWay = mapReadResult.ways.minByOrNull { way ->
-                            val segments = way.latLongs.map { seg ->
-                                seg.map { latLong -> Point.fromLngLat(latLong.longitude, latLong.latitude) }
-                            }
-
-                            val minDistanceToSegments = segments.mapNotNull { segment ->
-                                getNearestPointOnLineDistance(point, segment)
-                            }
-
-                            minDistanceToSegments.minOrNull() ?: Double.MAX_VALUE
+                        // Filter ways by bounding box first, then find closest (was checking ALL ways for each sample)
+                        val candidateWays = waysWithGeometry.filter { way ->
+                            way.bounds?.contains(point) != false
                         }
 
-                        val surfaceCondition = closestWay?.let { way -> getSurfaceConditionFromTags(closestWay.tags) }
+                        val closestWayTags = if (candidateWays.size < mapReadResult.ways.size) {
+                            // Only compute distances for candidate ways that pass bounding box check
+                            val closestWay = candidateWays.minByOrNull { way ->
+                                val minDistanceToSegments = way.segments.mapNotNull { segment ->
+                                    getNearestPointOnLineDistance(point, segment)
+                                }
+                                minDistanceToSegments.minOrNull() ?: Double.MAX_VALUE
+                            }
+                            closestWay?.tags
+                        } else {
+                            // Few enough ways that bounding box filter doesn't help, compute directly
+                            val closestWay = mapReadResult.ways.minByOrNull { way ->
+                                val segments = way.latLongs.map { seg ->
+                                    seg.map { latLong -> Point.fromLngLat(latLong.longitude, latLong.latitude) }
+                                }
+                                val minDistanceToSegments = segments.mapNotNull { segment ->
+                                    getNearestPointOnLineDistance(point, segment)
+                                }
+                                minDistanceToSegments.minOrNull() ?: Double.MAX_VALUE
+                            }
+                            closestWay?.tags
+                        }
+
+                        val surfaceCondition = closestWayTags?.let { tags -> getSurfaceConditionFromTags(tags) }
 
                         if (surfaceCondition != null) {
                             // Log.d(KarooRouteGraphExtension.TAG, "Found surface condition $surfaceCondition for sample at ${sample.latLong} from way with tags: ${closestWay.tags}")
@@ -352,6 +411,16 @@ class SurfaceConditionRetrievalService(
                 if (polyline == null) return@collect
                 if (polyline == lastKnownPolyline) return@collect
 
+                // Check cache for this polyline
+                val polylineHash = polyline.hashCode().toString()
+                if (surfaceConditionCache.containsKey(polylineHash)) {
+                    Log.d(KarooRouteGraphExtension.TAG, "Using cached surface conditions for route")
+                    val cachedSegments = surfaceConditionCache[polylineHash]!!
+                    stateFlow.update { cachedSegments }
+                    lastKnownPolyline = polyline
+                    return@collect
+                }
+
                 stateFlow.update { null }
 
                 lastKnownPolyline = polyline
@@ -397,6 +466,7 @@ class SurfaceConditionRetrievalService(
                 val tilesWithMapfiles = tiles.associateWith { tile ->
                     knownMapfiles.filter { mapfileInfo ->
                         val bbox = mapfileInfo.boundingBox
+                        val mapfileBbox = BBox(bbox.minLatitude, bbox.minLongitude, bbox.maxLatitude, bbox.maxLongitude)
 
                         // Get the bounding box of the tile by converting its corners to lat/lon
                         val (topLeftLat, topLeftLon) = TileUtils.tileXYToLatLon(
@@ -410,7 +480,7 @@ class SurfaceConditionRetrievalService(
                             tile.z
                         )
 
-                        val tileBbox = BoundingBox(
+                        val tileBbox = BBox(
                             bottomRightLat,
                             topLeftLon,
                             topLeftLat,
@@ -418,7 +488,7 @@ class SurfaceConditionRetrievalService(
                         )
 
                         // Check if tile bounding box intersects with mapfile bounding box
-                        bbox.intersects(tileBbox)
+                        mapfileBbox.intersects(tileBbox.minLon, tileBbox.minLat, tileBbox.maxLon, tileBbox.maxLat)
                     }.map { it.file }
                 }
                 val neededMapfiles = tilesWithMapfiles.values.toSet()
@@ -444,6 +514,16 @@ class SurfaceConditionRetrievalService(
                 val surfaceConditionSegments = buildSurfaceConditionSegments(routeDistance,
                     routeSampled,
                     mapfilesToTiles)
+
+                // Cache the results
+                surfaceConditionCache[polylineHash] = surfaceConditionSegments
+                
+                // Evict oldest entries if cache exceeds max size
+                if (surfaceConditionCache.size > maxCacheSize) {
+                    val oldestKey = surfaceConditionCache.keys.first()
+                    surfaceConditionCache.remove(oldestKey)
+                    Log.d(KarooRouteGraphExtension.TAG, "Evicted oldest surface condition cache entry")
+                }
 
                 val totalSegmentLengthByType = surfaceConditionSegments.groupBy { it.condition }.mapValues { entry ->
                     entry.value.sumOf { it.endMeters - it.startMeters }

@@ -100,10 +100,12 @@ sealed class DistanceToPoiResult : Comparable<DistanceToPoiResult> {
  * @return A map of POIs to their nearest points on the route and distances.
  */
 fun calculatePoiDistances(polyline: LineString, pois: List<POI>, maxDistanceToRoute: Double): Map<POI, List<NearestPoint>> {
+    // Pre-compute coordinates to avoid repeated extraction
+    val coordinates = polyline.coordinates()
+    
+    // Build result map directly
     return pois.associateWith { poi ->
-        val nearestPoints = calculatePoiDistance(polyline, poi, maxDistanceToRoute)
-
-        nearestPoints
+        calculatePoiDistance(polyline, poi, maxDistanceToRoute, coordinates)
     }
 }
 
@@ -172,17 +174,18 @@ fun getNearestPointOnLineDistance(point: Point, line: List<Point>): Double? {
  * @param polyline The polyline to calculate distances against.
  * @param poi The POI to calculate distances for.
  * @param maxDistanceToRoute The maximum distance from the route to consider a POI as relevant.
+ * @param coordinates Pre-computed coordinates for efficiency (optional).
  * @return A list of nearest points on the route with their distances.
  */
-private fun calculatePoiDistance(polyline: LineString, poi: POI, maxDistanceToRoute: Double): List<NearestPoint> {
+private fun calculatePoiDistance(polyline: LineString, poi: POI, maxDistanceToRoute: Double, coordinates: List<Point>? = null): List<NearestPoint> {
     val nearestPointCandidates = mutableListOf<NearestPoint>()
     var currentRouteDistance = 0.0f
     val poiPoint = Point.fromLngLat(poi.symbol.lng, poi.symbol.lat)
 
-    val coordinates = polyline.coordinates()
-    for (i in 1 until coordinates.size){
-        val startPoint = coordinates[i - 1]
-        val endPoint = coordinates[i]
+    val coords = coordinates ?: polyline.coordinates()
+    for (i in 1 until coords.size){
+        val startPoint = coords[i - 1]
+        val endPoint = coords[i]
 
         val nearestPointOnSegment = getNearestPointOnLine(poiPoint, startPoint, endPoint)
         val nearestPointDist = TurfMeasurement.distance(poiPoint, nearestPointOnSegment, TurfConstants.UNIT_METERS).toFloat()
@@ -199,20 +202,36 @@ private fun calculatePoiDistance(polyline: LineString, poi: POI, maxDistanceToRo
         currentRouteDistance += TurfMeasurement.distance(startPoint, endPoint, TurfConstants.UNIT_METERS).toFloat()
     }
 
-    // Cluster nearest point candidates together
+    // Cluster nearest point candidates together - O(k log k) instead of O(k²)
+    // Uses sorted list with binary search for efficient clustering
     return buildList {
-        nearestPointCandidates.forEach { candidate ->
-            val existingCandidate = this@buildList.find { existingPoint ->
-                (existingPoint.distanceFromRouteStart - candidate.distanceFromRouteStart).absoluteValue < maxDistanceToRoute * 3
+        val clusterThreshold = maxDistanceToRoute * 3
+        val sortedCandidates = nearestPointCandidates.sortedBy { it.distanceFromRouteStart }
+        val usedIndices = mutableSetOf<Int>()
+
+        for (i in sortedCandidates.indices) {
+            if (i in usedIndices) continue
+
+            // Find all candidates within clusterThreshold of this one
+            val clusterStart = sortedCandidates[i].distanceFromRouteStart - clusterThreshold
+            val clusterEnd = sortedCandidates[i].distanceFromRouteStart + clusterThreshold
+
+            // Binary search for cluster range
+            val clusterStartIdx = sortedCandidates.binarySearch { (it.distanceFromRouteStart - clusterStart).toInt().coerceIn(-1, 1) }
+                .let { if (it < 0) -(it + 1) else it }
+            val clusterEndIdx = sortedCandidates.indexOfFirst { it.distanceFromRouteStart > clusterEnd }
+                .let { if (it < 0) sortedCandidates.size else it }
+
+            // Mark all in cluster as used
+            for (j in clusterStartIdx until clusterEndIdx) {
+                usedIndices.add(j)
             }
 
-            if (existingCandidate != null){
-                if (candidate.distanceFromPointOnRoute < existingCandidate.distanceFromPointOnRoute){
-                    this@buildList.remove(existingCandidate)
-                    this@buildList.add(candidate)
-                }
-            } else {
-                this@buildList.add(candidate)
+            // Find closest candidate in cluster to route
+            val closestInCluster = sortedCandidates.subList(clusterStartIdx, clusterEndIdx)
+                .minByOrNull { it.distanceFromPointOnRoute }
+            if (closestInCluster != null) {
+                add(closestInCluster)
             }
         }
     }
