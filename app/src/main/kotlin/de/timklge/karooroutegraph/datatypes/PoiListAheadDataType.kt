@@ -77,6 +77,7 @@ class PoiListAheadDataType(
     private var cachedRouteKey: String? = null
     private var cachedPoiDistances: Map<POI, List<NearestPoint>>? = null
     private val glance = GlanceRemoteViews()
+    private var cachedBitmap: Bitmap? = null
 
     private fun isNightMode(): Boolean {
         val nightModeFlags = applicationContext.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
@@ -252,7 +253,8 @@ class PoiListAheadDataType(
             val startY = 8f
 
             poisAheadFlow.collect { pois ->
-                val bitmap = createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                val bitmap = cachedBitmap?.also { it.eraseColor(Color.TRANSPARENT) }
+                    ?: createBitmap(width, height, Bitmap.Config.ARGB_8888).also { cachedBitmap = it }
                 val canvas = Canvas(bitmap)
 
                 canvas.drawColor(backgroundColor)

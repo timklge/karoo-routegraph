@@ -3,6 +3,7 @@ package de.timklge.karooroutegraph.datatypes
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Canvas
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
@@ -99,6 +100,132 @@ class RouteGraphDataType(
     val surfaceConditionFillPaintsNightmode = getSurfaceConditionPaints(applicationContext, true)
     val surfaceConditionFillPaintsDaymode = getSurfaceConditionPaints(applicationContext, false)
 
+    // Cached Paint objects to avoid recreation on every frame render
+    private data class PaintCache(
+        val poiLinePaint: Paint,
+        val poiLinePaintDashed: Paint,
+        val backgroundStrokePaint: Paint,
+        val backgroundStrokePaintDashed: Paint,
+        val axisStrokePaint: Paint,
+        val backgroundFillPaint: Paint,
+        val backgroundFillPaintInv: Paint,
+        val backgroundFillPaintInvSolid: Paint,
+        val elevationFillPaint: Paint,
+        val currentLinePaint: Paint,
+        val upcomingLinePaint: Paint,
+        val pastLinePaint: Paint,
+        val textPaint: Paint,
+        val textPaintInv: Paint,
+        val inversePaintFilter: Paint,
+        val categoryPaints: Map<ClimbCategory, Paint>,
+        val iconBitmapCache: MutableMap<Pair<Int, Boolean>, Bitmap>
+    )
+
+    private var lastNightMode: Boolean? = null
+    private var paintCache: PaintCache? = null
+
+    private fun getPaints(nightMode: Boolean): PaintCache {
+        // Return cached paints if theme hasn't changed
+        if (paintCache != null && lastNightMode == nightMode) {
+            return paintCache!!
+        }
+
+        val paints = PaintCache(
+            poiLinePaint = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
+                style = Paint.Style.STROKE
+                strokeWidth = 6f
+            },
+            poiLinePaintDashed = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
+                style = Paint.Style.STROKE
+                strokeWidth = 6f
+                pathEffect = android.graphics.DashPathEffect(floatArrayOf(15f, 10f), 0f)
+            },
+            backgroundStrokePaint = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.black else R.color.white)
+                style = Paint.Style.STROKE
+                strokeWidth = 11f
+            },
+            backgroundStrokePaintDashed = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.black else R.color.white)
+                style = Paint.Style.STROKE
+                strokeWidth = 11f
+                pathEffect = android.graphics.DashPathEffect(floatArrayOf(15f, 10f), 0f)
+            },
+            axisStrokePaint = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
+                style = Paint.Style.STROKE
+                strokeWidth = 4f
+            },
+            backgroundFillPaint = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.whiteBg else R.color.blackBg)
+                style = Paint.Style.FILL
+            },
+            backgroundFillPaintInv = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.blackBg else R.color.whiteBg)
+                style = Paint.Style.FILL
+            },
+            backgroundFillPaintInvSolid = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.black else R.color.white)
+                style = Paint.Style.FILL
+                alpha = (255 * 0.8f).roundToInt()
+            },
+            elevationFillPaint = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.elevDarkBg else R.color.elevBg)
+                style = Paint.Style.FILL
+            },
+            currentLinePaint = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
+                style = Paint.Style.STROKE
+                strokeWidth = 5f
+            },
+            upcomingLinePaint = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
+                style = Paint.Style.STROKE
+                strokeWidth = 3f
+            },
+            pastLinePaint = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
+                style = Paint.Style.STROKE
+                strokeWidth = 3f
+            },
+            textPaint = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
+                style = Paint.Style.FILL
+                textSize = 30f
+                textAlign = Paint.Align.LEFT
+            },
+            textPaintInv = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.black else R.color.white)
+                style = Paint.Style.FILL
+                textSize = 30f
+                textAlign = Paint.Align.LEFT
+            },
+            inversePaintFilter = Paint().apply {
+                colorFilter = android.graphics.ColorMatrixColorFilter(
+                    android.graphics.ColorMatrix().apply { set(floatArrayOf(
+                        -1f,  0f,  0f, 0f, 255f,
+                        0f, -1f,  0f, 0f, 255f,
+                        0f,  0f, -1f, 0f, 255f,
+                        0f,  0f,  0f, 1f,   0f
+                    )) }
+                )
+            },
+            categoryPaints = ClimbCategory.entries.associateWith { category ->
+                Paint().apply {
+                    color = applicationContext.getColor(category.colorRes)
+                    style = Paint.Style.FILL
+                }
+            },
+            iconBitmapCache = mutableMapOf<Pair<Int, Boolean>, Bitmap>()
+        )
+
+        paintCache = paints
+        lastNightMode = nightMode
+        return paints
+    }
+
     data class StreamData(val routeGraphViewModel: RouteGraphViewModel, val routeGraphDisplayViewModel: RouteGraphDisplayViewModel,
                           val settings: RouteGraphSettings, val isVisible: Boolean, val surfaceConditions: List<SurfaceConditionRetrievalService.SurfaceConditionSegment>?)
 
@@ -138,102 +265,24 @@ class RouteGraphDataType(
 
                 val graphBounds = RectF(if (config.gridSize.first > 30) 35f else 0f, 15f, config.viewSize.first.toFloat() - 10f, config.viewSize.second.toFloat() - 30f)
 
-                val poiLinePaint = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
-                    style = Paint.Style.STROKE
-                    strokeWidth = 6f
-                }
-
-                val poiLinePaintDashed = Paint(poiLinePaint).apply {
-                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(15f, 10f), 0f)
-                }
-
-                val backgroundStrokePaint = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.black else R.color.white)
-                    style = Paint.Style.STROKE
-                    strokeWidth = poiLinePaint.strokeWidth + 5f
-                }
-
-                val backgroundStrokePaintDashed = Paint(backgroundStrokePaint).apply {
-                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(15f, 10f), 0f)
-                }
-
-                val axisStrokePaint = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
-                    style = Paint.Style.STROKE
-                    strokeWidth = 4f
-                }
-
-                val backgroundFillPaint = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.whiteBg else R.color.blackBg)
-                    style = Paint.Style.FILL
-                }
-
-                val backgroundFillPaintInv = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.blackBg else R.color.whiteBg)
-                    style = Paint.Style.FILL
-                }
-
-                val backgroundFillPaintInvSolid = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.black else R.color.white)
-                    style = Paint.Style.FILL
-                    alpha = (255 * 0.8f).roundToInt()
-                }
-
-                val elevationFillPaint = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.elevDarkBg else R.color.elevBg)
-                    style = Paint.Style.FILL
-                }
-
-                val currentLinePaint = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
-                    style = Paint.Style.STROKE
-                    strokeWidth = 5f
-                }
-
-                val upcomingLinePaint = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
-                    style = Paint.Style.STROKE
-                    strokeWidth = 3f
-                }
-
-                val pastLinePaint = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
-                    style = Paint.Style.STROKE
-                    strokeWidth = 3f
-                }
-
-                val textPaint = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
-                    style = Paint.Style.FILL
-                    textSize = 30f
-                    textAlign = Paint.Align.LEFT
-                }
-
-                val textPaintInv = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.black else R.color.white)
-                    style = Paint.Style.FILL
-                    textSize = 30f
-                    textAlign = Paint.Align.LEFT
-                }
-
-                val inversePaintFilter = Paint().apply {
-                    colorFilter = android.graphics.ColorMatrixColorFilter(
-                        android.graphics.ColorMatrix().apply { set(floatArrayOf(
-                            -1f,  0f,  0f, 0f, 255f,
-                            0f, -1f,  0f, 0f, 255f,
-                            0f,  0f, -1f, 0f, 255f,
-                            0f,  0f,  0f, 1f,   0f
-                        )) }
-                    )
-                }
-
-                val categoryPaints = ClimbCategory.entries.associateWith { category ->
-                    Paint().apply {
-                        color = applicationContext.getColor(category.colorRes)
-                        style = Paint.Style.FILL
-                    }
-                }
+                // Use cached paints instead of creating new ones
+                val paints = getPaints(nightMode)
+                val poiLinePaint = paints.poiLinePaint
+                val poiLinePaintDashed = paints.poiLinePaintDashed
+                val backgroundStrokePaint = paints.backgroundStrokePaint
+                val backgroundStrokePaintDashed = paints.backgroundStrokePaintDashed
+                val axisStrokePaint = paints.axisStrokePaint
+                val backgroundFillPaint = paints.backgroundFillPaint
+                val backgroundFillPaintInv = paints.backgroundFillPaintInv
+                val backgroundFillPaintInvSolid = paints.backgroundFillPaintInvSolid
+                val elevationFillPaint = paints.elevationFillPaint
+                val currentLinePaint = paints.currentLinePaint
+                val upcomingLinePaint = paints.upcomingLinePaint
+                val pastLinePaint = paints.pastLinePaint
+                val textPaint = paints.textPaint
+                val textPaintInv = paints.textPaintInv
+                val inversePaintFilter = paints.inversePaintFilter
+                val categoryPaints = paints.categoryPaints
 
                 val zoomLevel = displayViewModel.zoomLevel
 
@@ -608,7 +657,11 @@ class RouteGraphDataType(
                                 val icon = mapPoiToIcon(poi.symbol.type)
                                 val sizeX = 35
                                 val sizeY = 35
-                                val bitmap = AppCompatResources.getDrawable(context, icon)?.toBitmap(sizeX, sizeY)
+                                val cacheKey = Pair(icon, nightMode)
+                                val bitmap: Bitmap = paints.iconBitmapCache.getOrPut(cacheKey) {
+                                    AppCompatResources.getDrawable(context, icon)?.toBitmap(sizeX, sizeY)
+                                        ?: return@getOrPut null as Bitmap
+                                }
 
                                 val iconPaint = if (!isNightMode()) inversePaintFilter else textPaint
 
