@@ -70,9 +70,11 @@ import de.timklge.karooroutegraph.updatePbfDownloadStore
 import de.timklge.karooroutegraph.updatePbfDownloadStoreStatus
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import java.text.Collator
 import kotlin.collections.component1
 import kotlin.collections.component2
 import kotlin.math.roundToInt
+import androidx.compose.ui.platform.LocalConfiguration
 
 @Composable
 private fun getContinentString(continent: String): String {
@@ -88,6 +90,12 @@ private fun getCountryString(countryCode: String, defaultName: String): String {
     val resourceName = "country_" + countryCode.lowercase()
     val resId = remember(countryCode) { context.resources.getIdentifier(resourceName, "string", context.packageName) }
     return if (resId != 0) stringResource(resId) else defaultName
+}
+
+private fun getCountryStringSync(context: android.content.Context, countryCode: String, defaultName: String): String {
+    val resourceName = "country_" + countryCode.lowercase()
+    val resId = context.resources.getIdentifier(resourceName, "string", context.packageName)
+    return if (resId != 0) context.getString(resId) else defaultName
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -233,6 +241,8 @@ fun PointsOfInterestScreen(
                             nearbyPOIPbfDownloadService.countriesData.entries.groupBy { it.value.continent }.toSortedMap()
                         }
                         var expandedContinents by remember { mutableStateOf(setOf<String>()) }
+                        val locale = LocalConfiguration.current.locales[0]
+                        val collator = remember(locale) { Collator.getInstance(locale) }
 
                         Dialog(onDismissRequest = { showDownloadPoisDialog = false }) {
                             Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface, modifier = Modifier.padding(16.dp).fillMaxSize()) {
@@ -260,7 +270,7 @@ fun PointsOfInterestScreen(
                                             }
 
                                             if (expandedContinents.contains(continent)) {
-                                                items(countries.sortedBy { country -> country.value.name }) { entry ->
+                                                items(countries.sortedWith(compareBy(collator) { entry -> getCountryStringSync(ctx, entry.key, entry.value.name) })) { entry ->
                                                     val key = entry.key
                                                     val data = entry.value
                                                     val downloadedPbf = downloadedPbfs.find { it.countryKey == key }
