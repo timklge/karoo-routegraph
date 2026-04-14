@@ -124,14 +124,15 @@ class PoiListAheadDataType(
                     val poiName = poi.tags["name"]
                         ?: NearbyPoiCategory.fromTag(poi.tags)?.let { applicationContext.getString(it.labelRes) }
                         ?: "Unnamed POI"
+                    val category = NearbyPoiCategory.fromTag(poi.tags)
+                    val poiType = category?.hhType ?: io.hammerhead.karooext.models.Symbol.POI.Types.GENERIC
                     POI(
                         symbol = io.hammerhead.karooext.models.Symbol.POI(
                             id = "ahead-${poi.id}",
                             lat = poi.lat,
                             lng = poi.lon,
                             name = poiName,
-                            type = NearbyPoiCategory.fromTag(poi.tags)?.hhType
-                                ?: io.hammerhead.karooext.models.Symbol.POI.Types.GENERIC
+                            type = poiType
                         ),
                         type = PoiType.POI
                     )

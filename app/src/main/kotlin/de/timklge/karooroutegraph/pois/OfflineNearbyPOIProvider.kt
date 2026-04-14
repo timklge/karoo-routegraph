@@ -92,6 +92,7 @@ class OfflineNearbyPOIProvider(val context: Context, val downloadService: Nearby
         val requestedTagsOrEverything = requestedTags.ifEmpty {
             NearbyPoiCategory.entries.map { it.osmTag }.flatten().distinct()
         }
+        Log.i(KarooRouteGraphExtension.TAG, "Offline POI query: requestedTags=$requestedTags, requestedTagsOrEverything=$requestedTagsOrEverything")
 
         val pointsMinLon = samples.minOf { it.longitude() }
         val pointsMaxLon = samples.maxOf { it.longitude() }
@@ -111,6 +112,13 @@ class OfflineNearbyPOIProvider(val context: Context, val downloadService: Nearby
 
         Log.i(KarooRouteGraphExtension.TAG, "Searching offline POIs in countries: $availableCountriesInBounds")
 
+        // Pre-compile tag search patterns for SQL LIKE clause
+        // This moves tag filtering from application code to database level
+        val tagPatterns = requestedTagsOrEverything.map { (key, value) ->
+            "\"$key\":\"$value\""
+        }
+        Log.i(KarooRouteGraphExtension.TAG, "Offline POI tagPatterns: $tagPatterns")
+
         val jobs = availableCountriesInBounds.map { countryKey ->
             CoroutineScope(Dispatchers.IO).async {
                 buildList {
@@ -119,11 +127,31 @@ class OfflineNearbyPOIProvider(val context: Context, val downloadService: Nearby
 
                     try {
                         SQLiteDatabase.openDatabase(dbFile.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+                            // Use SQL LIKE to filter tags at database level
+                            // This significantly reduces the number of rows processed
+                            // Note: tags is stored as BLOB so we need CAST to TEXT for LIKE comparison
+                            val whereClause = buildString {
+                                append("lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? AND (")
+                                tagPatterns.forEachIndexed { index, pattern ->
+                                    if (index > 0) append(" OR ")
+                                    append("CAST(tags AS TEXT) LIKE ?")
+                                }
+                                append(")")
+                            }
+
+                            val whereArgs = arrayOf(
+                                searchMinLat.toString(),
+                                searchMaxLat.toString(),
+                                searchMinLon.toString(),
+                                searchMaxLon.toString(),
+                                *tagPatterns.map { "%$it%" }.toTypedArray()
+                            )
+
                             val cursor = db.query(
                                 "nodes",
                                 arrayOf("id", "lat", "lon", "tags"),
-                                "lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?",
-                                arrayOf(searchMinLat.toString(), searchMaxLat.toString(), searchMinLon.toString(), searchMaxLon.toString()),
+                                whereClause,
+                                whereArgs,
                                 null, null, null
                             )
 
@@ -138,9 +166,11 @@ class OfflineNearbyPOIProvider(val context: Context, val downloadService: Nearby
                                     val lon = it.getDouble(lonIndex)
                                     val tagsBlob = it.getBlob(tagsIndex)
 
+                                    // Parse JSON only for rows that passed the LIKE filter
                                     val jsonObject = jsonWithUnknownKeys.parseToJsonElement(String(tagsBlob))
                                     val tags = jsonObject.jsonObject.mapValues { entry -> entry.value.jsonPrimitive.content }
 
+                                    // Verify the match (LIKE is approximate)
                                     val matchesTags = requestedTagsOrEverything.any { (key, value) ->
                                         tags[key] == value
                                     }
@@ -168,6 +198,7 @@ class OfflineNearbyPOIProvider(val context: Context, val downloadService: Nearby
         }
 
         val result = jobs.awaitAll().flatten().toSet()
+        Log.i(KarooRouteGraphExtension.TAG, "Offline POI query found ${result.size} POIs, returning ${result.take(limit).size}")
 
         return result.take(limit)
     }

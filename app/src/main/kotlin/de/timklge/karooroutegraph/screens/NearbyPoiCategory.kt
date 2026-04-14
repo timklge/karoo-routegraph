@@ -1,5 +1,6 @@
 package de.timklge.karooroutegraph.screens
 
+import android.util.Log
 import de.timklge.karooroutegraph.R
 import io.hammerhead.karooext.models.Symbol
 
@@ -15,8 +16,8 @@ enum class NearbyPoiCategory(val labelRes: Int, val osmTag: List<Pair<String, St
     CAMPING_SITE(R.string.category_camping_site, listOf("tourism" to "camp_site"), Symbol.POI.Types.CAMPING),
     TOURISM_ATTRACTION(R.string.category_attraction, listOf("tourism" to "attraction"), Symbol.POI.Types.VIEWPOINT),
     VIEWPOINT(R.string.category_viewpoint, listOf("tourism" to "viewpoint"), Symbol.POI.Types.VIEWPOINT),
-    BEACH(R.string.category_beach, listOf("natural" to "beach"), Symbol.POI.Types.GENERIC),
-    SWIMMING_AREA(R.string.category_swimming_area, listOf("leisure" to "swimming_area"), Symbol.POI.Types.GENERIC);
+    BEACH(R.string.category_beach, listOf("natural" to "beach"), Symbol.POI.Types.SWIMMING),
+    SWIMMING_AREA(R.string.category_swimming_area, listOf("leisure" to "swimming_area"), Symbol.POI.Types.SWIMMING);
 
     companion object {
         fun fromTag(tags: Map<String, String>): NearbyPoiCategory? {
