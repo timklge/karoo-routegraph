@@ -125,36 +125,23 @@ class VerticalRouteGraphDataType(
         val words = text.split(" ")
         val lines = mutableListOf<String>()
         var currentLine = ""
+        val spaceWidth = paint.measureText(" ")
 
         for (word in words) {
-            val testLine = if (currentLine.isEmpty()) word else "$currentLine $word"
+            val wordWidth = paint.measureText(word)
+            val testLineWidth = if (currentLine.isEmpty()) wordWidth else paint.measureText(currentLine) + spaceWidth + wordWidth
 
-            if (paint.measureText(testLine) <= maxWidth) {
-                currentLine = testLine
+            if (testLineWidth <= maxWidth) {
+                currentLine = if (currentLine.isEmpty()) word else "$currentLine $word"
             } else {
                 if (currentLine.isNotEmpty()) {
                     lines.add(currentLine)
                     currentLine = word
                 } else {
                     // Single word is too long, break it character by character
-                    var partialWord = ""
-                    for (char in word) {
-                        val testChar = "$partialWord$char"
-                        if (paint.measureText(testChar) <= maxWidth) {
-                            partialWord = testChar
-                        } else {
-                            if (partialWord.isNotEmpty()) {
-                                lines.add(partialWord)
-                                partialWord = char.toString()
-                            } else {
-                                // Even single character is too wide, just add it
-                                lines.add(char.toString())
-                            }
-                        }
-                    }
-                    if (partialWord.isNotEmpty()) {
-                        currentLine = partialWord
-                    }
+                    val brokenLines = breakLongWord(word, paint, maxWidth)
+                    lines.addAll(brokenLines.dropLast(1))
+                    currentLine = brokenLines.lastOrNull() ?: ""
                 }
             }
         }
@@ -170,6 +157,35 @@ class VerticalRouteGraphDataType(
         }
 
         return lines.ifEmpty { listOf(text) }
+    }
+
+    /**
+     * Break a long word into multiple lines to fit within maxWidth
+     */
+    private fun breakLongWord(word: String, paint: Paint, maxWidth: Float): List<String> {
+        val lines = mutableListOf<String>()
+        var currentLine = ""
+
+        for (char in word) {
+            val testChar = "$currentLine$char"
+            if (paint.measureText(testChar) <= maxWidth) {
+                currentLine = testChar
+            } else {
+                if (currentLine.isNotEmpty()) {
+                    lines.add(currentLine)
+                    currentLine = char.toString()
+                } else {
+                    // Even single character is too wide, just add it
+                    lines.add(char.toString())
+                }
+            }
+        }
+
+        if (currentLine.isNotEmpty()) {
+            lines.add(currentLine)
+        }
+
+        return lines
     }
 
     data class StreamData(val routeGraphViewModel: RouteGraphViewModel,
@@ -194,6 +210,120 @@ class VerticalRouteGraphDataType(
     // Surface condition paints with hatched patterns
     val surfaceConditionFillPaintsNightmode = getSurfaceConditionPaints(applicationContext, true)
     val surfaceConditionFillPaintsDaymode = getSurfaceConditionPaints(applicationContext, false)
+
+    // Cached Paint objects to avoid recreation on every frame render
+    private data class PaintCache(
+        val poiLinePaint: Paint,
+        val poiLinePaintDashed: Paint,
+        val backgroundStrokePaint: Paint,
+        val backgroundStrokePaintDashed: Paint,
+        val axisStrokePaint: Paint,
+        val backgroundFillPaintInv: Paint,
+        val elevationFillPaint: Paint,
+        val currentLinePaint: Paint,
+        val upcomingLinePaint: Paint,
+        val pastLinePaint: Paint,
+        val textPaint: Paint,
+        val textPaintBold: Paint,
+        val inversePaintFilter: Paint,
+        val categoryPaints: Map<ClimbCategory, Paint>
+    )
+
+    private var lastNightMode: Boolean? = null
+    private var paintCache: PaintCache? = null
+
+    private fun getPaints(nightMode: Boolean): PaintCache {
+        // Return cached paints if theme hasn't changed
+        if (paintCache != null && lastNightMode == nightMode) {
+            return paintCache!!
+        }
+
+        val paints = PaintCache(
+            poiLinePaint = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
+                style = Paint.Style.STROKE
+                strokeWidth = 5f
+            },
+            poiLinePaintDashed = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
+                style = Paint.Style.STROKE
+                strokeWidth = 5f
+                pathEffect = android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 0f)
+            },
+            backgroundStrokePaint = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.black else R.color.white)
+                style = Paint.Style.STROKE
+                strokeWidth = 10f
+            },
+            backgroundStrokePaintDashed = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.black else R.color.white)
+                style = Paint.Style.STROKE
+                strokeWidth = 10f
+                pathEffect = android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 0f)
+            },
+            axisStrokePaint = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
+                style = Paint.Style.STROKE
+                strokeWidth = 4f
+            },
+            backgroundFillPaintInv = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.blackBg else R.color.whiteBg)
+                style = Paint.Style.FILL
+            },
+            elevationFillPaint = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.elevDarkBg else R.color.elevBg)
+                style = Paint.Style.FILL
+            },
+            currentLinePaint = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
+                style = Paint.Style.STROKE
+                strokeWidth = 5f
+            },
+            upcomingLinePaint = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
+                style = Paint.Style.STROKE
+                strokeWidth = 3f
+            },
+            pastLinePaint = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
+                style = Paint.Style.STROKE
+                strokeWidth = 3f
+            },
+            textPaint = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
+                style = Paint.Style.FILL
+                textSize = 35f
+                textAlign = Paint.Align.LEFT
+            },
+            textPaintBold = Paint().apply {
+                color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
+                style = Paint.Style.FILL
+                textSize = 40f
+                textAlign = Paint.Align.LEFT
+                typeface = Typeface.DEFAULT_BOLD
+            },
+            inversePaintFilter = Paint().apply {
+                colorFilter = android.graphics.ColorMatrixColorFilter(
+                    android.graphics.ColorMatrix().apply { set(floatArrayOf(
+                        -1f,  0f,  0f, 0f, 255f,
+                        0f, -1f,  0f, 0f, 255f,
+                        0f,  0f, -1f, 0f, 255f,
+                        0f,  0f,  0f, 1f,   0f
+                    )) }
+                )
+            },
+            categoryPaints = ClimbCategory.entries.associateWith { category ->
+                Paint().apply {
+                    color = applicationContext.getColor(category.colorRes)
+                    style = Paint.Style.FILL
+                }
+            }
+        )
+
+        paintCache = paints
+        lastNightMode = nightMode
+        return paints
+    }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
@@ -248,92 +378,22 @@ class VerticalRouteGraphDataType(
                 val right = 80f + (if (radarLaneIsVisible) 30f else 0f)
                 val graphBounds = RectF(left, 15f, right, config.viewSize.second.toFloat() - 25f)
 
-                val poiLinePaint = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
-                    style = Paint.Style.STROKE
-                    strokeWidth = 5f
-                }
-
-                val poiLinePaintDashed = Paint(poiLinePaint).apply {
-                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 0f)
-                }
-
-                val backgroundStrokePaint = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.black else R.color.white)
-                    style = Paint.Style.STROKE
-                    strokeWidth = 10f
-                }
-
-                val backgroundStrokePaintDashed = Paint(backgroundStrokePaint).apply {
-                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 0f)
-                }
-
-                val axisStrokePaint = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
-                    style = Paint.Style.STROKE
-                    strokeWidth = 4f
-                }
-
-                val backgroundFillPaintInv = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.blackBg else R.color.whiteBg)
-                    style = Paint.Style.FILL
-                }
-
-                val elevationFillPaint = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.elevDarkBg else R.color.elevBg)
-                    style = Paint.Style.FILL
-                }
-
-                val currentLinePaint = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
-                    style = Paint.Style.STROKE
-                    strokeWidth = 5f
-                }
-
-                val upcomingLinePaint = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
-                    style = Paint.Style.STROKE
-                    strokeWidth = 3f
-                }
-
-                val pastLinePaint = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
-                    style = Paint.Style.STROKE
-                    strokeWidth = 3f
-                }
-
-                val textPaint = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
-                    style = Paint.Style.FILL
-                    textSize = 35f
-                    textAlign = Paint.Align.LEFT
-                }
-
-                val textPaintBold = Paint().apply {
-                    color = applicationContext.getColor(if(nightMode) R.color.white else R.color.black)
-                    style = Paint.Style.FILL
-                    textSize = 40f
-                    textAlign = Paint.Align.LEFT
-                    typeface = Typeface.DEFAULT_BOLD
-                }
-
-                val inversePaintFilter = Paint().apply {
-                    colorFilter = android.graphics.ColorMatrixColorFilter(
-                        android.graphics.ColorMatrix().apply { set(floatArrayOf(
-                            -1f,  0f,  0f, 0f, 255f,
-                            0f, -1f,  0f, 0f, 255f,
-                            0f,  0f, -1f, 0f, 255f,
-                            0f,  0f,  0f, 1f,   0f
-                        )) }
-                    )
-                }
-
-                val categoryPaints = ClimbCategory.entries.associateWith { category ->
-                    Paint().apply {
-                        color = applicationContext.getColor(category.colorRes)
-                        style = Paint.Style.FILL
-                    }
-                }
+                // Use cached paints instead of creating new ones
+                val paints = getPaints(nightMode)
+                val poiLinePaint = paints.poiLinePaint
+                val poiLinePaintDashed = paints.poiLinePaintDashed
+                val backgroundStrokePaint = paints.backgroundStrokePaint
+                val backgroundStrokePaintDashed = paints.backgroundStrokePaintDashed
+                val axisStrokePaint = paints.axisStrokePaint
+                val backgroundFillPaintInv = paints.backgroundFillPaintInv
+                val elevationFillPaint = paints.elevationFillPaint
+                val currentLinePaint = paints.currentLinePaint
+                val upcomingLinePaint = paints.upcomingLinePaint
+                val pastLinePaint = paints.pastLinePaint
+                val textPaint = paints.textPaint
+                val textPaintBold = paints.textPaintBold
+                val inversePaintFilter = paints.inversePaintFilter
+                val categoryPaints = paints.categoryPaints
 
                 val zoomLevel = displayViewModel.verticalZoomLevel
                 val viewDistanceStart = if (zoomLevel == ZoomLevel.CompleteRoute){

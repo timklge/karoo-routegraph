@@ -31,7 +31,20 @@ class TileDownloadService(
     data class CachedTile(val lastAccessed: Instant, val bitmap: Bitmap)
 
     private val cacheDir = File(context.cacheDir, "tiles")
-    private val inMemoryCache = mutableMapOf<Tile, CachedTile>()
+    
+    // Use LinkedHashMap with access-order for efficient LRU cache
+    // This eliminates the need for O(n log n) sorting in gcCache()
+    private val inMemoryCache = object : LinkedHashMap<Tile, CachedTile>(
+        /* initialCapacity */ 64,
+        /* loadFactor */ 0.75f,
+        /* accessOrder */ true
+    ) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Tile, CachedTile>): Boolean {
+            // Let manual eviction handle removal for logging and age-based checks
+            return false
+        }
+    }
+    
     private val mutex = Mutex()
     private val maxCacheSize = 50
     private val maxCacheAge = Duration.ofMinutes(30)
@@ -78,10 +91,11 @@ class TileDownloadService(
     }
 
     suspend fun getTileIfAvailableInstantly(tile: Tile): Bitmap? {
+        // Access-order LinkedHashMap automatically updates order on get()
         mutex.withLock {
             val cachedTile = inMemoryCache[tile]
             if (cachedTile != null) {
-                // Update last accessed time in memory cache
+                // Update last accessed time (automatic with access-order LinkedHashMap)
                 inMemoryCache[tile] = cachedTile.copy(lastAccessed = Instant.now())
                 return cachedTile.bitmap
             }
@@ -206,26 +220,30 @@ class TileDownloadService(
         val expiryTime = now.minus(maxCacheAge)
 
         // Remove entries older than maxCacheAge
+        // LinkedHashMap iterator is efficient and maintains access order
         val iterator = inMemoryCache.iterator()
         while (iterator.hasNext()) {
             val entry = iterator.next()
             if (entry.value.lastAccessed.isBefore(expiryTime)) {
                 iterator.remove()
                 Log.d(KarooRouteGraphExtension.TAG, "GC Cache: Removed expired tile ${entry.key}")
+            } else {
+                // Since we iterate in access-order, once we find a recent entry,
+                // all remaining entries accessed later are also recent
+                break
             }
         }
 
-        // If cache still exceeds max size, remove the oldest entries
-        if (inMemoryCache.size > maxCacheSize) {
-            // Sort entries by lastAccessed time (oldest first)
-            val sortedEntries = inMemoryCache.entries.sortedBy { it.value.lastAccessed }
-            val entriesToRemove = inMemoryCache.size - maxCacheSize
-
-            // Remove the oldest entries
-            for (i in 0 until entriesToRemove) {
-                val entryToRemove = sortedEntries[i]
-                inMemoryCache.remove(entryToRemove.key)
-                Log.d(KarooRouteGraphExtension.TAG, "GC Cache: Removed oldest tile ${entryToRemove.key} due to size limit")
+        // If cache still exceeds max size, remove the oldest entries (least recently used)
+        // LinkedHashMap iteration order is access-order, so first entries are LRU
+        while (inMemoryCache.size > maxCacheSize) {
+            val iterator = inMemoryCache.iterator()
+            if (iterator.hasNext()) {
+                val entry = iterator.next()
+                iterator.remove()
+                Log.d(KarooRouteGraphExtension.TAG, "GC Cache: Removed LRU tile ${entry.key} due to size limit")
+            } else {
+                break
             }
         }
     }

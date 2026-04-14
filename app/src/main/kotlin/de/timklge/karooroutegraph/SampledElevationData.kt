@@ -2,16 +2,19 @@ package de.timklge.karooroutegraph
 
 import com.mapbox.geojson.LineString
 import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.floor
 
 class SampledElevationData(val interval: Float, val elevations: FloatArray) {
     fun getMinimumElevationInRange(startDistance: Float, endDistance: Float): Float {
         var minElevation = Float.MAX_VALUE
 
-        for(i in elevations.indices) {
-            val currentPosition = i * interval
-            if (currentPosition in startDistance..endDistance) {
-                minElevation = minOf(minElevation, elevations[i])
-            }
+        // Calculate index range directly instead of scanning entire array
+        val startIndex = floor(startDistance / interval).toInt().coerceIn(0, elevations.size - 1)
+        val endIndex = ceil(endDistance / interval).toInt().coerceIn(0, elevations.size - 1)
+
+        for (i in startIndex..endIndex) {
+            minElevation = minOf(minElevation, elevations[i])
         }
 
         return minElevation
@@ -20,11 +23,12 @@ class SampledElevationData(val interval: Float, val elevations: FloatArray) {
     fun getMaximumElevationInRange(startDistance: Float, endDistance: Float): Float {
         var maxElevation = Float.MIN_VALUE
 
-        for(i in elevations.indices) {
-            val currentPosition = i * interval
-            if (currentPosition in startDistance..endDistance) {
-                maxElevation = maxOf(maxElevation, elevations[i])
-            }
+        // Calculate index range directly instead of scanning entire array
+        val startIndex = floor(startDistance / interval).toInt().coerceIn(0, elevations.size - 1)
+        val endIndex = ceil(endDistance / interval).toInt().coerceIn(0, elevations.size - 1)
+
+        for (i in startIndex..endIndex) {
+            maxElevation = maxOf(maxElevation, elevations[i])
         }
 
         return maxElevation
@@ -33,16 +37,15 @@ class SampledElevationData(val interval: Float, val elevations: FloatArray) {
     fun getMaximumInclineInRange(startDistance: Float, endDistance: Float): Float {
         var maxIncline = 0f
 
-        for(i in 0 until elevations.size - 1) {
-            val currentPosition = i * interval
-            val nextPosition = (i + 1) * interval
+        // Calculate index range directly
+        val startIndex = floor(startDistance / interval).toInt().coerceIn(0, elevations.size - 2)
+        val endIndex = ceil(endDistance / interval).toInt().coerceIn(0, elevations.size - 1)
 
-            if (currentPosition < endDistance && nextPosition > startDistance) {
-                val incline = (elevations[i + 1] - elevations[i]) / interval
+        for (i in startIndex until endIndex) {
+            val incline = (elevations[i + 1] - elevations[i]) / interval
 
-                if (abs(incline) > abs(maxIncline)) {
-                    maxIncline = incline
-                }
+            if (abs(incline) > abs(maxIncline)) {
+                maxIncline = incline
             }
         }
 
@@ -52,13 +55,14 @@ class SampledElevationData(val interval: Float, val elevations: FloatArray) {
     fun getTotalClimb(startDistance: Float, endDistance: Float): Double {
         var elevationSum = 0.0
 
-        for(i in 1 until elevations.size) { // Corrected loop range and removed redundant check
-            val currentPosition = i * interval
-            if (currentPosition in startDistance+1..endDistance) { // Original condition
-                val addedElevation = elevations[i] - elevations[i-1]
-                if (addedElevation > 0) {
-                    elevationSum += addedElevation
-                }
+        // Calculate index range directly
+        val startIndex = floor((startDistance + 1) / interval).toInt().coerceIn(1, elevations.size - 1)
+        val endIndex = ceil(endDistance / interval).toInt().coerceIn(0, elevations.size - 1)
+
+        for (i in startIndex..endIndex) {
+            val addedElevation = elevations[i] - elevations[i - 1]
+            if (addedElevation > 0) {
+                elevationSum += addedElevation
             }
         }
 
@@ -95,18 +99,16 @@ class SampledElevationData(val interval: Float, val elevations: FloatArray) {
             for (i in 0 until numSamples) {
                 val targetDistance = sparseData.first().first + i * interval
 
-                // Find the two sparse points that bracket the target distance
-                var leftIndex = 0
-                var rightIndex = sparseData.size - 1
-
                 // Binary search to find the bracketing points efficiently
-                for (j in sparseData.indices) {
-                    if (sparseData[j].first <= targetDistance) {
-                        leftIndex = j
-                    } else {
-                        rightIndex = j
-                        break
-                    }
+                val searchResult = sparseData.binarySearch { it.first.compareTo(targetDistance) }
+
+                val (leftIndex, rightIndex) = if (searchResult >= 0) {
+                    // Exact match found
+                    searchResult to searchResult
+                } else {
+                    // Insertion point is where the element would be, so left is insertionPoint - 1
+                    val insertionPoint = -searchResult - 1
+                    (insertionPoint - 1).coerceAtLeast(0) to insertionPoint.coerceAtMost(sparseData.size - 1)
                 }
 
                 // Handle edge cases

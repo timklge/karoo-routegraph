@@ -17,14 +17,9 @@ import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.screens.RouteGraphTemporaryPOIs
 import io.hammerhead.karooext.extension.KarooExtension
 import io.hammerhead.karooext.internal.Emitter
-import io.hammerhead.karooext.models.DataType
-import io.hammerhead.karooext.models.HardwareType
 import io.hammerhead.karooext.models.HideSymbols
 import io.hammerhead.karooext.models.MapEffect
-import io.hammerhead.karooext.models.OnLocationChanged
-import io.hammerhead.karooext.models.OnMapZoomLevel
 import io.hammerhead.karooext.models.ShowSymbols
-import io.hammerhead.karooext.models.StreamState
 import io.hammerhead.karooext.models.Symbol
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,7 +31,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import kotlin.math.pow
-import kotlin.time.Duration.Companion.seconds
 
 class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.VERSION_NAME) {
     companion object {
@@ -137,34 +131,6 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
 
                 lastDrawnTemporaryPOIs = newSymbols
 
-            }
-        }
-
-        mapScope.launch {
-            val zoomLevelFlow = karooSystem.stream<OnMapZoomLevel>()
-            val locationFlow = karooSystem.stream<OnLocationChanged>()
-            val distanceToDestinationFlow = karooSystem.streamDataFlow(DataType.Type.DISTANCE_TO_DESTINATION)
-
-            data class StreamData(
-                val settings: RouteGraphSettings,
-                val location: OnLocationChanged,
-                val mapZoom: OnMapZoomLevel,
-                val viewModel: RouteGraphViewModel,
-                val isOnRoute: Boolean
-            )
-
-            val redrawInterval = if (karooSystem.karooSystemService.hardwareType == HardwareType.K2) {
-                15.seconds
-            } else {
-                10.seconds
-            }
-
-            combine(applicationContext.streamSettings(karooSystem.karooSystemService), locationFlow, zoomLevelFlow, routeGraphViewModelProvider.viewModelFlow, distanceToDestinationFlow) { settings, location, mapZoom, viewModel, distanceToDestination ->
-                val isOnRoute = (distanceToDestination as? StreamState.Streaming)?.dataPoint?.values?.get(DataType.Field.ON_ROUTE) == 0.0
-
-                StreamData(settings, location, mapZoom, viewModel, isOnRoute)
-            }.throttle(redrawInterval.inWholeMilliseconds).collect { (settings, location, mapZoom, viewModel, isOnRoute) ->
-                Log.d(TAG, "Location: $location, MapZoom: $mapZoom, Settings: $settings, IsOnRoute: $isOnRoute")
             }
         }
 

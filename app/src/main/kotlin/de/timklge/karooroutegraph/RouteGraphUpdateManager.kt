@@ -27,17 +27,14 @@ import io.hammerhead.karooext.models.Symbol
 import io.hammerhead.karooext.models.UserProfile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.seconds
@@ -95,7 +92,6 @@ class RouteGraphUpdateManager(
         }
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
     fun start(){
         Log.d(TAG, "Starting graph updater")
 
@@ -145,12 +141,7 @@ class RouteGraphUpdateManager(
                 }
 
                 navState.copy(poiSettings = viewSettings)
-            }.distinctUntilChanged().transformLatest { value ->
-                while(true){
-                    emit(value)
-                    delay(60.seconds)
-                }
-            }
+            }.distinctUntilChanged()
             .throttle(5_000L)
             .collect { (settings, navigationStateEvent: OnNavigationState.NavigationState, userProfile, globalPOIs, locationAndRemainingRouteDistance, temporaryPOIs: RouteGraphTemporaryPOIs, onRoute, _, poiSettings) ->
                 val poiSettings = poiSettings ?: return@collect

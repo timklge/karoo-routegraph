@@ -96,6 +96,7 @@
     <string name="category_viewpoint">Viewpoint</string>
     <string name="category_beach">Beach</string>
     <string name="category_swimming_area">Swimming Area</string>
+    <string name="category_gas_station">Gas Station</string>
 
     <!-- Distance formatting strings -->
     <string name="distance_ahead">%1$s ahead, %2$s from route</string>
