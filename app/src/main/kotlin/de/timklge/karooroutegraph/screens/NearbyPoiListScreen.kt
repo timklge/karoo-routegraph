@@ -69,6 +69,7 @@ import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.SurfaceConditionRetrievalService
 import de.timklge.karooroutegraph.TravelTimeEstimationService
 import de.timklge.karooroutegraph.datatypes.streamPowerPerHour
+import de.timklge.karooroutegraph.getOpeningHoursStatusLabel
 import de.timklge.karooroutegraph.getTimeUntilNextChange
 import de.timklge.karooroutegraph.isOpen
 import de.timklge.karooroutegraph.pois.DistanceToPoiResult
@@ -104,6 +105,7 @@ fun NearbyPoiListScreen() {
     var lastErrorMessage by remember { mutableStateOf<String?>(null) }
     var showSortDialog by remember { mutableStateOf(false) }
     var selectedSort by remember { mutableStateOf(PoiSortOption.LINEAR_DISTANCE) }
+    val context = LocalContext.current
 
     val karooSystemServiceProvider = koinInject<KarooSystemServiceProvider>()
     val offlineNearbyPOIProvider = koinInject<OfflineNearbyPOIProvider>()
@@ -479,84 +481,50 @@ fun NearbyPoiListScreen() {
 
                             val distanceLabel = currentPosition?.let {
                                 buildAnnotatedString {
-                                if (selectedSort == PoiSortOption.LINEAR_DISTANCE) {
-                                    val distanceMeters = linearDistanceToPoi(poi)
+                                    if (selectedSort == PoiSortOption.LINEAR_DISTANCE) {
+                                        val distanceMeters = linearDistanceToPoi(poi)
 
-                                    distanceMeters?.let { distance ->
-                                        append(formatDistance(distance, isImperial))
-                                    }
-
-                                    eta = System.currentTimeMillis()
-                                } else {
-                                    val nearestPoints = nearestPointsOnRouteToFoundPois.entries.find { it.key.symbol == poi.poi }?.value
-                                    val nearestPointAhead = nearestPoints?.sortedBy { point -> point.distanceFromRouteStart }?.firstOrNull { point ->
-                                        point.distanceFromRouteStart >= (viewModel?.distanceAlongRoute ?: 0.0f)
-                                    }
-
-                                    val result = if (viewModel?.distanceAlongRoute != null) distanceToPoi(poi.poi, viewModel?.sampledElevationData,
-                                        nearestPointsOnRouteToFoundPois, currentPosition, selectedSort, viewModel?.distanceAlongRoute,
-                                        nearestPointAhead) else null
-
-                                    append(result?.formatDistance(LocalContext.current, isImperial) ?: "")
-
-                                    val estimatedTravelTime = result?.let {
-                                        travelTimeEstimationService.estimateTravelTime(
-                                            routeElevationData = viewModel?.sampledElevationData,
-                                            startDistance = viewModel?.distanceAlongRoute?.toDouble() ?: 0.0,
-                                            endDistance = (viewModel?.distanceAlongRoute?.toDouble() ?: 0.0) + ((result as? DistanceToPoiResult.AheadOnRouteDistance)?.distanceOnRoute ?: 0.0),
-                                            totalWeight = (userProfile?.weight?.toDouble() ?: 70.0) + 10.0,
-                                            lastHourAvgPower = averagePowerFlow,
-                                            surfaceConditions = surfaceConditions ?: emptyList(),
-                                            finalSegmentLength = (result as? DistanceToPoiResult.AheadOnRouteDistance)?.distanceFromPointOnRoute
-                                        )
-                                    }
-                                    eta = System.currentTimeMillis() + (estimatedTravelTime?.toLong(DurationUnit.MILLISECONDS) ?: 0)
-                                }
-
-                                viewModel?.let { viewModel ->
-                                    if (selectedSort == PoiSortOption.AHEAD_ON_ROUTE && viewModel.distanceAlongRoute != null){
-                                        append(" ⏲\u00A0${android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(eta))}")
-                                    }
-
-                                    val openingHours = poi.element.tags["opening_hours"]
-                                    val isOpenAtEta = openingHours?.let {
-                                        try {
-                                            isOpen(eta, openingHours)
-                                        } catch (e: Exception) {
-                                            Log.e(KarooRouteGraphExtension.TAG, "Failed to parse opening hours for POI ${poi.element.id}", e)
-                                            null
-                                        }
-                                    }
-                                    val timeUntilNextChange = openingHours?.let {
-                                        try {
-                                            val nextChange = getTimeUntilNextChange(eta, openingHours)
-
-                                            nextChange
-                                        } catch (e: Exception) {
-                                            Log.e(KarooRouteGraphExtension.TAG, "Failed to determine if POI is closing soon for POI ${poi.element.id}", e)
-
-                                            null
-                                        }
-                                    }
-
-                                    isOpenAtEta?.let {
-                                        val statusText = " " + if (isOpenAtEta) {
-                                            if (timeUntilNextChange == null || timeUntilNextChange > 60 * 60 * 1000) {
-                                                stringResource(R.string.open_at_eta)
-                                            } else {
-                                                stringResource(R.string.open_closing_soon, android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(eta + timeUntilNextChange)).toString())
-                                            }
-                                        } else {
-                                            if (timeUntilNextChange == null || timeUntilNextChange > 60 * 60 * 1000) {
-                                                stringResource(R.string.closed_at_eta)
-                                            } else {
-                                                stringResource(R.string.closed_opening_soon, android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(eta + timeUntilNextChange)).toString())
-                                            }
+                                        distanceMeters?.let { distance ->
+                                            append(formatDistance(distance, isImperial))
                                         }
 
-                                        append(statusText.uppercase())
+                                        eta = System.currentTimeMillis()
+                                    } else {
+                                        val nearestPoints = nearestPointsOnRouteToFoundPois.entries.find { it.key.symbol == poi.poi }?.value
+                                        val nearestPointAhead = nearestPoints?.sortedBy { point -> point.distanceFromRouteStart }?.firstOrNull { point ->
+                                            point.distanceFromRouteStart >= (viewModel?.distanceAlongRoute ?: 0.0f)
+                                        }
+
+                                        val result = if (viewModel?.distanceAlongRoute != null) distanceToPoi(poi.poi, viewModel?.sampledElevationData,
+                                            nearestPointsOnRouteToFoundPois, currentPosition, selectedSort, viewModel?.distanceAlongRoute,
+                                            nearestPointAhead) else null
+
+                                        append(result?.formatDistance(LocalContext.current, isImperial) ?: "")
+
+                                        val estimatedTravelTime = result?.let {
+                                            travelTimeEstimationService.estimateTravelTime(
+                                                routeElevationData = viewModel?.sampledElevationData,
+                                                startDistance = viewModel?.distanceAlongRoute?.toDouble() ?: 0.0,
+                                                endDistance = (viewModel?.distanceAlongRoute?.toDouble() ?: 0.0) + ((result as? DistanceToPoiResult.AheadOnRouteDistance)?.distanceOnRoute ?: 0.0),
+                                                totalWeight = (userProfile?.weight?.toDouble() ?: 70.0) + 10.0,
+                                                lastHourAvgPower = averagePowerFlow,
+                                                surfaceConditions = surfaceConditions ?: emptyList(),
+                                                finalSegmentLength = (result as? DistanceToPoiResult.AheadOnRouteDistance)?.distanceFromPointOnRoute
+                                            )
+                                        }
+                                        eta = System.currentTimeMillis() + (estimatedTravelTime?.toLong(DurationUnit.MILLISECONDS) ?: 0)
                                     }
-                                }
+
+                                    viewModel?.let { viewModel ->
+                                        if (selectedSort == PoiSortOption.AHEAD_ON_ROUTE && viewModel.distanceAlongRoute != null){
+                                            append(" ⏲\u00A0${android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(eta))}")
+                                        }
+
+                                        val openingHours = poi.element.tags["opening_hours"]
+                                        getOpeningHoursStatusLabel(eta, openingHours, context)?.let { statusText ->
+                                            append(statusText.uppercase())
+                                        }
+                                    }
                                 }
                             }
 
@@ -737,24 +705,9 @@ fun NearbyPoiListScreen() {
                                     .padding(end = 8.dp)
                             )
                             val arrivalTime = android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(currentEta))
+                            val openingHoursText = getOpeningHoursStatusLabel(currentEta, openingHours, context)
                             Text(
-                                text = if (isOpen){
-                                    if (timeUntilNextChange != null && timeUntilNextChange <= 60 * 60 * 1000) {
-                                        stringResource(R.string.open_closing_soon, android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(currentEta + timeUntilNextChange)).toString())
-                                    } else if (openingHoursDialogEta != null){
-                                        stringResource(R.string.open_at, arrivalTime)
-                                    } else {
-                                        stringResource(R.string.open_now, arrivalTime)
-                                    }
-                                } else {
-                                    if (timeUntilNextChange != null && timeUntilNextChange <= 60 * 60 * 1000) {
-                                        stringResource(R.string.closed_opening_soon, android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(currentEta + timeUntilNextChange)).toString())
-                                    } else if (openingHoursDialogEta != null) {
-                                        stringResource(R.string.closed_at, arrivalTime)
-                                    } else {
-                                        stringResource(R.string.closed_now, arrivalTime)
-                                    }
-                                },
+                                text = openingHoursText ?: arrivalTime,
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.weight(0.65f)
                             )
