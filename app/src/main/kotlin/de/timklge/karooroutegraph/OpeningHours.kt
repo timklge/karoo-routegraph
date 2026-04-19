@@ -535,13 +535,13 @@ fun getOpeningHoursStatusLabel(eta: Long, openingHours: String?, context: Contex
         if (isOpenAtEta) {
             when {
                 timeUntilNextChange != null -> context.getString(R.string.open_closing_soon, android.text.format.DateFormat.getTimeFormat(context).format(Date(eta + timeUntilNextChange)).toString())
-                timeSinceLastChange != null -> context.getString(R.string.closed_since, android.text.format.DateFormat.getTimeFormat(context).format(Date(eta - timeSinceLastChange)).toString())
+                timeSinceLastChange != null -> context.getString(R.string.open_since, android.text.format.DateFormat.getTimeFormat(context).format(Date(eta - timeSinceLastChange)).toString())
                 else -> context.getString(R.string.open_at_eta)
             }
         } else {
             when {
                 timeUntilNextChange != null -> context.getString(R.string.closed_opening_soon, android.text.format.DateFormat.getTimeFormat(context).format(Date(eta + timeUntilNextChange)).toString())
-                timeSinceLastChange != null -> context.getString(R.string.open_since, android.text.format.DateFormat.getTimeFormat(context).format(Date(eta - timeSinceLastChange)).toString())
+                timeSinceLastChange != null -> context.getString(R.string.closed_since, android.text.format.DateFormat.getTimeFormat(context).format(Date(eta - timeSinceLastChange)).toString())
                 else -> context.getString(R.string.closed_at_eta)
             }
         }
