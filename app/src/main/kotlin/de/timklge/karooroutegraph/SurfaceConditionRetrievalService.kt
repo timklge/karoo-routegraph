@@ -360,11 +360,10 @@ class SurfaceConditionRetrievalService(
 
                 val lineString = LineString.fromPolyline(polyline, 5)
 
-                val routeDistance = try {
+                val routeDistance = if (lineString.coordinates().isNotEmpty()) {
                     TurfMeasurement.length(lineString, TurfConstants.UNIT_METERS)
-                } catch (t: Throwable) {
-                    Log.e(KarooRouteGraphExtension.TAG, "Error calculating route distance: ${t.message}", t)
-                    return@collect
+                } else {
+                    0.0
                 }
                 val samplingIntervalMeters = when (routeDistance) {
                     in 0.0..100_000.0 -> 80.0
@@ -375,7 +374,7 @@ class SurfaceConditionRetrievalService(
 
                 val routeSampled = buildList {
                     var distanceMeters = 0.0
-                    while (distanceMeters <= routeDistance) {
+                    while (distanceMeters < routeDistance) {
                         val point = TurfMeasurement.along(lineString, distanceMeters, TurfConstants.UNIT_METERS)
                         add(RouteSamplePoint(
                             latLong = LatLong(point.latitude(), point.longitude()),
