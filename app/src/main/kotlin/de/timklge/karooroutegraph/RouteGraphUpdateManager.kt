@@ -39,6 +39,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
@@ -169,478 +170,481 @@ class RouteGraphUpdateManager(
             }
             .throttle(5_000L)
             .collect { (settings, navigationStateEvent: OnNavigationState.NavigationState, userProfile, globalPOIs, locationAndRemainingRouteDistance, temporaryPOIs: RouteGraphTemporaryPOIs, onRoute, poiSettings) ->
-                val isImperial = userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
-                val navigatingToDestinationPolyline = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingToDestination)?.polyline?.let { LineString.fromPolyline(it, 5) }
-                val elevationPolyline: LineString? = when (navigationStateEvent) {
-                    is OnNavigationState.NavigationState.NavigatingRoute -> {
-                        navigationStateEvent.routeElevationPolyline?.let { LineString.fromPolyline(it, 1) }
-                    }
-                    is OnNavigationState.NavigationState.NavigatingToDestination -> {
-                        navigationStateEvent.elevationPolyline?.let { LineString.fromPolyline(it, 1) }
-                    }
-                    else -> null
-                }
-                val karooClimbs = when (navigationStateEvent) {
-                    is OnNavigationState.NavigationState.NavigatingRoute -> {
-                        navigationStateEvent.climbs
-                    }
-                    is OnNavigationState.NavigationState.NavigatingToDestination -> {
-                        navigationStateEvent.climbs
-                    }
-                    else -> null
-                }
-                val routeDistance = if (navigatingToDestinationPolyline != null) {
-                    try {
-                        TurfMeasurement.length(navigatingToDestinationPolyline, TurfConstants.UNIT_METERS)
-                    } catch(e: Exception) {
-                        Log.e(TAG, "Failed to calculate route distance", e)
-                        null
-                    }
-                } else {
-                    (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.routeDistance
-                }
-                val interval = if(routeDistance != null) {
-                    when (routeDistance) {
-                        in 0f..100_000f -> 60f
-                        in 100_000f..200_000f -> 80f
-                        in 200_000f..400_000f -> 100f
-                        else -> 120f
-                    }
-                } else 60f
-                val sampledElevationData = elevationPolyline?.let {
-                    SampledElevationData.fromSparseElevationData(it, interval)
-                }
-
-                val currentDistanceAlongRoute = if (routeDistance != null && locationAndRemainingRouteDistance.remainingRouteDistance != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute){
-                    if (navigationStateEvent.rejoinDistance == null && navigationStateEvent.rejoinPolyline == null) {
-                        routeDistance - locationAndRemainingRouteDistance.remainingRouteDistance
-                    } else {
-                        null
-                    }
-                } else if (routeDistance != null && locationAndRemainingRouteDistance.remainingRouteDistance != null){
-                    routeDistance - locationAndRemainingRouteDistance.remainingRouteDistance
-                } else null
-
-                val distanceAlongRoute = currentDistanceAlongRoute ?: lastKnownPositionAlongRoute
-
-                if (currentDistanceAlongRoute != null) {
-                    lastKnownPositionAlongRoute = currentDistanceAlongRoute
-                }
-
-                val newClimbs = karooClimbs?.let {
-                    Log.d(TAG, "Karoo reported climbs: $karooClimbs")
-
-                    karooClimbs.mapNotNull { karooClimb ->
-                        val category = ClimbCategory.categorize(
-                            karooClimb.grade.toFloat() / 100.0f,
-                            karooClimb.length.toFloat()
-                        )
-                        val startDistance = karooClimb.startDistance.toFloat()
-
-                        category?.let {
-                            Climb(
-                                category,
-                                startDistance.roundToInt(),
-                                startDistance.roundToInt() + karooClimb.length.roundToInt()
-                            )
+                try {
+                    val isImperial = userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
+                    val navigatingToDestinationPolyline = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingToDestination)?.polyline?.let { LineString.fromPolyline(it, 5) }
+                    val elevationPolyline: LineString? = when (navigationStateEvent) {
+                        is OnNavigationState.NavigationState.NavigatingRoute -> {
+                            navigationStateEvent.routeElevationPolyline?.let { LineString.fromPolyline(it, 1) }
                         }
+                        is OnNavigationState.NavigationState.NavigatingToDestination -> {
+                            navigationStateEvent.elevationPolyline?.let { LineString.fromPolyline(it, 1) }
+                        }
+                        else -> null
                     }
-                }
-
-                val isNavigatingToDestination = navigatingToDestinationPolyline != null
-
-                val routeLineString = when (navigationStateEvent) {
-                    is OnNavigationState.NavigationState.NavigatingRoute -> {
-                        val polyline = navigationStateEvent.routePolyline
-                        val lineString = LineString.fromPolyline(polyline, 5)
-
-                        if (navigationStateEvent.reversed) {
-                            // Reverse the polyline if we are navigating in reverse
-                            LineString.fromLngLats(lineString.coordinates().reversed())
+                    val karooClimbs = when (navigationStateEvent) {
+                        is OnNavigationState.NavigationState.NavigatingRoute -> {
+                            navigationStateEvent.climbs
+                        }
+                        is OnNavigationState.NavigationState.NavigatingToDestination -> {
+                            navigationStateEvent.climbs
+                        }
+                        else -> null
+                    }
+                    val routeDistance = if (navigatingToDestinationPolyline != null) {
+                        if (navigatingToDestinationPolyline.coordinates().isNotEmpty()) {
+                            TurfMeasurement.length(navigatingToDestinationPolyline, TurfConstants.UNIT_METERS)
                         } else {
-                            lineString
+                            0.0
                         }
-                    }
-
-                    is OnNavigationState.NavigationState.NavigatingToDestination -> {
-                        navigatingToDestinationPolyline
-                    }
-
-                    else -> {
-                        null
-                    }
-                }
-
-                val routeChanged =  if (knownRoute == null || routeLineString != knownRoute || knownSettings != settings){
-                    knownRoute = routeLineString
-                    knownIncidents = null
-                    knownIncidentWarningShown = false
-                    lastKnownPositionAlongRoute = null
-                    knownSettings = settings
-                    knownClimbs = null
-
-                    true
-                } else false
-
-                val shouldUpdateClimbs = onRoute && (routeChanged || (newClimbs?.size ?: 0) > (knownClimbs?.size ?: 0))
-                if (shouldUpdateClimbs) {
-                    knownClimbs = newClimbs
-                }
-
-                if (routeChanged) {
-                    displayViewModelProvider.update {
-                        it.copy(minimapZoomLevel = if (knownRoute != null) MinimapZoomLevel.COMPLETE_ROUTE else MinimapZoomLevel.FAR)
-                    }
-                }
-
-                // Request incidents
-                if (settings.enableTrafficIncidentReporting && knownIncidents == null && routeLineString != null && routeDistance != null){
-                    try {
-                        val incidents = incidentProvider.requestIncidents(settings.hereMapsApiKey, routeLineString)
-
-                        incidents.results?.forEach {
-                            Log.d(TAG, "Incident: ${it.incidentDetails?.id} ${it.incidentDetails?.hrn} ${it.incidentDetails?.startTime} ${it.incidentDetails?.endTime} ${it.incidentDetails?.description}")
-                        }
-
-                        knownIncidents = incidents
-
-                        routeGraphViewModelProvider.update {
-                            it.copy(
-                                incidents = incidents,
-                            )
-                        }
-
-                        if (incidents.results?.isNotEmpty() == true){
-                            scope.launch {
-                                delay(10_000L) // Wait for 10 seconds before showing the alert
-
-                                karooSystem.karooSystemService.dispatch(InRideAlert(
-                                    "incident-update-${System.currentTimeMillis()}",
-                                    R.drawable.bx_info_circle,
-                                    context.getString(R.string.incidents),
-                                    context.getString(R.string.traffic_incidents_found, incidents.results.size),
-                                    10_000L,
-                                    R.color.eleLightRed,
-                                    R.color.black
-                                ))
-
-                                val intent = Intent("de.timklge.HIDE_POWERBAR").apply {
-                                    putExtra("duration", 11_000L)
-                                    putExtra("location", "top")
-                                }
-
-                                context.sendBroadcast(intent)
-
-                                karooSystem.karooSystemService.dispatch(PlayBeepPattern(
-                                    listOf(PlayBeepPattern.Tone(3000, 300), PlayBeepPattern.Tone(3000, 300), PlayBeepPattern.Tone(3000, 300))
-                                ))
-                            }
-                        }
-
-                        Log.i(TAG, "Incident data updated at ${incidents.sourceUpdated} with ${incidents.results?.size} incidents")
-                    } catch(e: Exception){
-                        if (!knownIncidentWarningShown){
-                            scope.launch {
-                                delay(10_000L) // Wait for 10 seconds before showing the alert
-
-                                val intent = Intent("de.timklge.HIDE_POWERBAR").apply {
-                                    putExtra("duration", 11_000L)
-                                    putExtra("location", "top")
-                                }
-
-                                context.sendBroadcast(intent)
-
-                                karooSystem.karooSystemService.dispatch(InRideAlert(
-                                    "incident-update-${System.currentTimeMillis()}",
-                                    R.drawable.bx_info_circle,
-                                    context.getString(R.string.incidents),
-                                    context.getString(R.string.failed_to_request_incidents),
-                                    10_000L,
-                                    R.color.eleLightRed,
-                                    R.color.black
-                                ))
-                            }
-                            knownIncidentWarningShown = true
-                        }
-
-                        Log.e(TAG, "Failed to request incidents", e)
-                    }
-                }
-
-                val incidentsToProcess = knownIncidents?.results?.toMutableList() ?: mutableListOf()
-                val groupedIncidentsLists = mutableListOf<List<IncidentResult>>()
-
-                while (incidentsToProcess.isNotEmpty()) {
-                    val currentIncident = incidentsToProcess.removeAt(0)
-                    val currentGroup = mutableListOf(currentIncident)
-                    val currentAvgLoc = getAverageLocation(currentIncident)
-
-                    if (currentAvgLoc != null) {
-                        val (currentAvgLat, currentAvgLng) = currentAvgLoc
-                        var i = incidentsToProcess.size - 1
-                        while (i >= 0) {
-                            val otherIncident = incidentsToProcess[i]
-                            val otherAvgLoc = getAverageLocation(otherIncident)
-
-                            if (otherAvgLoc != null) {
-                                val (otherAvgLat, otherAvgLng) = otherAvgLoc
-                                if (calculateDistance(currentAvgLat, currentAvgLng, otherAvgLat, otherAvgLng) < INCIDENT_GROUPING_RADIUS) {
-                                    currentGroup.add(otherIncident)
-                                    incidentsToProcess.removeAt(i)
-                                }
-                            }
-                            i--
-                        }
-                    }
-                    groupedIncidentsLists.add(currentGroup)
-                }
-
-                val incidentPois = groupedIncidentsLists.mapNotNull { group: List<IncidentResult> ->
-                    if (group.isEmpty()) {
-                        null
                     } else {
-                        val representativeIncident = group.first()
-
-                        val allPointsInGroup = group.flatMap { incident: IncidentResult ->
-                            (incident.location?.shape?.links?.flatMap { link -> link.points ?: emptyList() } ?: emptyList())
+                        (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.routeDistance
+                    }
+                    val interval = if(routeDistance != null) {
+                        when (routeDistance) {
+                            in 0f..100_000f -> 60f
+                            in 100_000f..200_000f -> 80f
+                            in 200_000f..400_000f -> 100f
+                            else -> 120f
                         }
+                    } else 60f
+                    val sampledElevationData = elevationPolyline?.let {
+                        SampledElevationData.fromSparseElevationData(it, interval)
+                    }
 
-                        if (allPointsInGroup.isEmpty()) {
+                    val currentDistanceAlongRoute = if (routeDistance != null && locationAndRemainingRouteDistance.remainingRouteDistance != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute){
+                        if (navigationStateEvent.rejoinDistance == null && navigationStateEvent.rejoinPolyline == null) {
+                            routeDistance - locationAndRemainingRouteDistance.remainingRouteDistance
+                        } else {
                             null
-                        } else {
-                            val validLats = allPointsInGroup.mapNotNull { point -> point.lat }
-                            val validLngs = allPointsInGroup.mapNotNull { point -> point.lng }
+                        }
+                    } else if (routeDistance != null && locationAndRemainingRouteDistance.remainingRouteDistance != null){
+                        routeDistance - locationAndRemainingRouteDistance.remainingRouteDistance
+                    } else null
 
-                            if (validLats.isEmpty() || validLngs.isEmpty()) {
-                                null
+                    val distanceAlongRoute = currentDistanceAlongRoute ?: lastKnownPositionAlongRoute
+
+                    if (currentDistanceAlongRoute != null) {
+                        lastKnownPositionAlongRoute = currentDistanceAlongRoute
+                    }
+
+                    val newClimbs = karooClimbs?.let {
+                        Log.d(TAG, "Karoo reported climbs: $karooClimbs")
+
+                        karooClimbs.mapNotNull { karooClimb ->
+                            val category = ClimbCategory.categorize(
+                                karooClimb.grade.toFloat() / 100.0f,
+                                karooClimb.length.toFloat()
+                            )
+                            val startDistance = karooClimb.startDistance.toFloat()
+
+                            category?.let {
+                                Climb(
+                                    category,
+                                    startDistance.roundToInt(),
+                                    startDistance.roundToInt() + karooClimb.length.roundToInt()
+                                )
+                            }
+                        }
+                    }
+
+                    val isNavigatingToDestination = navigatingToDestinationPolyline != null
+
+                    val routeLineString = when (navigationStateEvent) {
+                        is OnNavigationState.NavigationState.NavigatingRoute -> {
+                            val polyline = navigationStateEvent.routePolyline
+                            val lineString = LineString.fromPolyline(polyline, 5)
+
+                            if (navigationStateEvent.reversed) {
+                                // Reverse the polyline if we are navigating in reverse
+                                LineString.fromLngLats(lineString.coordinates().reversed())
                             } else {
-                                val avgLat = validLats.average()
-                                val avgLng = validLngs.average()
+                                lineString
+                            }
+                        }
 
-                                if (avgLat.isNaN() || avgLng.isNaN()) {
-                                    null
-                                } else {
-                                    val baseId = representativeIncident.incidentDetails?.id ?: "unknown_${System.currentTimeMillis()}"
-                                    val id = "incident-${baseId}${if (group.size > 1) "-group${group.size}" else ""}"
+                        is OnNavigationState.NavigationState.NavigatingToDestination -> {
+                            navigatingToDestinationPolyline
+                        }
 
-                                    val baseType: String? = representativeIncident.incidentDetails?.type
-                                    val typeDescription = when (baseType) {
-                                        "accident" -> "Accident"
-                                        "construction" -> "Construction"
-                                        "disabledVehicle" -> "Disabled Vehicle"
-                                        "massTransit" -> "Mass Transit"
-                                        "plannedEvent" -> "Planned Event"
-                                        "roadHazard" -> "Road Hazard"
-                                        "roadClosure" -> "Road Closure"
-                                        "weather" -> "Weather"
-                                        else -> "Unknown Incident"
+                        else -> {
+                            null
+                        }
+                    }
+
+                    val routeChanged =  if (knownRoute == null || routeLineString != knownRoute || knownSettings != settings){
+                        knownRoute = routeLineString
+                        knownIncidents = null
+                        knownIncidentWarningShown = false
+                        lastKnownPositionAlongRoute = null
+                        knownSettings = settings
+                        knownClimbs = null
+
+                        true
+                    } else false
+
+                    val shouldUpdateClimbs = onRoute && (routeChanged || (newClimbs?.size ?: 0) > (knownClimbs?.size ?: 0))
+                    if (shouldUpdateClimbs) {
+                        knownClimbs = newClimbs
+                    }
+
+                    if (routeChanged) {
+                        displayViewModelProvider.update {
+                            it.copy(minimapZoomLevel = if (knownRoute != null) MinimapZoomLevel.COMPLETE_ROUTE else MinimapZoomLevel.FAR)
+                        }
+                    }
+
+                    // Request incidents
+                    if (settings.enableTrafficIncidentReporting && knownIncidents == null && routeLineString != null && routeDistance != null){
+                        try {
+                            val incidents = incidentProvider.requestIncidents(settings.hereMapsApiKey, routeLineString)
+
+                            incidents.results?.forEach {
+                                Log.d(TAG, "Incident: ${it.incidentDetails?.id} ${it.incidentDetails?.hrn} ${it.incidentDetails?.startTime} ${it.incidentDetails?.endTime} ${it.incidentDetails?.description}")
+                            }
+
+                            knownIncidents = incidents
+
+                            routeGraphViewModelProvider.update {
+                                it.copy(
+                                    incidents = incidents,
+                                )
+                            }
+
+                            if (incidents.results?.isNotEmpty() == true){
+                                scope.launch {
+                                    delay(10_000L) // Wait for 10 seconds before showing the alert
+
+                                    karooSystem.karooSystemService.dispatch(InRideAlert(
+                                        "incident-update-${System.currentTimeMillis()}",
+                                        R.drawable.bx_info_circle,
+                                        context.getString(R.string.incidents),
+                                        context.getString(R.string.traffic_incidents_found, incidents.results.size),
+                                        10_000L,
+                                        R.color.eleLightRed,
+                                        R.color.black
+                                    ))
+
+                                    val intent = Intent("de.timklge.HIDE_POWERBAR").apply {
+                                        putExtra("duration", 11_000L)
+                                        putExtra("location", "top")
                                     }
 
-                                    POI(
-                                        Symbol.POI(
-                                            id,
-                                            avgLat,
-                                            avgLng,
-                                            type = Symbol.POI.Types.CAUTION,
-                                            typeDescription
-                                        ),
-                                        PoiType.INCIDENT
-                                    )
+                                    context.sendBroadcast(intent)
+
+                                    karooSystem.karooSystemService.dispatch(PlayBeepPattern(
+                                        listOf(PlayBeepPattern.Tone(3000, 300), PlayBeepPattern.Tone(3000, 300), PlayBeepPattern.Tone(3000, 300))
+                                    ))
+                                }
+                            }
+
+                            Log.i(TAG, "Incident data updated at ${incidents.sourceUpdated} with ${incidents.results?.size} incidents")
+                        } catch(e: Exception){
+                            if (!knownIncidentWarningShown){
+                                scope.launch {
+                                    delay(10_000L) // Wait for 10 seconds before showing the alert
+
+                                    val intent = Intent("de.timklge.HIDE_POWERBAR").apply {
+                                        putExtra("duration", 11_000L)
+                                        putExtra("location", "top")
+                                    }
+
+                                    context.sendBroadcast(intent)
+
+                                    karooSystem.karooSystemService.dispatch(InRideAlert(
+                                        "incident-update-${System.currentTimeMillis()}",
+                                        R.drawable.bx_info_circle,
+                                        context.getString(R.string.incidents),
+                                        context.getString(R.string.failed_to_request_incidents),
+                                        10_000L,
+                                        R.color.eleLightRed,
+                                        R.color.black
+                                    ))
+                                }
+                                knownIncidentWarningShown = true
+                            }
+
+                            Log.e(TAG, "Failed to request incidents", e)
+                        }
+                    }
+
+                    val incidentsToProcess = knownIncidents?.results?.toMutableList() ?: mutableListOf()
+                    val groupedIncidentsLists = mutableListOf<List<IncidentResult>>()
+
+                    while (incidentsToProcess.isNotEmpty()) {
+                        val currentIncident = incidentsToProcess.removeAt(0)
+                        val currentGroup = mutableListOf(currentIncident)
+                        val currentAvgLoc = getAverageLocation(currentIncident)
+
+                        if (currentAvgLoc != null) {
+                            val (currentAvgLat, currentAvgLng) = currentAvgLoc
+                            var i = incidentsToProcess.size - 1
+                            while (i >= 0) {
+                                val otherIncident = incidentsToProcess[i]
+                                val otherAvgLoc = getAverageLocation(otherIncident)
+
+                                if (otherAvgLoc != null) {
+                                    val (otherAvgLat, otherAvgLng) = otherAvgLoc
+                                    if (calculateDistance(currentAvgLat, currentAvgLng, otherAvgLat, otherAvgLng) < INCIDENT_GROUPING_RADIUS) {
+                                        currentGroup.add(otherIncident)
+                                        incidentsToProcess.removeAt(i)
+                                    }
+                                }
+                                i--
+                            }
+                        }
+                        groupedIncidentsLists.add(currentGroup)
+                    }
+
+                    val incidentPois = groupedIncidentsLists.mapNotNull { group: List<IncidentResult> ->
+                        if (group.isEmpty()) {
+                            null
+                        } else {
+                            val representativeIncident = group.first()
+
+                            val allPointsInGroup = group.flatMap { incident: IncidentResult ->
+                                (incident.location?.shape?.links?.flatMap { link -> link.points ?: emptyList() } ?: emptyList())
+                            }
+
+                            if (allPointsInGroup.isEmpty()) {
+                                null
+                            } else {
+                                val validLats = allPointsInGroup.mapNotNull { point -> point.lat }
+                                val validLngs = allPointsInGroup.mapNotNull { point -> point.lng }
+
+                                if (validLats.isEmpty() || validLngs.isEmpty()) {
+                                    null
+                                } else {
+                                    val avgLat = validLats.average()
+                                    val avgLng = validLngs.average()
+
+                                    if (avgLat.isNaN() || avgLng.isNaN()) {
+                                        null
+                                    } else {
+                                        val baseId = representativeIncident.incidentDetails?.id ?: "unknown_${System.currentTimeMillis()}"
+                                        val id = "incident-${baseId}${if (group.size > 1) "-group${group.size}" else ""}"
+
+                                        val baseType: String? = representativeIncident.incidentDetails?.type
+                                        val typeDescription = when (baseType) {
+                                            "accident" -> "Accident"
+                                            "construction" -> "Construction"
+                                            "disabledVehicle" -> "Disabled Vehicle"
+                                            "massTransit" -> "Mass Transit"
+                                            "plannedEvent" -> "Planned Event"
+                                            "roadHazard" -> "Road Hazard"
+                                            "roadClosure" -> "Road Closure"
+                                            "weather" -> "Weather"
+                                            else -> "Unknown Incident"
+                                        }
+
+                                        POI(
+                                            Symbol.POI(
+                                                id,
+                                                avgLat,
+                                                avgLng,
+                                                type = Symbol.POI.Types.CAUTION,
+                                                typeDescription
+                                            ),
+                                            PoiType.INCIDENT
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
-                }
 
-                val lastKnownAutoAddedPoisRequestedAtPosition = lastAutoAddedPoisRequestedAtPosition
-                val autoAddPoisEnabled = poiSettings.autoAddPoisToMap || poiSettings.autoAddToElevationProfileAndMinimap
-                val refreshAutoAddedPois = (routeChanged || lastKnownAutoAddedPoisRequestedAtPosition == null || (
-                        locationAndRemainingRouteDistance.lat != null && locationAndRemainingRouteDistance.lon != null && TurfMeasurement.distance(
-                            Point.fromLngLat(locationAndRemainingRouteDistance.lon, locationAndRemainingRouteDistance.lat),
-                            lastKnownAutoAddedPoisRequestedAtPosition,
-                            TurfConstants.UNIT_METERS
-                        ) > 1_500
-                ) || lastAutoAddedPoisCategories != poiSettings.autoAddPoiCategories) && autoAddPoisEnabled
+                    val lastKnownAutoAddedPoisRequestedAtPosition = lastAutoAddedPoisRequestedAtPosition
+                    val autoAddPoisEnabled = poiSettings.autoAddPoisToMap || poiSettings.autoAddToElevationProfileAndMinimap
+                    val refreshAutoAddedPois = (routeChanged || lastKnownAutoAddedPoisRequestedAtPosition == null || (
+                            locationAndRemainingRouteDistance.lat != null && locationAndRemainingRouteDistance.lon != null && TurfMeasurement.distance(
+                                Point.fromLngLat(locationAndRemainingRouteDistance.lon, locationAndRemainingRouteDistance.lat),
+                                lastKnownAutoAddedPoisRequestedAtPosition,
+                                TurfConstants.UNIT_METERS
+                            ) > 1_500
+                    ) || lastAutoAddedPoisCategories != poiSettings.autoAddPoiCategories) && autoAddPoisEnabled
 
-                if (refreshAutoAddedPois) {
-                    if (poiSettings.autoAddPoiCategories.isNotEmpty()) {
-                        Log.i(TAG, "Route changed, updating auto added POIs")
+                    if (refreshAutoAddedPois) {
+                        if (poiSettings.autoAddPoiCategories.isNotEmpty()) {
+                            Log.i(TAG, "Route changed, updating auto added POIs")
 
-                        val currentLocation =
-                            if (locationAndRemainingRouteDistance.lat != null && locationAndRemainingRouteDistance.lon != null) {
-                                Point.fromLngLat(
-                                    locationAndRemainingRouteDistance.lon,
-                                    locationAndRemainingRouteDistance.lat
-                                )
-                            } else {
+                            val currentLocation =
+                                if (locationAndRemainingRouteDistance.lat != null && locationAndRemainingRouteDistance.lon != null) {
+                                    Point.fromLngLat(
+                                        locationAndRemainingRouteDistance.lon,
+                                        locationAndRemainingRouteDistance.lat
+                                    )
+                                } else {
+                                    null
+                                }
+
+                            val newAutoAddedPois = buildMap {
+                                if (routeLineString != null) {
+                                    // Request POIs along the route
+                                    offlineNearbyPOIProvider.requestNearbyPOIs(
+                                        poiSettings.autoAddPoiCategories.map { it.osmTag }.flatten(),
+                                        routeLineString.coordinates(),
+                                        settings.poiDistanceToRouteMaxMeters.toInt(),
+                                        200
+                                    ).forEach { poi ->
+                                        val symbol = Symbol.POI(
+                                            id = "autoadded-${poi.id}",
+                                            lat = poi.lat,
+                                            lng = poi.lon,
+                                            name = processPoiName(poi.tags["name"] ?: unnamedPoi),
+                                            type = NearbyPoiCategory.fromTag(poi.tags)?.hhType
+                                                ?: Symbol.POI.Types.GENERIC,
+                                        )
+
+                                        put(poi.id, symbol)
+                                    }
+                                } else if (currentLocation != null) {
+                                    // Request POIs around the current location
+                                    offlineNearbyPOIProvider.requestNearbyPOIs(
+                                        poiSettings.autoAddPoiCategories.map { it.osmTag }.flatten(),
+                                        listOf(currentLocation),
+                                        settings.poiDistanceToRouteMaxMeters.toInt() * 4,
+                                        200
+                                    ).forEach { poi ->
+                                        val symbol = Symbol.POI(
+                                            id = "autoadded-${poi.id}",
+                                            lat = poi.lat,
+                                            lng = poi.lon,
+                                            name = processPoiName(poi.tags["name"] ?: unnamedPoi),
+                                            type = NearbyPoiCategory.fromTag(poi.tags)?.hhType
+                                                ?: Symbol.POI.Types.GENERIC,
+                                        )
+
+                                        put(poi.id, symbol)
+                                    }
+                                }
+                            }
+
+                            lastAutoAddedPoisByOsmId = newAutoAddedPois
+                            lastAutoAddedPoisRequestedAtPosition = currentLocation
+                            lastAutoAddedPoisCategories = poiSettings.autoAddPoiCategories
+
+                            autoAddedPOIsViewModelProvider.update {
+                                it.copy(autoAddedPoisByOsmId = newAutoAddedPois)
+                            }
+
+                            Log.i(TAG, "Auto added POIs: ${newAutoAddedPois.values.map { it.name }}")
+                        } else {
+                            lastAutoAddedPoisByOsmId = emptyMap()
+                            lastAutoAddedPoisRequestedAtPosition = null
+                            lastAutoAddedPoisCategories = emptySet()
+
+                            autoAddedPOIsViewModelProvider.update {
+                                it.copy(autoAddedPoisByOsmId = emptyMap())
+                            }
+
+                            Log.i(TAG, "Auto add POIs disabled, clearing auto added POIs")
+                        }
+                    }
+
+                    val autoAddToElevationProfileAndMinimap = poiSettings.autoAddToElevationProfileAndMinimap
+                    val poiSum = if (autoAddToElevationProfileAndMinimap) {
+                        temporaryPOIs.poisByOsmId + lastAutoAddedPoisByOsmId
+                    } else {
+                        temporaryPOIs.poisByOsmId
+                    }
+                    val tempPoiSymbols = poiSum.map { (_, poi) -> POI(poi) }
+                    val localPois = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.pois.orEmpty().map { symbol ->
+                        POI(
+                            symbol = symbol,
+                            type = PoiType.POI
+                        )
+                    }
+                    val globalPois = globalPOIs.pois.map { poi ->
+                        POI(poi.copy(name = processPoiName(poi.name)))
+                    }
+
+                    val pois = buildList {
+                        addAll(tempPoiSymbols)
+                        addAll(globalPois)
+                        addAll(localPois)
+
+                        addAll(
+                            getStartAndEndPoiIfNone(
+                                routeLineString,
+                                map { it.symbol },
+                                settings,
+                                context,
+                                isNavigatingToDestination
+                            )
+                        )
+
+                        addAll(incidentPois)
+                    }
+
+                    val poisChanged = knownPois != pois.toSet()
+                    knownPois = pois.toSet()
+
+                    Log.d(TAG, "Received navigation state: $navigationStateEvent")
+                    Log.d(TAG, "Current known climbs: $knownClimbs")
+
+                    if (routeChanged || poisChanged) {
+                        if (routeLineString != null){
+                            Log.i(TAG, "Route changed, recalculating POI distances")
+
+                            val updatedPoiDistances = calculatePoiDistances(
+                                routeLineString,
+                                pois,
+                                settings.poiDistanceToRouteMaxMeters
+                            )
+                            poiDistances = updatedPoiDistances
+
+                            val poiDistancesDebug = updatedPoiDistances.map { (key, value) ->
+                                "${key.symbol.name} (${key.symbol.type}): $value"
+                            }.joinToString(", ")
+                            Log.d(TAG, "POI distances: $poiDistancesDebug")
+                        }
+                        knownRoute = routeLineString
+                    }
+
+                    when(navigationStateEvent){
+                        is OnNavigationState.NavigationState.NavigatingRoute -> {
+                            Log.d(TAG, "Navigating ${navigationStateEvent.name}")
+                        }
+                        is OnNavigationState.NavigationState.NavigatingToDestination -> {
+                            Log.d(TAG, "Navigating to destination")
+                        }
+                        is OnNavigationState.NavigationState.Idle -> {
+                            Log.d(TAG, "Navigation idle")
+                        }
+                    }
+
+                    val lastKnownPointAlongRoute = knownRoute?.let { knownRoute ->
+                        if (distanceAlongRoute != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute) {
+                            try {
+                                TurfMeasurement.along(knownRoute, distanceAlongRoute.coerceIn(0.0, routeDistance), TurfConstants.UNIT_METERS)
+                            } catch(e: Exception){
+                                Log.e(TAG, "Failed to calculate last known point along route", e)
                                 null
                             }
-
-                        val newAutoAddedPois = buildMap {
-                            if (routeLineString != null) {
-                                // Request POIs along the route
-                                offlineNearbyPOIProvider.requestNearbyPOIs(
-                                    poiSettings.autoAddPoiCategories.map { it.osmTag }.flatten(),
-                                    routeLineString.coordinates(),
-                                    settings.poiDistanceToRouteMaxMeters.toInt(),
-                                    200
-                                ).forEach { poi ->
-                                    val symbol = Symbol.POI(
-                                        id = "autoadded-${poi.id}",
-                                        lat = poi.lat,
-                                        lng = poi.lon,
-                                        name = processPoiName(poi.tags["name"] ?: unnamedPoi),
-                                        type = NearbyPoiCategory.fromTag(poi.tags)?.hhType
-                                            ?: Symbol.POI.Types.GENERIC,
-                                    )
-
-                                    put(poi.id, symbol)
-                                }
-                            } else if (currentLocation != null) {
-                                // Request POIs around the current location
-                                offlineNearbyPOIProvider.requestNearbyPOIs(
-                                    poiSettings.autoAddPoiCategories.map { it.osmTag }.flatten(),
-                                    listOf(currentLocation),
-                                    settings.poiDistanceToRouteMaxMeters.toInt() * 4,
-                                    200
-                                ).forEach { poi ->
-                                    val symbol = Symbol.POI(
-                                        id = "autoadded-${poi.id}",
-                                        lat = poi.lat,
-                                        lng = poi.lon,
-                                        name = processPoiName(poi.tags["name"] ?: unnamedPoi),
-                                        type = NearbyPoiCategory.fromTag(poi.tags)?.hhType
-                                            ?: Symbol.POI.Types.GENERIC,
-                                    )
-
-                                    put(poi.id, symbol)
-                                }
-                            }
-                        }
-
-                        lastAutoAddedPoisByOsmId = newAutoAddedPois
-                        lastAutoAddedPoisRequestedAtPosition = currentLocation
-                        lastAutoAddedPoisCategories = poiSettings.autoAddPoiCategories
-
-                        autoAddedPOIsViewModelProvider.update {
-                            it.copy(autoAddedPoisByOsmId = newAutoAddedPois)
-                        }
-
-                        Log.i(TAG, "Auto added POIs: ${newAutoAddedPois.values.map { it.name }}")
-                    } else {
-                        lastAutoAddedPoisByOsmId = emptyMap()
-                        lastAutoAddedPoisRequestedAtPosition = null
-                        lastAutoAddedPoisCategories = emptySet()
-
-                        autoAddedPOIsViewModelProvider.update {
-                            it.copy(autoAddedPoisByOsmId = emptyMap())
-                        }
-
-                        Log.i(TAG, "Auto add POIs disabled, clearing auto added POIs")
-                    }
-                }
-
-                val autoAddToElevationProfileAndMinimap = poiSettings.autoAddToElevationProfileAndMinimap
-                val poiSum = if (autoAddToElevationProfileAndMinimap) {
-                    temporaryPOIs.poisByOsmId + lastAutoAddedPoisByOsmId
-                } else {
-                    temporaryPOIs.poisByOsmId
-                }
-                val tempPoiSymbols = poiSum.map { (_, poi) -> POI(poi) }
-                val localPois = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.pois.orEmpty().map { symbol ->
-                    POI(
-                        symbol = symbol,
-                        type = PoiType.POI
-                    )
-                }
-                val globalPois = globalPOIs.pois.map { poi ->
-                    POI(poi.copy(name = processPoiName(poi.name)))
-                }
-
-                val pois = buildList {
-                    addAll(tempPoiSymbols)
-                    addAll(globalPois)
-                    addAll(localPois)
-
-                    addAll(
-                        getStartAndEndPoiIfNone(
-                            routeLineString,
-                            map { it.symbol },
-                            settings,
-                            context,
-                            isNavigatingToDestination
-                        )
-                    )
-
-                    addAll(incidentPois)
-                }
-
-                val poisChanged = knownPois != pois.toSet()
-                knownPois = pois.toSet()
-
-                Log.d(TAG, "Received navigation state: $navigationStateEvent")
-                Log.d(TAG, "Current known climbs: $knownClimbs")
-
-                if (routeChanged || poisChanged) {
-                    if (routeLineString != null){
-                        Log.i(TAG, "Route changed, recalculating POI distances")
-
-                        val updatedPoiDistances = calculatePoiDistances(
-                            routeLineString,
-                            pois,
-                            settings.poiDistanceToRouteMaxMeters
-                        )
-                        poiDistances = updatedPoiDistances
-
-                        val poiDistancesDebug = updatedPoiDistances.map { (key, value) ->
-                            "${key.symbol.name} (${key.symbol.type}): $value"
-                        }.joinToString(", ")
-                        Log.d(TAG, "POI distances: $poiDistancesDebug")
-                    }
-                    knownRoute = routeLineString
-                }
-
-                when(navigationStateEvent){
-                    is OnNavigationState.NavigationState.NavigatingRoute -> {
-                        Log.d(TAG, "Navigating ${navigationStateEvent.name}")
-                    }
-                    is OnNavigationState.NavigationState.NavigatingToDestination -> {
-                        Log.d(TAG, "Navigating to destination")
-                    }
-                    is OnNavigationState.NavigationState.Idle -> {
-                        Log.d(TAG, "Navigation idle")
-                    }
-                }
-
-                val lastKnownPointAlongRoute = knownRoute?.let { knownRoute ->
-                    if (distanceAlongRoute != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute) {
-                        try {
-                            TurfMeasurement.along(knownRoute, distanceAlongRoute.coerceIn(0.0, routeDistance), TurfConstants.UNIT_METERS)
-                        } catch(e: Exception){
-                            Log.e(TAG, "Failed to calculate last known point along route", e)
+                        } else {
                             null
                         }
-                    } else {
-                        null
                     }
-                }
 
-                routeGraphViewModelProvider.update {
-                    it.copy(
-                        routeDistance = routeDistance?.toFloat(),
-                        distanceAlongRoute = distanceAlongRoute?.toFloat(),
-                        isOnRoute = currentDistanceAlongRoute != null,
-                        knownRoute = knownRoute,
-                        poiDistances = poiDistances,
-                        knownPoiOpeningHours = temporaryPOIs.poiIdOpeningHours,
-                        sampledElevationData = sampledElevationData,
-                        climbs = knownClimbs,
-                        isImperial = isImperial,
-                        navigatingToDestination = navigationStateEvent is OnNavigationState.NavigationState.NavigatingToDestination,
-                        rejoin = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.rejoinPolyline?.let { LineString.fromPolyline(it, 5) },
-                        locationAndRemainingRouteDistance = locationAndRemainingRouteDistance,
-                        lastKnownPositionOnMainRoute = lastKnownPointAlongRoute ?: it.lastKnownPositionOnMainRoute
-                    )
+                    routeGraphViewModelProvider.update {
+                        it.copy(
+                            routeDistance = routeDistance?.toFloat(),
+                            distanceAlongRoute = distanceAlongRoute?.toFloat(),
+                            isOnRoute = currentDistanceAlongRoute != null,
+                            knownRoute = knownRoute,
+                            poiDistances = poiDistances,
+                            knownPoiOpeningHours = temporaryPOIs.poiIdOpeningHours,
+                            sampledElevationData = sampledElevationData,
+                            climbs = knownClimbs,
+                            isImperial = isImperial,
+                            navigatingToDestination = navigationStateEvent is OnNavigationState.NavigationState.NavigatingToDestination,
+                            rejoin = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.rejoinPolyline?.let { LineString.fromPolyline(it, 5) },
+                            locationAndRemainingRouteDistance = locationAndRemainingRouteDistance,
+                            lastKnownPositionOnMainRoute = lastKnownPointAlongRoute ?: it.lastKnownPositionOnMainRoute
+                        )
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error in collect handler", e)
                 }
             }
         }

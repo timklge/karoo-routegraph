@@ -1,10 +1,14 @@
 package de.timklge.karooroutegraph
 
+import android.content.Context
+import android.util.Log
+import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
 import de.timklge.karooroutegraph.ohparser.ohminLexer
 import de.timklge.karooroutegraph.ohparser.ohminParser
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import java.util.Calendar
+import java.util.Date
 
 private enum class OhStatus { OPEN, CLOSED, UNKNOWN }
 
@@ -493,4 +497,53 @@ private fun isTimeInRange(currentMinutes: Int, startMinutes: Int, endMinutes: In
     endMinutes > startMinutes  -> currentMinutes in startMinutes until endMinutes
     endMinutes == startMinutes -> true  // full-day span (e.g. 00:00-00:00)
     else -> currentMinutes >= startMinutes || currentMinutes < endMinutes  // overnight
+}
+
+fun getOpeningHoursStatusLabel(eta: Long, openingHours: String?, context: Context): String? {
+    val isOpenAtEta = openingHours?.let {
+        try {
+            isOpen(eta, openingHours)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to parse opening hours", e)
+            null
+        }
+    }
+
+    val timeUntilNextChange = openingHours?.let {
+        try {
+            val untilNextChange = getTimeUntilNextChange(eta, openingHours)
+
+            if (untilNextChange < 60 * 60 * 1000) untilNextChange else null
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to determine if POI is closing soon", e)
+            null
+        }
+    }
+
+    val timeSinceLastChange = openingHours?.let {
+        try {
+            val sinceLastChange = 60 * 60 * 1000 - getTimeUntilNextChange(eta - 60 * 60 * 1000, openingHours)
+
+            if (sinceLastChange < 0) sinceLastChange else null
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to determine if POI is opening soon", e)
+            null
+        }
+    }
+
+    return isOpenAtEta?.let {
+        if (isOpenAtEta) {
+            when {
+                timeUntilNextChange != null -> context.getString(R.string.open_closing_soon, android.text.format.DateFormat.getTimeFormat(context).format(Date(eta + timeUntilNextChange)).toString())
+                timeSinceLastChange != null -> context.getString(R.string.open_since, android.text.format.DateFormat.getTimeFormat(context).format(Date(eta - timeSinceLastChange)).toString())
+                else -> context.getString(R.string.open_at_eta)
+            }
+        } else {
+            when {
+                timeUntilNextChange != null -> context.getString(R.string.closed_opening_soon, android.text.format.DateFormat.getTimeFormat(context).format(Date(eta + timeUntilNextChange)).toString())
+                timeSinceLastChange != null -> context.getString(R.string.closed_since, android.text.format.DateFormat.getTimeFormat(context).format(Date(eta - timeSinceLastChange)).toString())
+                else -> context.getString(R.string.closed_at_eta)
+            }
+        }
+    }
 }

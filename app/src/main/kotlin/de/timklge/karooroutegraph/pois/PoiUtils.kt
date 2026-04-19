@@ -259,11 +259,10 @@ fun getStartAndEndPoiIfNone(routeLineString: LineString?, pois: List<Symbol.POI>
         val startPoint = routeLineString?.coordinates()?.firstOrNull()
         val endPoint = routeLineString?.coordinates()?.lastOrNull()
         val routeLength = routeLineString?.let {
-            try {
+            if (routeLineString.coordinates().isNotEmpty()) {
                 TurfMeasurement.length(routeLineString, TurfConstants.UNIT_METERS).toFloat()
-            } catch(e: Exception) {
-                Log.e(KarooRouteGraphExtension.Companion.TAG, "Failed to calculate route length", e)
-                null
+            } else {
+                0.0f
             }
         }
 
