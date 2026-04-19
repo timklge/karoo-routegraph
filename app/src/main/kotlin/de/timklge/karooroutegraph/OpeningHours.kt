@@ -524,7 +524,7 @@ fun getOpeningHoursStatusLabel(eta: Long, openingHours: String?, context: Contex
         try {
             val sinceLastChange = 60 * 60 * 1000 - getTimeUntilNextChange(eta - 60 * 60 * 1000, openingHours)
 
-            if (sinceLastChange < 0) sinceLastChange else null
+            if (sinceLastChange > 0) sinceLastChange else null
         } catch (e: Exception) {
             Log.e(TAG, "Failed to determine if POI is opening soon", e)
             null
@@ -532,7 +532,7 @@ fun getOpeningHoursStatusLabel(eta: Long, openingHours: String?, context: Contex
     }
 
     return isOpenAtEta?.let {
-        if (isOpenAtEta) {
+        " " + if (isOpenAtEta) {
             when {
                 timeUntilNextChange != null -> context.getString(R.string.open_closing_soon, android.text.format.DateFormat.getTimeFormat(context).format(Date(eta + timeUntilNextChange)).toString())
                 timeSinceLastChange != null -> context.getString(R.string.open_since, android.text.format.DateFormat.getTimeFormat(context).format(Date(eta - timeSinceLastChange)).toString())
