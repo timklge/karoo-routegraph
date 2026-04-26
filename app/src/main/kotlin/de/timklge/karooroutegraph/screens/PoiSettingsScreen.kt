@@ -1,5 +1,6 @@
 package de.timklge.karooroutegraph.screens
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.util.Log
 import androidx.compose.foundation.background
@@ -76,22 +77,14 @@ import kotlin.collections.component2
 import kotlin.math.roundToInt
 import androidx.compose.ui.platform.LocalConfiguration
 
-@Composable
-private fun getContinentString(continent: String): String {
-    val context = LocalContext.current
+@SuppressLint("DiscouragedApi")
+private fun getContinentStringSync(context: android.content.Context, continent: String): String {
     val resourceName = "continent_" + continent.lowercase().replace(" ", "_")
-    val resId = remember(continent) { context.resources.getIdentifier(resourceName, "string", context.packageName) }
-    return if (resId != 0) stringResource(resId) else continent
+    val resId = context.resources.getIdentifier(resourceName, "string", context.packageName)
+    return if (resId != 0) context.getString(resId) else continent
 }
 
-@Composable
-private fun getCountryString(countryCode: String, defaultName: String): String {
-    val context = LocalContext.current
-    val resourceName = "country_" + countryCode.lowercase()
-    val resId = remember(countryCode) { context.resources.getIdentifier(resourceName, "string", context.packageName) }
-    return if (resId != 0) stringResource(resId) else defaultName
-}
-
+@SuppressLint("DiscouragedApi")
 private fun getCountryStringSync(context: android.content.Context, countryCode: String, defaultName: String): String {
     val resourceName = "country_" + countryCode.lowercase()
     val resId = context.resources.getIdentifier(resourceName, "string", context.packageName)
@@ -260,7 +253,7 @@ fun PointsOfInterestScreen(
                                                     horizontalArrangement = Arrangement.SpaceBetween,
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
-                                                    Text(text = getContinentString(continent), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                                     Text(text = remember(continent) { getContinentStringSync(ctx, continent) }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                                                     Icon(
                                                         imageVector = if (isExpanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
                                                         contentDescription = if (isExpanded) stringResource(R.string.collapse) else stringResource(R.string.expand)
@@ -281,7 +274,7 @@ fun PointsOfInterestScreen(
                                                         horizontalArrangement = Arrangement.SpaceBetween,
                                                         verticalAlignment = Alignment.CenterVertically
                                                     ) {
-                                                        Text(text = getCountryString(key, data.name), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                                                        Text(text = remember(key) { getCountryStringSync(ctx, key, data.name) }, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
 
                                                         if (downloadedPbf == null) {
                                                             IconButton(onClick = {
