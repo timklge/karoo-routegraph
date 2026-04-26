@@ -31,7 +31,7 @@ class NearbyPOIPbfDownloadService(
     private val okHttpClient = OkHttpClient()
 
     fun getDownloadUrl(countryKey: String): String {
-        return "$DOWNLOAD_URL/pois.${countryKey.lowercase()}.db"
+        return "$DOWNLOAD_URL/pois.${countryKey.lowercase()}.db.gz"
     }
 
     private var downloadJob: Job? = null
@@ -108,41 +108,71 @@ class NearbyPOIPbfDownloadService(
                         }
 
                         val fileLength = responseBody.contentLength()
-                        val inputStream = responseBody.byteStream()
+                        Log.i(KarooRouteGraphExtension.TAG, "Content-Length for ${nextPbfToDownload.countryKey}: $fileLength bytes")
+
+                        var compressedBytesRead = 0L
+                        val rawStream = responseBody.byteStream()
+                        val countingStream = object : java.io.InputStream() {
+                            override fun read(): Int {
+                                val b = rawStream.read()
+                                if (b != -1) compressedBytesRead++
+                                return b
+                            }
+                            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                                val n = rawStream.read(b, off, len)
+                                if (n != -1) compressedBytesRead += n
+                                return n
+                            }
+                            override fun close() = rawStream.close()
+                        }
+                        val inputStream = java.util.zip.GZIPInputStream(countingStream)
 
                         // Create output file in app's private storage
+                        val tempFile = File.createTempFile("pois_${nextPbfToDownload.countryKey.lowercase()}", ".db.gz", context.cacheDir)
                         val outputFile = getPoiFile(nextPbfToDownload.countryKey)
-                        val outputStream = FileOutputStream(outputFile)
 
-                        val buffer = ByteArray(8192)
-                        var total: Long = 0
-                        var count: Int
-                        var lastProgressUpdate = 0.0f
+                        try {
+                            val outputStream = FileOutputStream(tempFile)
 
-                        while (inputStream.read(buffer).also { count = it } != -1) {
-                            total += count
-                            outputStream.write(buffer, 0, count)
+                            val buffer = ByteArray(4096)
+                            var count: Int
+                            var lastProgressUpdate = 0.0f
 
-                            // Update progress in database (only if changed by at least 0.1)
-                            if (fileLength > 0) {
-                                val progress = (total.toFloat() / fileLength).coerceIn(0.0f, 1.0f)
-                                if (progress - lastProgressUpdate >= 0.1f || progress >= 1.0f) {
-                                    updatePbfDownloadStoreStatus(context, nextPbfToDownload.countryKey, PbfDownloadStatus.PENDING, progress)
-                                    lastProgressUpdate = progress
+                            while (inputStream.read(buffer).also { count = it } != -1) {
+                                outputStream.write(buffer, 0, count)
+
+                                // Update progress in database (only if changed by at least 0.1)
+                                if (fileLength > 0) {
+                                    val progress = (compressedBytesRead.toFloat() / fileLength).coerceIn(0.0f, 1.0f)
+                                    if (progress - lastProgressUpdate >= 0.1f || progress >= 1.0f) {
+                                        updatePbfDownloadStoreStatus(context, nextPbfToDownload.countryKey, PbfDownloadStatus.PENDING, progress)
+                                        lastProgressUpdate = progress
+                                    }
+                                } else {
+                                    updatePbfDownloadStoreStatus(context, nextPbfToDownload.countryKey, PbfDownloadStatus.PENDING, 0.0f)
                                 }
-                            } else {
-                                updatePbfDownloadStoreStatus(context, nextPbfToDownload.countryKey, PbfDownloadStatus.PENDING, 0.0f)
+                            }
+
+                            Log.i(KarooRouteGraphExtension.TAG, "Finished downloading PBF for ${nextPbfToDownload.countryKey}, renaming file...")
+
+                            outputStream.flush()
+                            outputStream.close()
+                            inputStream.close()
+                            if (!tempFile.renameTo(outputFile)) {
+                                Log.e(KarooRouteGraphExtension.TAG, "Failed to move downloaded file to final location for ${nextPbfToDownload.countryKey}")
+                                updatePbfDownloadStoreStatus(context, nextPbfToDownload.countryKey, PbfDownloadStatus.DOWNLOAD_FAILED)
+                                return@use
+                            }
+
+                            // Mark as available
+                            updatePbfDownloadStoreStatus(context, nextPbfToDownload.countryKey, PbfDownloadStatus.AVAILABLE)
+
+                            Log.i(KarooRouteGraphExtension.TAG, "Successfully downloaded PBF for ${nextPbfToDownload.countryKey}")
+                        } finally {
+                            if (tempFile.exists()) {
+                                tempFile.delete()
                             }
                         }
-
-                        outputStream.flush()
-                        outputStream.close()
-                        inputStream.close()
-
-                        // Mark as processing
-                        updatePbfDownloadStoreStatus(context, nextPbfToDownload.countryKey, PbfDownloadStatus.AVAILABLE)
-
-                        Log.i(KarooRouteGraphExtension.TAG, "Successfully downloaded PBF for ${nextPbfToDownload.countryKey}")
                     }
                 } catch (e: Exception) {
                     Log.e(KarooRouteGraphExtension.TAG, "Error downloading PBF for ${nextPbfToDownload.countryKey}", e)
