@@ -169,8 +169,6 @@ class OfflineNearbyPOIProvider(val context: Context, val downloadService: Nearby
             }
         }
 
-        val result = jobs.awaitAll().flatten().toSet()
-
-        return result.take(limit)
+        return jobs.awaitAll().flatten()
     }
 }
