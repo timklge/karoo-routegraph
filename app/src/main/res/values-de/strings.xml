@@ -115,6 +115,9 @@
     <string name="category_water">Trinkwasser</string>
     <string name="category_gas_station">Tankstelle</string>
     <string name="category_supermarket">Supermarkt</string>
+    <string name="category_convenience_store">Lebensmittelladen</string>
+    <string name="category_bike_parking">Fahrradstellplatz</string>
+    <string name="category_public_bath">Öffentliches Bad</string>
     <string name="category_restaurant">Restaurant</string>
     <string name="category_cafe">Café</string>
     <string name="category_ice_cream">Eisdiele</string>
@@ -127,7 +130,7 @@
     <string name="category_hotel">Hotel</string>
     <string name="category_train_station">Bahnhof</string>
     <string name="category_waste_basket">Mülleimer</string>
-    <string name="category_bench">Bank</string>
+    <string name="category_laundry">Wäscherei</string>
     <string name="category_bike_shop">Radladen</string>
     <string name="category_pharmacy">Apotheke</string>
     <string name="category_hospital">Krankenhaus</string>
