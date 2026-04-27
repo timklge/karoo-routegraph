@@ -95,6 +95,8 @@ import java.util.Date
 import kotlin.math.roundToInt
 import kotlin.time.DurationUnit
 
+const val NEARBY_LIMIT_AFTER_SORTING = 200
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NearbyPoiListScreen() {
@@ -174,7 +176,7 @@ fun NearbyPoiListScreen() {
     suspend fun sortPois() {
         when (selectedSort) {
             PoiSortOption.LINEAR_DISTANCE -> {
-                pois = mappedPois.sortedBy { linearDistanceToPoi(it) ?: Double.MAX_VALUE }
+                pois = mappedPois.sortedBy { linearDistanceToPoi(it) ?: Double.MAX_VALUE }.take(NEARBY_LIMIT_AFTER_SORTING)
             }
             PoiSortOption.AHEAD_ON_ROUTE -> {
                 if (viewModel?.knownRoute == null) {
@@ -188,7 +190,7 @@ fun NearbyPoiListScreen() {
 
                     pois = mappedPois.sortedBy { poi ->
                         distanceToPoi(poi.poi, viewModel?.sampledElevationData, newNearestPointsOnRouteToFoundPois, currentPosition, selectedSort, viewModel?.distanceAlongRoute)
-                    }
+                    }.take(NEARBY_LIMIT_AFTER_SORTING)
                 }
             }
         }

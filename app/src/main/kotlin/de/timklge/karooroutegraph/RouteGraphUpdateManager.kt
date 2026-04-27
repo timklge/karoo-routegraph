@@ -455,7 +455,7 @@ class RouteGraphUpdateManager(
 
                     val lastKnownAutoAddedPoisRequestedAtPosition = lastAutoAddedPoisRequestedAtPosition
                     val autoAddPoisEnabled = poiSettings.autoAddPoisToMap || poiSettings.autoAddToElevationProfileAndMinimap
-                    val refreshAutoAddedPois = (routeChanged || lastKnownAutoAddedPoisRequestedAtPosition == null || (
+                    val refreshAutoAddedPois = ((routeChanged && routeLineString != null) || lastKnownAutoAddedPoisRequestedAtPosition == null || (
                             locationAndRemainingRouteDistance.lat != null && locationAndRemainingRouteDistance.lon != null && TurfMeasurement.distance(
                                 Point.fromLngLat(locationAndRemainingRouteDistance.lon, locationAndRemainingRouteDistance.lat),
                                 lastKnownAutoAddedPoisRequestedAtPosition,
