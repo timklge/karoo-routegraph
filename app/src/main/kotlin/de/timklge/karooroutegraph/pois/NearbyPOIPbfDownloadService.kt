@@ -3,11 +3,15 @@ package de.timklge.karooroutegraph.pois
 import android.content.Context
 import android.util.Log
 import de.timklge.karooroutegraph.KarooRouteGraphExtension
+import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.streamPbfDownloadStore
+import de.timklge.karooroutegraph.updatePbfDownloadStore
 import de.timklge.karooroutegraph.updatePbfDownloadStoreStatus
+import io.hammerhead.karooext.models.SystemNotification
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
@@ -18,11 +22,14 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.coroutines.executeAsync
 import java.io.File
 import java.io.FileOutputStream
+import java.time.Instant
 
 class NearbyPOIPbfDownloadService(
     private val context: Context,
+    private val karooSystemServiceProvider: KarooSystemServiceProvider,
 ) {
     companion object {
         const val DOWNLOAD_URL = "https://routegraph.timklge.de/pois"
@@ -35,6 +42,7 @@ class NearbyPOIPbfDownloadService(
     }
 
     private var downloadJob: Job? = null
+    private var updateCheckJob: Job? = null
     lateinit var countriesData: Map<String, CountryData>
 
     data class CountryData(
@@ -46,6 +54,7 @@ class NearbyPOIPbfDownloadService(
     init {
         loadCountryData()
         startDownloadJob()
+        startUpdateCheckJob()
     }
 
     fun loadCountryData() {
@@ -73,14 +82,112 @@ class NearbyPOIPbfDownloadService(
         return File(context.filesDir, "pois.${countryKey.lowercase()}.db")
     }
 
+    /**
+     * Returns the last modified timestamp of the available PBF file on the server for the given country key.
+     */
+    suspend fun getLastModifiedUrl(countryKey: String): Instant {
+        val downloadUrl = getDownloadUrl(countryKey)
+
+        val request = Request.Builder()
+            .url(downloadUrl)
+            .head()
+            .build()
+
+        okHttpClient.newCall(request).executeAsync().use { response ->
+            val lastModifiedHeader = response.header("Last-Modified")
+                ?: throw Exception("No Last-Modified header in response for $countryKey")
+
+            val formatter = java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME
+            return java.time.ZonedDateTime.parse(lastModifiedHeader, formatter).toInstant()
+        }
+    }
+
+    fun handleUpdateIntent() {
+        Log.i(KarooRouteGraphExtension.TAG, "Received update intent")
+
+        CoroutineScope(Dispatchers.IO).launch {
+            updatePbfDownloadStore(context) { currentPbfs ->
+                currentPbfs.map {
+                    if (it.downloadState == PbfDownloadStatus.UPDATE_AVAILABLE) {
+                        it.copy(downloadState = PbfDownloadStatus.UPDATING)
+                    } else {
+                        it
+                    }
+                }
+            }
+        }
+    }
+
+    fun startUpdateCheckJob() {
+        var retryCount = 0
+
+        updateCheckJob = CoroutineScope(Dispatchers.IO).launch {
+            while (isActive) {
+                val downloadedPbfs = streamPbfDownloadStore(context).filter { list ->
+                    list.any { it.downloadState == PbfDownloadStatus.AVAILABLE }
+                }.first()
+
+                try {
+                    for (pbf in downloadedPbfs) {
+                        val outputFile = getPoiFile(pbf.countryKey)
+                        val outputFileModifiedTimestamp: Instant? = if (outputFile.exists()) {
+                            Instant.ofEpochMilli(outputFile.lastModified())
+                        } else {
+                            null
+                        }
+                        val onlineFileModifiedTimestamp: Instant = getLastModifiedUrl(pbf.countryKey)
+
+                        if (outputFileModifiedTimestamp == null || onlineFileModifiedTimestamp.isAfter(outputFileModifiedTimestamp)) {
+                            Log.i(KarooRouteGraphExtension.TAG, "DB file for ${pbf.countryKey} is outdated or missing. Online last modified: $onlineFileModifiedTimestamp, local last modified: $outputFileModifiedTimestamp. Marking for update.")
+
+                            updatePbfDownloadStoreStatus(
+                                context,
+                                pbf.countryKey,
+                                PbfDownloadStatus.UPDATE_AVAILABLE
+                            )
+                        } else {
+                            Log.i(
+                                KarooRouteGraphExtension.TAG,
+                                "DB file for ${pbf.countryKey} is up to date. Online last modified: $onlineFileModifiedTimestamp, local last modified: $outputFileModifiedTimestamp. No update needed."
+                            )
+                        }
+                    }
+
+                    karooSystemServiceProvider.karooSystemService.dispatch(
+                        SystemNotification(
+                            id = "routegraph-poi-update-found",
+                            header = "RouteGraph",
+                            message = "POI database update available",
+                            style = SystemNotification.Style.UPDATE,
+                            action = "Download",
+                            actionIntent = "de.timklge.karooroutegraph.POI_UPDATE_INTENT"
+                        )
+                    )
+
+                    break
+                } catch (e: Exception) {
+                    Log.e(KarooRouteGraphExtension.TAG, "Error checking for PBF updates", e)
+
+                    delay(60 * 1000) // Wait 1 minute before retrying on error
+                    retryCount++
+
+                    if (retryCount > 5) {
+                        Log.e(KarooRouteGraphExtension.TAG, "Too many errors checking for PBF updates. Stopping update check job.")
+                        return@launch
+                    }
+                }
+            }
+        }
+    }
+
     fun startDownloadJob() {
         downloadJob = CoroutineScope(Dispatchers.IO).launch {
             while (isActive) {
                 val downloadedPbfs = streamPbfDownloadStore(context).filter { list ->
-                    list.any { it.downloadState == PbfDownloadStatus.PENDING }
+                    list.any { it.downloadState == PbfDownloadStatus.PENDING || it.downloadState == PbfDownloadStatus.UPDATING }
                 }.first()
 
-                val nextPbfToDownload = downloadedPbfs.firstOrNull { pbf -> pbf.downloadState == PbfDownloadStatus.PENDING }
+                val nextPbfToDownload = downloadedPbfs.firstOrNull { pbf -> pbf.downloadState == PbfDownloadStatus.PENDING || pbf.downloadState == PbfDownloadStatus.UPDATING }
                 if (nextPbfToDownload == null) {
                     continue
                 }
@@ -98,7 +205,7 @@ class NearbyPOIPbfDownloadService(
                         .build()
 
                     // Execute the request
-                    okHttpClient.newCall(request).execute().use { response ->
+                    okHttpClient.newCall(request).executeAsync().use { response ->
                         val responseBody = response.body
 
                         if (!response.isSuccessful) {

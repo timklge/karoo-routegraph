@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Update
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -311,12 +312,19 @@ fun PointsOfInterestScreen(
                                                             }
                                                         } else {
                                                             when (status) {
-                                                                PbfDownloadStatus.PENDING -> if (downloadedPbf.progress in 0.01f..0.99f) {
+                                                                PbfDownloadStatus.PENDING, PbfDownloadStatus.UPDATING -> if (downloadedPbf.progress in 0.01f..0.99f) {
                                                                     CircularProgressIndicator(modifier = Modifier.size(48.dp), progress = { downloadedPbf.progress })
                                                                 } else {
                                                                     CircularProgressIndicator(modifier = Modifier.size(48.dp))
                                                                 }
                                                                 PbfDownloadStatus.DOWNLOAD_FAILED -> Icon(Icons.Filled.Warning, contentDescription = stringResource(R.string.failed), tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(48.dp))
+                                                                PbfDownloadStatus.UPDATE_AVAILABLE -> {
+                                                                    IconButton(onClick = {
+                                                                        coroutineScope.launch { updatePbfDownloadStoreStatus(ctx, key, PbfDownloadStatus.UPDATING) }
+                                                                    }) {
+                                                                        Icon(Icons.Default.Update, contentDescription = stringResource(R.string.download), tint = MaterialTheme.colorScheme.primary)
+                                                                    }
+                                                                }
                                                                 else -> {}
                                                             }
                                                             if (status == PbfDownloadStatus.DOWNLOAD_FAILED) {

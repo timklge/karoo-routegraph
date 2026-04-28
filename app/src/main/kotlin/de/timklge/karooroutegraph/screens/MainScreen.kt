@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -25,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,6 +39,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.R
+import de.timklge.karooroutegraph.pois.PbfDownloadStatus
+import de.timklge.karooroutegraph.streamPbfDownloadStore
 import org.koin.compose.koinInject
 
 enum class ZoomUnit(val stringResource: Int) {
@@ -138,6 +142,9 @@ fun MainMenuScreen(
     val ctx = LocalContext.current
     val karooSystem = KarooSystemServiceProvider(ctx).karooSystemService
 
+    val pbfDownloads by streamPbfDownloadStore(ctx).collectAsState(emptyList())
+    val isAnyPoiDownloading = pbfDownloads.any { it.downloadState == PbfDownloadStatus.PENDING || it.downloadState == PbfDownloadStatus.UPDATING }
+
     DisposableEffect(Unit) {
         karooSystem.connect { connected ->
             karooConnected = connected
@@ -172,6 +179,7 @@ fun MainMenuScreen(
                         items(menuItems) { item ->
                             MenuItemRow(
                                 item = item,
+                                isLoading = item.screen == SettingsScreen.POINTS_OF_INTEREST && isAnyPoiDownloading,
                                 onClick = { onMenuItemClick(item.screen) }
                             )
                             if (item != menuItems.last()) HorizontalDivider()
@@ -191,6 +199,7 @@ fun MainMenuScreen(
 @Composable
 fun MenuItemRow(
     item: MenuItem,
+    isLoading: Boolean,
     onClick: () -> Unit
 ) {
     Row(
@@ -209,7 +218,11 @@ fun MenuItemRow(
         Spacer(modifier = Modifier.width(16.dp))
         Text(
             text = stringResource(item.labelResId),
-            style = MaterialTheme.typography.titleMedium
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.weight(1f)
         )
+        if (isLoading) {
+            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 3.dp)
+        }
     }
 }

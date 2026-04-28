@@ -55,6 +55,7 @@ testng = { group = "org.testng", name = "testng", version.ref = "testng" }
 osm4j-core = { module = "de.topobyte:osm4j-core", version.ref = "osm4j" }
 osm4j-pbf = { module = "de.topobyte:osm4j-pbf", version.ref = "osm4j" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+okhttp-coroutines = { module = "com.squareup.okhttp3:okhttp-coroutines", version.ref = "okhttp" }
 antlr4-runtime = { module = "org.antlr:antlr4-runtime", version.ref = "antlr4" }
 
 [bundles]
