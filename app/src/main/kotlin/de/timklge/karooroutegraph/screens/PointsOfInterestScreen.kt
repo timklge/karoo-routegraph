@@ -111,6 +111,7 @@ fun PointsOfInterestScreen(
     var autoAddPoisToMap by remember { mutableStateOf(false) }
     var autoAddToElevationProfileAndMinimap by remember { mutableStateOf(false) }
     var autoAddPoiCategories by remember { mutableStateOf(emptySet<NearbyPoiCategory>()) }
+    var recentlyUsedCategories by remember { mutableStateOf(emptyList<NearbyPoiCategory>()) }
     var showAutoAddPoiCategoriesDialog by remember { mutableStateOf(false) }
     var showDownloadPoisDialog by remember { mutableStateOf(false) }
     var poiDistanceToRouteMaxMeters by remember { mutableDoubleStateOf(1000.0) }
@@ -131,7 +132,8 @@ fun PointsOfInterestScreen(
                 enableOfflinePoiStorage = enableOfflinePoiStorage,
                 autoAddPoisToMap = autoAddPoisToMap,
                 autoAddPoiCategories = autoAddPoiCategories,
-                autoAddToElevationProfileAndMinimap = autoAddToElevationProfileAndMinimap
+                autoAddToElevationProfileAndMinimap = autoAddToElevationProfileAndMinimap,
+                recentlyUsedCategories = recentlyUsedCategories
             )
         }
     }
@@ -149,6 +151,7 @@ fun PointsOfInterestScreen(
             autoAddPoisToMap = settings.autoAddPoisToMap
             autoAddPoiCategories = settings.autoAddPoiCategories
             autoAddToElevationProfileAndMinimap = settings.autoAddToElevationProfileAndMinimap
+            recentlyUsedCategories = settings.recentlyUsedCategories
         }
     }
 
@@ -226,9 +229,11 @@ fun PointsOfInterestScreen(
                     if (showAutoAddPoiCategoriesDialog) {
                         CategorySelectionDialog(
                             initialCategories = autoAddPoiCategories,
+                            recentlyUsedCategories = recentlyUsedCategories,
                             onDismiss = { showAutoAddPoiCategoriesDialog = false },
                             onConfirm = { newCategories ->
                                 autoAddPoiCategories = newCategories
+                                recentlyUsedCategories = newCategories.toList() + recentlyUsedCategories.filter { it !in newCategories }
                                 showAutoAddPoiCategoriesDialog = false
                                 coroutineScope.launch { updatePoiSettings() }
                             }

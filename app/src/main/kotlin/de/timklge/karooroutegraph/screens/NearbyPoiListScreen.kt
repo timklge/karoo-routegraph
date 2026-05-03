@@ -100,6 +100,7 @@ import kotlin.time.DurationUnit
 fun NearbyPoiListScreen() {
     val coroutineScope = rememberCoroutineScope()
     var selectedCategories by remember { mutableStateOf(emptySet<NearbyPoiCategory>()) }
+    var recentlyUsedCategories by remember { mutableStateOf(emptyList<NearbyPoiCategory>()) }
     var showDialog by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
     var lastErrorMessage by remember { mutableStateOf<String?>(null) }
@@ -329,6 +330,7 @@ fun NearbyPoiListScreen() {
         val viewSettings = karooSystemServiceProvider.streamViewSettings().first()
         val savedSort = viewSettings.poiSortOptionForNearbyPois
         selectedCategories = viewSettings.poiCategoriesForNearbyPois
+        recentlyUsedCategories = viewSettings.recentlyUsedCategories
 
         if (viewModel?.knownRoute == null && savedSort == PoiSortOption.AHEAD_ON_ROUTE) {
             selectedSort = PoiSortOption.LINEAR_DISTANCE
@@ -423,6 +425,7 @@ fun NearbyPoiListScreen() {
                                 ExposedDropdownMenuDefaults.TrailingIcon(expanded = false)
                             },
                             modifier = Modifier.fillMaxWidth(),
+                            maxLines = 1,
                             enabled = false,
                             colors = OutlinedTextFieldDefaults.colors(
                                 disabledBorderColor = MaterialTheme.colorScheme.outline,
@@ -643,14 +646,19 @@ fun NearbyPoiListScreen() {
     if (showDialog) {
         CategorySelectionDialog(
             initialCategories = selectedCategories,
+            recentlyUsedCategories = recentlyUsedCategories,
             onDismiss = { showDialog = false },
             onConfirm = { newCategories ->
                 selectedCategories = newCategories
+                recentlyUsedCategories = newCategories.toList() + recentlyUsedCategories.filter { it !in newCategories }
                 showDialog = false
 
                 coroutineScope.launch {
                     karooSystemServiceProvider.saveViewSettings { settings ->
-                        settings.copy(poiCategoriesForNearbyPois = selectedCategories)
+                        settings.copy(
+                            poiCategoriesForNearbyPois = selectedCategories,
+                            recentlyUsedCategories = recentlyUsedCategories
+                        )
                     }
                     onRefresh()
                 }
@@ -750,65 +758,3 @@ fun NearbyPoiListScreen() {
     }
 }
 
-@Composable
-fun CategorySelectionDialog(
-    initialCategories: Set<NearbyPoiCategory>,
-    onDismiss: () -> Unit,
-    onConfirm: (Set<NearbyPoiCategory>) -> Unit
-) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        var tempSelectedCategories by remember { mutableStateOf(initialCategories) }
-
-        Card(modifier = Modifier.padding(16.dp)) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                LazyColumn(modifier = Modifier.weight(1f)) {
-                    items(NearbyPoiCategory.entries) { category ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    tempSelectedCategories =
-                                        if (tempSelectedCategories.contains(category)) {
-                                            tempSelectedCategories - category
-                                        } else {
-                                            tempSelectedCategories + category
-                                        }
-                                }
-                        ) {
-                            Checkbox(
-                                checked = tempSelectedCategories.contains(category),
-                                onCheckedChange = {
-                                    tempSelectedCategories = if (tempSelectedCategories.contains(category)) {
-                                        tempSelectedCategories - category
-                                    } else {
-                                        tempSelectedCategories + category
-                                    }
-                                }
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource(category.labelRes))
-                        }
-                    }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text(stringResource(R.string.cancel))
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(onClick = {
-                        onConfirm(tempSelectedCategories)
-                    }) {
-                        Text(stringResource(R.string.ok))
-                    }
-                }
-            }
-        }
-    }
-}
