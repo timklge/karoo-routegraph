@@ -32,21 +32,35 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.R
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 
 @Composable
 fun PoiScreen(finish: () -> Unit){
     val coroutineScope = rememberCoroutineScope()
     var showWarnings by remember { mutableStateOf(false) }
+    val karooSystemServiceProvider = koinInject<KarooSystemServiceProvider>()
+    var initialPage by remember { mutableIntStateOf(1) }
+    var initialPageLoaded by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
+        initialPage = karooSystemServiceProvider.streamViewSettings().first().lastPoiTab
+        initialPageLoaded = true
         delay(3000L)
         showWarnings = true
     }
 
-    val pagerState = rememberPagerState(pageCount = { 3 }, initialPage = 1)
+    if (!initialPageLoaded) return
+
+    val pagerState = rememberPagerState(pageCount = { 3 }, initialPage = initialPage)
+
+    LaunchedEffect(pagerState.currentPage) {
+        karooSystemServiceProvider.saveViewSettings { it.copy(lastPoiTab = pagerState.currentPage) }
+    }
 
     Box(
         modifier = Modifier.fillMaxSize()

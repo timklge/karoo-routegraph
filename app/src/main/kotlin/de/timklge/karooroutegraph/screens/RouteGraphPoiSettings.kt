@@ -14,6 +14,7 @@ data class RouteGraphPoiSettings(
     val autoAddToElevationProfileAndMinimap: Boolean = false,
     val enableOfflinePoiStorage: Boolean = false,
     val autoAddPoisToMap: Boolean = false,
+    val lastPoiTab: Int = 1,
 ){
     companion object {
         val defaultSettings = Json.encodeToString(RouteGraphPoiSettings())
