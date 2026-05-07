@@ -91,7 +91,7 @@ During riding, you can open a POI managment menu by clicking the button shown in
 
 On all pages, you can use the dot menu for each POI to initiate navigation to that POI. For POIs looked up on the Nearby or Search pages, you can also choose to add that POI to the elevation profiles (and the main karoo map).
 
-In the settings menu, you can also choose to automatically select POI categories that should automatically be added to the map and elevation profiles when loading up a route.
+In the settings menu, you can also select POI categories that should automatically be added to the map and elevation profiles when loading up a route.
 
 ![POI navigation](poinav.png)
 
