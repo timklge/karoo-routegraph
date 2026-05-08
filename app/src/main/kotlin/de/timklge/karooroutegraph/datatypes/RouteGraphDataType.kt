@@ -267,7 +267,7 @@ class RouteGraphDataType(
                 val viewRange = viewDistanceStart..viewDistanceEnd
 
                 val minElevationActual = (viewModel.sampledElevationData?.getMinimumElevationInRange(viewDistanceStart, viewDistanceEnd) ?: 0.0f).let { floor(it / 30.0f) * 30.0f }
-                val maxElevationActual = (viewModel.sampledElevationData?.getMaximumElevationInRange(viewDistanceStart, viewDistanceEnd) ?: 0.0f).let { ceil(it / 100.0f) * 100.0f }
+                val maxElevationActual = (viewModel.sampledElevationData?.getMaximumElevationInRange(viewDistanceStart, viewDistanceEnd) ?: 0.0f).let { ceil(it / 30.0f) * 30.0f }
 
                 // Add some padding to the min and max elevation for better visualization
                 val elevationPadding = ((maxElevationActual - minElevationActual) * 0.2f).coerceAtLeast(50.0f)
