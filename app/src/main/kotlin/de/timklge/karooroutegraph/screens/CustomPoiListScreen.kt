@@ -175,7 +175,7 @@ fun CustomPoiListScreen() {
                     addAll(additionalPois.mapIndexed { index, poi -> DisplayedCustomPoi.Additional(index.toLong(), poi.symbol) })
 
                     // If not on route but have a last known position along the route, add it as POI to navigate to
-                    if (viewModel?.lastKnownPositionOnMainRoute != null && viewModel?.routeDistance == null) {
+                    if (viewModel?.lastKnownPositionOnMainRoute != null && viewModel?.routeDistance != null && viewModel?.isOnRoute == false) {
                         val lastKnownPositionAlongRoute = Symbol.POI(
                             lat = viewModel!!.lastKnownPositionOnMainRoute!!.latitude(),
                             lng = viewModel!!.lastKnownPositionOnMainRoute!!.longitude(),
