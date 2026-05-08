@@ -173,7 +173,13 @@ fun CustomPoiListScreen() {
                     addAll(globalPois)
                     addAll(tempPois)
                     addAll(additionalPois.mapIndexed { index, poi -> DisplayedCustomPoi.Additional(index.toLong(), poi.symbol) })
+                }
 
+                val poisSortedByDistance = poiList.filter { displayedCustomPoi -> distanceToPoi(displayedCustomPoi.poi, viewModel?.sampledElevationData, viewModel?.poiDistances, currentPosition, selectedSort, viewModel?.distanceAlongRoute) != null }.sortedBy { displayedCustomPoi ->
+                    distanceToPoi(displayedCustomPoi.poi, viewModel?.sampledElevationData, viewModel?.poiDistances, currentPosition, selectedSort, viewModel?.distanceAlongRoute)
+                }
+
+                buildList {
                     // If not on route but have a last known position along the route, add it as POI to navigate to
                     if (viewModel?.lastKnownPositionOnMainRoute != null && viewModel?.routeDistance != null && viewModel?.isOnRoute == false && viewModel?.distanceAlongRoute != 0.0f) {
                         val lastKnownPositionAlongRoute = Symbol.POI(
@@ -184,11 +190,11 @@ fun CustomPoiListScreen() {
                         )
                         add(DisplayedCustomPoi.Local(lastKnownPositionAlongRoute))
                     }
+
+                    addAll(poisSortedByDistance)
                 }
 
-                poiList.filter { displayedCustomPoi -> distanceToPoi(displayedCustomPoi.poi, viewModel?.sampledElevationData, viewModel?.poiDistances, currentPosition, selectedSort, viewModel?.distanceAlongRoute) != null }.sortedBy { displayedCustomPoi ->
-                    distanceToPoi(displayedCustomPoi.poi, viewModel?.sampledElevationData, viewModel?.poiDistances, currentPosition, selectedSort, viewModel?.distanceAlongRoute)
-                }
+                poisSortedByDistance
             } ?: run {
                 // Include additionalPois even when currentPosition is null
                 localPois + globalPois + additionalPois.mapIndexed { index, poi -> DisplayedCustomPoi.Additional(index.toLong(), poi.symbol) }
@@ -202,7 +208,7 @@ fun CustomPoiListScreen() {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
                 ExposedDropdownMenuBox(
                     expanded = expanded,
