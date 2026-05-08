@@ -627,7 +627,7 @@ class RouteGraphUpdateManager(
                     routeGraphViewModelProvider.update {
                         it.copy(
                             routeDistance = routeDistance?.toFloat(),
-                            distanceAlongRoute = distanceAlongRoute?.toFloat(),
+                            distanceAlongRoute = distanceAlongRoute.toFloat(),
                             isOnRoute = currentDistanceAlongRoute != null,
                             knownRoute = knownRoute,
                             poiDistances = poiDistances,
