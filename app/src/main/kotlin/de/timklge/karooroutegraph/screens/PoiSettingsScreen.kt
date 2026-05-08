@@ -100,7 +100,7 @@ private fun getCountryStringSync(context: android.content.Context, countryCode: 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PointsOfInterestScreen(
+fun PoiSettingsScreen(
     onBack: () -> Unit
 ) {
     val ctx = LocalContext.current
