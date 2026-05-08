@@ -144,7 +144,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     viewModel.routeDistance,
                     viewModel.distanceAlongRoute
                 )
-            }.distinctUntilChanged().throttle(20_000).collect { (temporaryPOIs, autoAddedPois, settings, lastKnownPositionOnMainRoute, isOnRoute, routeDistance, currentDistanceAlongRoute) ->
+            }.distinctUntilChanged().throttle(10_000).collect { (temporaryPOIs, autoAddedPois, settings, lastKnownPositionOnMainRoute, isOnRoute, routeDistance, currentDistanceAlongRoute) ->
                 Log.d(TAG, "Temporary POIs: ${temporaryPOIs.poisByOsmId.size}, Auto-added POIs: ${autoAddedPois.autoAddedPoisByOsmId.size}")
 
                 val newSymbols = buildSet {
