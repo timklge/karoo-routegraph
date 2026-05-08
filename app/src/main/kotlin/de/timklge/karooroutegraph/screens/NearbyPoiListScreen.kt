@@ -2,6 +2,7 @@ package de.timklge.karooroutegraph.screens
 
 import android.util.Log
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
@@ -29,7 +31,6 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
@@ -49,6 +50,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.text.style.LineBreak
@@ -402,7 +404,7 @@ fun NearbyPoiListScreen() {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                        .padding(start = 8.dp, end = 8.dp, top = 16.dp, bottom = 0.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val selectText = stringResource(R.string.select)
@@ -416,23 +418,56 @@ fun NearbyPoiListScreen() {
                     Box(modifier = Modifier
                         .weight(1f)
                         .clickable { showDialog = true }) {
-                        OutlinedTextField(
+                        val fieldInteractionSource = remember { MutableInteractionSource() }
+                        val fieldColors = OutlinedTextFieldDefaults.colors(
+                            disabledBorderColor = MaterialTheme.colorScheme.outline,
+                            disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                            disabledLabelColor = MaterialTheme.colorScheme.onSurface,
+                            disabledTrailingIconColor = MaterialTheme.colorScheme.onSurface
+                        )
+                        BasicTextField(
                             value = categoriesText,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text(stringResource(R.string.categories)) },
-                            trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = false)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            maxLines = 1,
+                            singleLine = true,
                             enabled = false,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                disabledBorderColor = MaterialTheme.colorScheme.outline,
-                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                                disabledLabelColor = MaterialTheme.colorScheme.onSurface,
-                                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurface
-                            )
+                            modifier = Modifier.fillMaxWidth(),
+                            interactionSource = fieldInteractionSource,
+                            textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            decorationBox = {
+                                OutlinedTextFieldDefaults.DecorationBox(
+                                    value = categoriesText,
+                                    innerTextField = {
+                                        Text(
+                                            text = categoriesText,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            style = MaterialTheme.typography.bodyLarge.copy(
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        )
+                                    },
+                                    enabled = false,
+                                    singleLine = true,
+                                    visualTransformation = VisualTransformation.None,
+                                    interactionSource = fieldInteractionSource,
+                                    label = { Text(stringResource(R.string.categories)) },
+                                    trailingIcon = {
+                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = false)
+                                    },
+                                    colors = fieldColors,
+                                    container = {
+                                        OutlinedTextFieldDefaults.Container(
+                                            enabled = false,
+                                            isError = false,
+                                            interactionSource = fieldInteractionSource,
+                                            colors = fieldColors
+                                        )
+                                    }
+                                )
+                            }
                         )
                     }
 
@@ -471,7 +506,7 @@ fun NearbyPoiListScreen() {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 2.dp),
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
