@@ -683,6 +683,10 @@ fun NearbyPoiListScreen() {
                     }
                 }
             }
+
+            item {
+                Spacer(modifier = Modifier.padding(30.dp))
+            }
         }
     }
 
