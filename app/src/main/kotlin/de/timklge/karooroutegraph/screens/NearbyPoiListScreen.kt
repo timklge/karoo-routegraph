@@ -2,6 +2,7 @@ package de.timklge.karooroutegraph.screens
 
 import android.util.Log
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
@@ -29,7 +31,6 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
@@ -49,6 +50,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.text.style.LineBreak
@@ -74,6 +76,7 @@ import de.timklge.karooroutegraph.getTimeUntilNextChange
 import de.timklge.karooroutegraph.isOpen
 import de.timklge.karooroutegraph.pois.DistanceToPoiResult
 import de.timklge.karooroutegraph.pois.NearbyPOI
+import de.timklge.karooroutegraph.pois.NearbyPOIProvider
 import de.timklge.karooroutegraph.pois.NearestPoint
 import de.timklge.karooroutegraph.pois.OfflineNearbyPOIProvider
 import de.timklge.karooroutegraph.pois.OverpassPOIProvider
@@ -100,6 +103,7 @@ import kotlin.time.DurationUnit
 fun NearbyPoiListScreen() {
     val coroutineScope = rememberCoroutineScope()
     var selectedCategories by remember { mutableStateOf(emptySet<NearbyPoiCategory>()) }
+    var recentlyUsedCategories by remember { mutableStateOf(emptyList<NearbyPoiCategory>()) }
     var showDialog by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
     var lastErrorMessage by remember { mutableStateOf<String?>(null) }
@@ -124,6 +128,7 @@ fun NearbyPoiListScreen() {
     val errorNoRoute = stringResource(R.string.error_no_route)
     val errorNoPosition = stringResource(R.string.error_no_position)
     val errorFetchPois = stringResource(R.string.error_fetch_pois)
+    val errorFetchPoisOverpass = stringResource(R.string.error_fetch_pois_overpass)
     val unnamedPoi = stringResource(R.string.unnamed_poi)
 
     LaunchedEffect(Unit) {
@@ -205,6 +210,8 @@ fun NearbyPoiListScreen() {
         lastErrorMessage = null // Reset error message
 
         coroutineScope.launch {
+            var nearbyPoiProvider: NearbyPOIProvider = overpassNearbyPOIProvider
+
             try {
                 val currentPos = currentPosition
                 if (currentPos == null) {
@@ -273,7 +280,7 @@ fun NearbyPoiListScreen() {
 
                         val routeLength = viewModel?.routeDistance?.toDouble() ?: TurfMeasurement.length(route, TurfConstants.UNIT_METERS)
                         val radius = if (onlyTownOrVillagesSelected) 5_000 else maxDistanceFromRoute.roundToInt()
-                        val nearbyPoiProvider = if (hasOfflineFiles) offlineNearbyPOIProvider else overpassNearbyPOIProvider
+                        nearbyPoiProvider = if (hasOfflineFiles) offlineNearbyPOIProvider else overpassNearbyPOIProvider
                         val lookaheadDistance = if (hasOfflineFiles) routeLength else 50_000.0
 
                         val routeAhead = try {
@@ -315,7 +322,11 @@ fun NearbyPoiListScreen() {
             } catch (e: CancellationException) {
                 throw e // Rethrow cancellation exceptions
             } catch(e: Throwable){
-                lastErrorMessage = String.format(errorFetchPois, e.message ?: "")
+                lastErrorMessage = if (nearbyPoiProvider is OverpassPOIProvider){
+                    String.format(errorFetchPoisOverpass, e.message ?: "")
+                } else {
+                    String.format(errorFetchPois, e.message ?: "")
+                }
                 delay(1_000)
                 isRefreshing = false
                 return@launch
@@ -329,6 +340,7 @@ fun NearbyPoiListScreen() {
         val viewSettings = karooSystemServiceProvider.streamViewSettings().first()
         val savedSort = viewSettings.poiSortOptionForNearbyPois
         selectedCategories = viewSettings.poiCategoriesForNearbyPois
+        recentlyUsedCategories = viewSettings.recentlyUsedCategories
 
         if (viewModel?.knownRoute == null && savedSort == PoiSortOption.AHEAD_ON_ROUTE) {
             selectedSort = PoiSortOption.LINEAR_DISTANCE
@@ -400,7 +412,7 @@ fun NearbyPoiListScreen() {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                        .padding(start = 8.dp, end = 8.dp, top = 16.dp, bottom = 0.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val selectText = stringResource(R.string.select)
@@ -414,22 +426,56 @@ fun NearbyPoiListScreen() {
                     Box(modifier = Modifier
                         .weight(1f)
                         .clickable { showDialog = true }) {
-                        OutlinedTextField(
+                        val fieldInteractionSource = remember { MutableInteractionSource() }
+                        val fieldColors = OutlinedTextFieldDefaults.colors(
+                            disabledBorderColor = MaterialTheme.colorScheme.outline,
+                            disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                            disabledLabelColor = MaterialTheme.colorScheme.onSurface,
+                            disabledTrailingIconColor = MaterialTheme.colorScheme.onSurface
+                        )
+                        BasicTextField(
                             value = categoriesText,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text(stringResource(R.string.categories)) },
-                            trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = false)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
                             enabled = false,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                disabledBorderColor = MaterialTheme.colorScheme.outline,
-                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                                disabledLabelColor = MaterialTheme.colorScheme.onSurface,
-                                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurface
-                            )
+                            modifier = Modifier.fillMaxWidth(),
+                            interactionSource = fieldInteractionSource,
+                            textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            decorationBox = {
+                                OutlinedTextFieldDefaults.DecorationBox(
+                                    value = categoriesText,
+                                    innerTextField = {
+                                        Text(
+                                            text = categoriesText,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            style = MaterialTheme.typography.bodyLarge.copy(
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        )
+                                    },
+                                    enabled = false,
+                                    singleLine = true,
+                                    visualTransformation = VisualTransformation.None,
+                                    interactionSource = fieldInteractionSource,
+                                    label = { Text(stringResource(R.string.categories)) },
+                                    trailingIcon = {
+                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = false)
+                                    },
+                                    colors = fieldColors,
+                                    container = {
+                                        OutlinedTextFieldDefaults.Container(
+                                            enabled = false,
+                                            isError = false,
+                                            interactionSource = fieldInteractionSource,
+                                            colors = fieldColors
+                                        )
+                                    }
+                                )
+                            }
                         )
                     }
 
@@ -468,7 +514,7 @@ fun NearbyPoiListScreen() {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 2.dp),
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
@@ -643,14 +689,19 @@ fun NearbyPoiListScreen() {
     if (showDialog) {
         CategorySelectionDialog(
             initialCategories = selectedCategories,
+            recentlyUsedCategories = recentlyUsedCategories,
             onDismiss = { showDialog = false },
             onConfirm = { newCategories ->
                 selectedCategories = newCategories
+                recentlyUsedCategories = newCategories.toList() + recentlyUsedCategories.filter { it !in newCategories }
                 showDialog = false
 
                 coroutineScope.launch {
                     karooSystemServiceProvider.saveViewSettings { settings ->
-                        settings.copy(poiCategoriesForNearbyPois = selectedCategories)
+                        settings.copy(
+                            poiCategoriesForNearbyPois = selectedCategories,
+                            recentlyUsedCategories = recentlyUsedCategories
+                        )
                     }
                     onRefresh()
                 }
@@ -750,65 +801,3 @@ fun NearbyPoiListScreen() {
     }
 }
 
-@Composable
-fun CategorySelectionDialog(
-    initialCategories: Set<NearbyPoiCategory>,
-    onDismiss: () -> Unit,
-    onConfirm: (Set<NearbyPoiCategory>) -> Unit
-) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        var tempSelectedCategories by remember { mutableStateOf(initialCategories) }
-
-        Card(modifier = Modifier.padding(16.dp)) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                LazyColumn(modifier = Modifier.weight(1f)) {
-                    items(NearbyPoiCategory.entries) { category ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    tempSelectedCategories =
-                                        if (tempSelectedCategories.contains(category)) {
-                                            tempSelectedCategories - category
-                                        } else {
-                                            tempSelectedCategories + category
-                                        }
-                                }
-                        ) {
-                            Checkbox(
-                                checked = tempSelectedCategories.contains(category),
-                                onCheckedChange = {
-                                    tempSelectedCategories = if (tempSelectedCategories.contains(category)) {
-                                        tempSelectedCategories - category
-                                    } else {
-                                        tempSelectedCategories + category
-                                    }
-                                }
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource(category.labelRes))
-                        }
-                    }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text(stringResource(R.string.cancel))
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(onClick = {
-                        onConfirm(tempSelectedCategories)
-                    }) {
-                        Text(stringResource(R.string.ok))
-                    }
-                }
-            }
-        }
-    }
-}

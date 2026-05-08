@@ -116,7 +116,7 @@ fun MainScreen(onFinish: () -> Unit) {
             )
         }
         SettingsScreen.POINTS_OF_INTEREST -> {
-            PointsOfInterestScreen(
+            PoiSettingsScreen(
                 onBack = { currentScreen = SettingsScreen.MENU }
             )
         }
