@@ -76,6 +76,7 @@ import de.timklge.karooroutegraph.getTimeUntilNextChange
 import de.timklge.karooroutegraph.isOpen
 import de.timklge.karooroutegraph.pois.DistanceToPoiResult
 import de.timklge.karooroutegraph.pois.NearbyPOI
+import de.timklge.karooroutegraph.pois.NearbyPOIProvider
 import de.timklge.karooroutegraph.pois.NearestPoint
 import de.timklge.karooroutegraph.pois.OfflineNearbyPOIProvider
 import de.timklge.karooroutegraph.pois.OverpassPOIProvider
@@ -127,6 +128,7 @@ fun NearbyPoiListScreen() {
     val errorNoRoute = stringResource(R.string.error_no_route)
     val errorNoPosition = stringResource(R.string.error_no_position)
     val errorFetchPois = stringResource(R.string.error_fetch_pois)
+    val errorFetchPoisOverpass = stringResource(R.string.error_fetch_pois_overpass)
     val unnamedPoi = stringResource(R.string.unnamed_poi)
 
     LaunchedEffect(Unit) {
@@ -208,6 +210,8 @@ fun NearbyPoiListScreen() {
         lastErrorMessage = null // Reset error message
 
         coroutineScope.launch {
+            var nearbyPoiProvider: NearbyPOIProvider = overpassNearbyPOIProvider
+
             try {
                 val currentPos = currentPosition
                 if (currentPos == null) {
@@ -276,7 +280,7 @@ fun NearbyPoiListScreen() {
 
                         val routeLength = viewModel?.routeDistance?.toDouble() ?: TurfMeasurement.length(route, TurfConstants.UNIT_METERS)
                         val radius = if (onlyTownOrVillagesSelected) 5_000 else maxDistanceFromRoute.roundToInt()
-                        val nearbyPoiProvider = if (hasOfflineFiles) offlineNearbyPOIProvider else overpassNearbyPOIProvider
+                        nearbyPoiProvider = if (hasOfflineFiles) offlineNearbyPOIProvider else overpassNearbyPOIProvider
                         val lookaheadDistance = if (hasOfflineFiles) routeLength else 50_000.0
 
                         val routeAhead = try {
@@ -318,7 +322,11 @@ fun NearbyPoiListScreen() {
             } catch (e: CancellationException) {
                 throw e // Rethrow cancellation exceptions
             } catch(e: Throwable){
-                lastErrorMessage = String.format(errorFetchPois, e.message ?: "")
+                lastErrorMessage = if (nearbyPoiProvider is OverpassPOIProvider){
+                    String.format(errorFetchPoisOverpass, e.message ?: "")
+                } else {
+                    String.format(errorFetchPois, e.message ?: "")
+                }
                 delay(1_000)
                 isRefreshing = false
                 return@launch
