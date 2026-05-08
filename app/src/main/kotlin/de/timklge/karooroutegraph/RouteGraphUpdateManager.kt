@@ -612,7 +612,7 @@ class RouteGraphUpdateManager(
                     }
 
                     val lastKnownPointAlongRoute = knownRoute?.let { knownRoute ->
-                        if (distanceAlongRoute != null && navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute) {
+                        if (navigationStateEvent is OnNavigationState.NavigationState.NavigatingRoute) {
                             try {
                                 TurfMeasurement.along(knownRoute, distanceAlongRoute.coerceIn(0.0, routeDistance), TurfConstants.UNIT_METERS)
                             } catch(e: Exception){
@@ -627,7 +627,7 @@ class RouteGraphUpdateManager(
                     routeGraphViewModelProvider.update {
                         it.copy(
                             routeDistance = routeDistance?.toFloat(),
-                            distanceAlongRoute = distanceAlongRoute?.toFloat(),
+                            distanceAlongRoute = distanceAlongRoute.toFloat(),
                             isOnRoute = currentDistanceAlongRoute != null,
                             knownRoute = knownRoute,
                             poiDistances = poiDistances,

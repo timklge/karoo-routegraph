@@ -34,6 +34,7 @@ import io.hammerhead.karooext.models.ShowPolyline
 import io.hammerhead.karooext.models.ShowSymbols
 import io.hammerhead.karooext.models.StreamState
 import io.hammerhead.karooext.models.Symbol
+import io.hammerhead.karooext.models.Symbol.POI.Types
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -123,24 +124,43 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         lastDrawnGradientIndicators = mutableSetOf()
 
         mapScope.launch {
-            data class TemporaryAndAutoAddedPOIs(
+            data class StreamData(
                 val temporaryPois: RouteGraphTemporaryPOIs,
                 val autoAddedPois: AutoAddedPOIsViewModel,
-                val settings: RouteGraphPoiSettings
+                val settings: RouteGraphPoiSettings,
+                val lastKnownPositionOnMainRoute: Point?,
+                val isOnRoute: Boolean?,
+                val routeDistance: Float?,
+                val currentDistanceAlongRoute: Float,
             )
 
-            combine(karooSystem.streamTemporaryPOIs(), autoAddedPOIsViewModelProvider.viewModelFlow, karooSystem.streamViewSettings()) { temporaryPois, autoAddedPois, settings ->
-                TemporaryAndAutoAddedPOIs(
+            combine(karooSystem.streamTemporaryPOIs(), autoAddedPOIsViewModelProvider.viewModelFlow, karooSystem.streamViewSettings(), routeGraphViewModelProvider.viewModelFlow) { temporaryPois, autoAddedPois, settings, viewModel ->
+                StreamData(
                     temporaryPois,
                     autoAddedPois,
-                    settings
+                    settings,
+                    viewModel.lastKnownPositionOnMainRoute,
+                    viewModel.isOnRoute,
+                    viewModel.routeDistance,
+                    viewModel.distanceAlongRoute
                 )
-            }.distinctUntilChanged().collect { (temporaryPOIs, autoAddedPois, settings) ->
+            }.distinctUntilChanged().throttle(20_000).collect { (temporaryPOIs, autoAddedPois, settings, lastKnownPositionOnMainRoute, isOnRoute, routeDistance, currentDistanceAlongRoute) ->
                 Log.d(TAG, "Temporary POIs: ${temporaryPOIs.poisByOsmId.size}, Auto-added POIs: ${autoAddedPois.autoAddedPoisByOsmId.size}")
 
                 val newSymbols = buildSet {
                     addAll(temporaryPOIs.poisByOsmId.values)
                     if (settings.autoAddPoisToMap) addAll(autoAddedPois.autoAddedPoisByOsmId.values)
+
+                    // Add POI for last known position on route when not on route
+                    if (lastKnownPositionOnMainRoute != null && routeDistance != null && isOnRoute == false && currentDistanceAlongRoute != 0.0f) {
+                        add(Symbol.POI(
+                            id = "last_known_position",
+                            lat = lastKnownPositionOnMainRoute.latitude(),
+                            lng = lastKnownPositionOnMainRoute.longitude(),
+                            name = "Last known position on route",
+                            type = Types.CONTROL
+                        ))
+                    }
                 }
 
                 val removedSymbosl = lastDrawnTemporaryPOIs - newSymbols

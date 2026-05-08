@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 data class RouteGraphViewModel(val routeDistance: Float? = null,
-                               val distanceAlongRoute: Float? = null,
+                               val distanceAlongRoute: Float = 0.0f,
                                val isOnRoute: Boolean? = null,
                                val lastKnownPositionOnMainRoute: Point? = null,
                                val knownRoute: LineString? = null,
