@@ -1,7 +1,7 @@
 package de.timklge.karooroutegraph
 
+import org.junit.Test
 import kotlin.math.abs
-import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Duration

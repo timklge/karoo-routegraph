@@ -1,7 +1,7 @@
 package de.timklge.karooroutegraph
 
+import org.junit.Test
 import java.util.Calendar
-import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue

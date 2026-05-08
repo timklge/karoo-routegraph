@@ -2,13 +2,12 @@ package de.timklge.karooroutegraph.datatypes
 
 import de.timklge.karooroutegraph.TravelTimeEstimationService
 import io.hammerhead.karooext.models.RideState
-import kotlin.math.pow
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
+import org.junit.Test
+import kotlin.math.pow
+import kotlin.test.assertEquals
 
 class AveragePowerEstimationTest {
 
