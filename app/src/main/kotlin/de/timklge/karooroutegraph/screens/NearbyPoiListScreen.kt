@@ -3,7 +3,6 @@ package de.timklge.karooroutegraph.screens
 import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,7 +22,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,7 +32,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -50,14 +47,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mapbox.geojson.Point
 import com.mapbox.turf.TurfConstants
@@ -221,9 +217,6 @@ fun NearbyPoiListScreen() {
                     return@launch
                 }
 
-                val desiredCount = 20 // Desired number of POIs to fetch
-                val limit = 30
-
                 val onlyTownOrVillagesSelected =
                     selectedCategories.all { it == NearbyPoiCategory.TOWN || it == NearbyPoiCategory.VILLAGE }
 
@@ -243,36 +236,34 @@ fun NearbyPoiListScreen() {
                         listOf(currentPos),
                         radius
                     ).isNotEmpty()
+                    nearbyPoiProvider = if (hasOfflineFiles) offlineNearbyPOIProvider else overpassNearbyPOIProvider
+
+                    // Desired number of POIs to fetch
+                    val desiredCount = if (nearbyPoiProvider is OverpassPOIProvider) {
+                        10
+                    } else {
+                        30
+                    }
+                    val limit = 30
 
                     if (selectedSort == PoiSortOption.LINEAR_DISTANCE) {
-                        if (hasOfflineFiles) {
-                            val offlineResponse = offlineNearbyPOIProvider.requestNearbyPOIs(
+                        val radiusSteps = if (onlyTownOrVillagesSelected) {
+                            listOf(5_000, 10_000, 20_000, 50_000)
+                        } else {
+                            listOf(2_000, 5_000, 10_000)
+                        }
+
+                        for (step in radiusSteps) {
+                            val newResponse = nearbyPoiProvider.requestNearbyPOIs(
                                 selectedCategories.flatMap { it.osmTag }.distinct(),
                                 points = listOf(currentPos),
-                                radius = if (onlyTownOrVillagesSelected) 50_000 else 10_000,
+                                radius = step,
                                 limit = limit
                             )
+                            overpassResponse = newResponse.toSet()
 
-                            overpassResponse = offlineResponse.toSet()
-                        } else {
-                            val radiusSteps = if (onlyTownOrVillagesSelected) {
-                                listOf(5_000, 10_000, 20_000, 50_000)
-                            } else {
-                                listOf(2_000, 5_000, 10_000)
-                            }
-
-                            for (step in radiusSteps) {
-                                val newResponse = overpassNearbyPOIProvider.requestNearbyPOIs(
-                                    selectedCategories.flatMap { it.osmTag }.distinct(),
-                                    points = listOf(currentPos),
-                                    radius = step,
-                                    limit = limit
-                                )
-                                overpassResponse = newResponse.toSet()
-
-                                if (newResponse.size >= desiredCount) {
-                                    break // Enough POIs found, exit loop
-                                }
+                            if (newResponse.size >= desiredCount) {
+                                break // Enough POIs found, exit loop
                             }
                         }
                     } else {
@@ -280,7 +271,6 @@ fun NearbyPoiListScreen() {
 
                         val routeLength = viewModel?.routeDistance?.toDouble() ?: TurfMeasurement.length(route, TurfConstants.UNIT_METERS)
                         val radius = if (onlyTownOrVillagesSelected) 5_000 else maxDistanceFromRoute.roundToInt()
-                        nearbyPoiProvider = if (hasOfflineFiles) offlineNearbyPOIProvider else overpassNearbyPOIProvider
                         val lookaheadDistance = if (hasOfflineFiles) routeLength else 50_000.0
 
                         val routeAhead = try {
