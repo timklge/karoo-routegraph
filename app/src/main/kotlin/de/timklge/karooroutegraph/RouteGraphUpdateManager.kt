@@ -39,7 +39,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
@@ -135,8 +134,7 @@ class RouteGraphUpdateManager(
         var knownClimbs: List<Climb>? = null
         var knownIncidentWarningShown = false
         var poiDistances: Map<POI, List<NearestPoint>>? = null
-        var knownOpeningHours: Map<POI, String> = emptyMap()
-        var lastKnownPositionAlongRoute: Double? = null
+        var lastKnownPositionAlongRoute: Double = 0.0
         var lastAutoAddedPoisByOsmId: Map<Long, Symbol.POI> = emptyMap()
         var lastAutoAddedPoisRequestedAtPosition: Point? = null
         var lastAutoAddedPoisCategories: Set<NearbyPoiCategory> = emptySet()
@@ -276,7 +274,7 @@ class RouteGraphUpdateManager(
                         knownRoute = routeLineString
                         knownIncidents = null
                         knownIncidentWarningShown = false
-                        lastKnownPositionAlongRoute = null
+                        lastKnownPositionAlongRoute = 0.0
                         knownSettings = settings
                         knownClimbs = null
 
