@@ -1,8 +1,6 @@
 package de.timklge.karooroutegraph.screens
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,7 +32,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.R
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
@@ -42,7 +39,6 @@ import org.koin.compose.koinInject
 @Composable
 fun PoiScreen(finish: () -> Unit){
     val coroutineScope = rememberCoroutineScope()
-    var showWarnings by remember { mutableStateOf(false) }
     val karooSystemServiceProvider = koinInject<KarooSystemServiceProvider>()
     var initialPage by remember { mutableIntStateOf(1) }
     var initialPageLoaded by remember { mutableStateOf(false) }
@@ -50,8 +46,6 @@ fun PoiScreen(finish: () -> Unit){
     LaunchedEffect(Unit) {
         initialPage = karooSystemServiceProvider.streamViewSettings().first().lastPoiTab
         initialPageLoaded = true
-        delay(3000L)
-        showWarnings = true
     }
 
     if (!initialPageLoaded) return
@@ -70,20 +64,6 @@ fun PoiScreen(finish: () -> Unit){
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) {
-                when (it) {
-                    0 -> {
-                        CustomPoiListScreen()
-                    }
-                    1 -> {
-                        NearbyPoiListScreen()
-                    }
-                    2 -> {
-                        PoiSearchScreen()
-                    }
-                }
-            }
-
             TabRow(selectedTabIndex = pagerState.currentPage, modifier = Modifier
                 .fillMaxWidth()
                 .wrapContentHeight(),
@@ -95,7 +75,7 @@ fun PoiScreen(finish: () -> Unit){
                         Box(
                             modifier = Modifier
                                 .tabIndicatorOffset(tabPositions[pagerState.currentPage])
-                                .align(Alignment.TopStart)
+                                .align(Alignment.BottomStart)
                                 .height(2.dp)
                                 .fillMaxWidth()
                                 .background(MaterialTheme.colorScheme.primary)
@@ -122,20 +102,25 @@ fun PoiScreen(finish: () -> Unit){
                         .padding(2.dp)
                 ) }, onClick = { coroutineScope.launch { pagerState.animateScrollToPage(2) } })
             }
+
+            HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) {
+                when (it) {
+                    0 -> {
+                        CustomPoiListScreen()
+                    }
+                    1 -> {
+                        NearbyPoiListScreen()
+                    }
+                    2 -> {
+                        PoiSearchScreen()
+                    }
+                }
+            }
         }
 
-        if (showWarnings){
-            Image(
-                painter = painterResource(id = R.drawable.back),
-                contentDescription = stringResource(R.string.back),
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(bottom = 10.dp)
-                    .size(54.dp)
-                    .clickable {
-                        finish()
-                    }
-            )
-        }
+        FixedBackButton(
+            modifier = Modifier.align(Alignment.BottomStart),
+            onBack = { finish() }
+        )
     }
 }

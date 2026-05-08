@@ -503,6 +503,10 @@ fun PoiSearchScreen() {
                     }
                 }
             }
+
+            item {
+                Spacer(modifier = Modifier.padding(30.dp))
+            }
         }
     }
 }
