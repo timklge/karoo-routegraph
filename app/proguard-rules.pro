@@ -26,3 +26,7 @@
 -keep class * extends androidx.work.ListenableWorker {
     <init>(android.content.Context, androidx.work.WorkerParameters);
 }
+
+-keep class de.timklge.karooroutegraph.datatypes.minimap.ChangeZoomLevelAction { *; }
+-keep class de.timklge.karooroutegraph.datatypes.minimap.ChangeMinimapZoomLevel { *; }
+-keep class de.timklge.karooroutegraph.datatypes.minimap.ChangeVerticalZoomLevelAction { *; }
