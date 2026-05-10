@@ -193,8 +193,6 @@ fun CustomPoiListScreen() {
 
                     addAll(poisSortedByDistance)
                 }
-
-                poisSortedByDistance
             } ?: run {
                 // Include additionalPois even when currentPosition is null
                 localPois + globalPois + additionalPois.mapIndexed { index, poi -> DisplayedCustomPoi.Additional(index.toLong(), poi.symbol) }
