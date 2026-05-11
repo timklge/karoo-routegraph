@@ -543,6 +543,7 @@ fun NearbyPoiListScreen() {
                                                 startDistance = viewModel?.distanceAlongRoute?.toDouble() ?: 0.0,
                                                 endDistance = (viewModel?.distanceAlongRoute?.toDouble() ?: 0.0) + ((result as? DistanceToPoiResult.AheadOnRouteDistance)?.distanceOnRoute ?: 0.0),
                                                 totalWeight = (userProfile?.weight?.toDouble() ?: 70.0) + 10.0,
+                                                profileFtp = userProfile?.ftp?.toDouble(),
                                                 lastHourAvgPower = averagePowerFlow,
                                                 surfaceConditions = surfaceConditions ?: emptyList(),
                                                 finalSegmentLength = (result as? DistanceToPoiResult.AheadOnRouteDistance)?.distanceFromPointOnRoute

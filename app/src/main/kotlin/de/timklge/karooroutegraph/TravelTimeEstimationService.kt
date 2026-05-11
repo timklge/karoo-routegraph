@@ -20,8 +20,10 @@ class TravelTimeEstimationService {
         const val CRR_GRAVEL = 0.015
         /** Rolling resistance coefficient on loose / off-road surface */
         const val CRR_LOOSE = 0.050
-        /** Fallback power when avgPower is not given (W) */
-        const val DEFAULT_POWER_W = 130.0
+        /** Fallback power, given as percentage of FTP */
+        const val DEFAULT_POWER_FTP_FACTOR = 0.6
+        /** Default FTP (watts) */
+        const val DEFAULT_FTP_WATT = 200.0
         /** Maximum modelled speed – 60 km/h (m/s) */
         const val MAX_SPEED_MS = 60.0 / 3.6
         /** Minimum modelled speed – effectively a walk on steep terrain (m/s) */
@@ -107,6 +109,7 @@ class TravelTimeEstimationService {
      * @param startDistance start point of the segment, in meters from beginning of the route
      * @param endDistance end point of the segment, in meters from beginning of the route
      * @param totalWeight combined weight of rider + bike (kg)
+     * @param profileFtp FTP of the rider (watts)
      * @param lastHourAvgPower average power output over the last hour in watts (if known).
      * @param surfaceConditions known surface conditions along the route where the road is not smooth pavement
      * @param finalSegmentLength length of an additional off-route final segment (in meters), for which 20 km/h is expected
@@ -116,6 +119,7 @@ class TravelTimeEstimationService {
         startDistance: Double,
         endDistance: Double,
         totalWeight: Double,
+        profileFtp: Double? = null,
         lastHourAvgPower: Double? = null,
         surfaceConditions: List<SurfaceConditionRetrievalService.SurfaceConditionSegment> = emptyList(),
         finalSegmentLength: Double? = null
@@ -124,10 +128,12 @@ class TravelTimeEstimationService {
 
         if (endDistance <= startDistance) return Duration.ZERO
 
+        val ftp = if (profileFtp != null && profileFtp in (50.0..500.0)) profileFtp else DEFAULT_FTP_WATT
+
         // Determine effective power output
         val effectivePower: Double = when {
             lastHourAvgPower != null && lastHourAvgPower >= 50 -> lastHourAvgPower
-            else -> DEFAULT_POWER_W
+            else -> ftp * DEFAULT_POWER_FTP_FACTOR
         }
 
         val interval = routeElevationData?.interval?.toDouble()

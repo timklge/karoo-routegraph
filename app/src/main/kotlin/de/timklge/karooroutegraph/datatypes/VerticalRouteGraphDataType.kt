@@ -683,6 +683,7 @@ class VerticalRouteGraphDataType(
                                         startDistance = viewModel.distanceAlongRoute.toDouble(),
                                         endDistance = nearestPoint.distanceFromRouteStart.toDouble(),
                                         totalWeight = userProfile.weight + 10.0,
+                                        profileFtp = userProfile.ftp.toDouble(),
                                         lastHourAvgPower = averagePower,
                                         surfaceConditions = surfaceConditions ?: emptyList(),
                                         finalSegmentLength = nearestPoint.distanceFromPointOnRoute.toDouble()
