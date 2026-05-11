@@ -24,9 +24,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlin.time.DurationUnit
 
@@ -38,20 +35,20 @@ class ETADataType(
 ) : DataTypeImpl("karoo-routegraph", "eta") {
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun startStream(emitter: Emitter<StreamState>) {
-        data class StreamState(val state: RouteGraphViewModel, val riderWeight: Float, val averageHourPower: Double?, val surfaceConditions: List<SurfaceConditionSegment>?)
+        data class StreamState(val state: RouteGraphViewModel, val userProfile: UserProfile, val averageHourPower: Double?, val surfaceConditions: List<SurfaceConditionSegment>?)
 
         val job = CoroutineScope(Dispatchers.Default).launch {
             val averagePowerFlow = streamPowerPerHour( karooSystemProvider)
             val surfaceConditionFlow = surfaceConditionRetrievalService.flow
 
             combine(viewModelProvider.viewModelFlow, karooSystemProvider.stream<UserProfile>(), averagePowerFlow, surfaceConditionFlow) { viewModel, userProfile, averagePower, surfaceConditions ->
-                StreamState(viewModel, userProfile.weight, averagePower, surfaceConditions)
-            }.throttle(20_000L).collect { (state, riderWeight, averagePower, surfaceConditions) ->
-                val currentDistanceAlongRoute = state.distanceAlongRoute?.toDouble()
+                StreamState(viewModel, userProfile, averagePower, surfaceConditions)
+            }.throttle(20_000L).collect { (state, userProfile, averagePower, surfaceConditions) ->
+                val currentDistanceAlongRoute = state.distanceAlongRoute.toDouble()
                 val currentRouteLength = state.routeDistance?.toDouble()
-                val totalWeight = riderWeight + 10.0f
+                val totalWeight = userProfile.weight + 10.0f
 
-                if (currentDistanceAlongRoute == null || currentRouteLength == null){
+                if (currentRouteLength == null){
                     emitter.onNext(io.hammerhead.karooext.models.StreamState.NotAvailable)
                     return@collect
                 }
@@ -61,6 +58,7 @@ class ETADataType(
                     startDistance = currentDistanceAlongRoute,
                     endDistance = currentRouteLength,
                     totalWeight = totalWeight.toDouble(),
+                    profileFtp = userProfile.ftp.toDouble(),
                     lastHourAvgPower = averagePower,
                     surfaceConditions = surfaceConditions ?: emptyList(),
                 )

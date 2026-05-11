@@ -363,12 +363,13 @@ fun PoiSearchScreen() {
                                 }
 
                                 viewModel?.let { vm ->
-                                    val estimatedTravelTime = if (selectedSort == PoiSortOption.AHEAD_ON_ROUTE && vm.distanceAlongRoute != null) {
+                                    val estimatedTravelTime = if (selectedSort == PoiSortOption.AHEAD_ON_ROUTE) {
                                         travelTimeEstimationService.estimateTravelTime(
                                             routeElevationData = vm.sampledElevationData,
                                             startDistance = vm.distanceAlongRoute.toDouble(),
                                             endDistance = vm.distanceAlongRoute.toDouble() + ((distanceResult as? DistanceToPoiResult.AheadOnRouteDistance)?.distanceOnRoute ?: 0.0),
                                             totalWeight = (userProfile?.weight?.toDouble() ?: 70.0) + 10.0,
+                                            profileFtp = userProfile?.ftp?.toDouble(),
                                             lastHourAvgPower = averagePowerFlow,
                                             surfaceConditions = surfaceConditions ?: emptyList(),
                                             finalSegmentLength = (distanceResult as? DistanceToPoiResult.AheadOnRouteDistance)?.distanceFromPointOnRoute
