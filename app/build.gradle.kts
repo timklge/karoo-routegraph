@@ -73,7 +73,7 @@ tasks.register("generateManifest") {
             "latestVersionCode" to android.defaultConfig.versionCode,
             "developer" to "github.com/timklge",
             "description" to "Open-source extension that provides an elevation graph datafield depicting the complete current route, including climbs and POIs (e. g. checkpoints and refueling stops). Also provides a minimap datafield and a POI navigation datafield to look up upcoming POIs of certain categories on the route (e. g. supermarkets).",
-            "releaseNotes" to "* Update gradient colors to match new karoo color palette",
+            "releaseNotes" to "* Calculate travel times on background thread when looking up POIs\n* Use 60 % of FTP instead of 130W as fallback in ETA calculation if no power data is available",
             "screenshotUrls" to listOf(
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/horizontal_routegraph.png",
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/minimap.png",
