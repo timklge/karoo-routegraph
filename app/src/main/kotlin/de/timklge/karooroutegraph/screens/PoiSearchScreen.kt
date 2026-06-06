@@ -69,6 +69,7 @@ import de.timklge.karooroutegraph.pois.formatDistance
 import io.hammerhead.karooext.models.LaunchPinDrop
 import io.hammerhead.karooext.models.Symbol
 import io.hammerhead.karooext.models.UserProfile
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -125,6 +126,7 @@ fun PoiSearchScreen() {
 
     var isImperial by remember { mutableStateOf(false)}
     val temporaryPois by karooSystemServiceProvider.streamTemporaryPOIs().collectAsStateWithLifecycle(RouteGraphTemporaryPOIs())
+    var refreshJob by remember { mutableStateOf<Job?>(null) }
 
     LaunchedEffect(Unit) {
         karooSystemServiceProvider.stream<UserProfile>()
@@ -159,15 +161,23 @@ fun PoiSearchScreen() {
     }
 
     fun onRefresh() {
-        if (isRefreshing) return // Prevent multiple refreshes
-
+        refreshJob?.cancel()
         focusManager.clearFocus()
         isRefreshing = true
         lastErrorMessage = null // Reset error message
 
-        coroutineScope.launch {
+        // Capture the state at the time onRefresh is invoked so the in-flight
+        // search always uses the query/sort/position the user just entered,
+        // not whatever the snapshot reports later.
+        val queryForSearch = searchQuery
+        val sortForSearch = selectedSort
+        val positionForSearch = currentPosition
+        val viewModelForSearch = viewModel
+        val maxDistanceForSearch = maxDistanceFromRoute
+
+        refreshJob = coroutineScope.launch {
             try {
-                val currentPos = currentPosition
+                val currentPos = positionForSearch
                 if (currentPos == null) {
                     lastErrorMessage = errorNoPosition
                     delay(1_000)
@@ -175,19 +185,19 @@ fun PoiSearchScreen() {
                     return@launch
                 }
 
-                if (searchQuery.isEmpty()) {
+                if (queryForSearch.isEmpty()) {
                     delay(1_000)
                     pois = emptyList() // Clear POIs if search query is empty
                     isRefreshing = false
                     return@launch
                 }
 
-                val foundPlaces = nominatimProvider.requestNominatim(searchQuery,
+                val foundPlaces = nominatimProvider.requestNominatim(queryForSearch,
                     lat = currentPos.latitude(),
                     lng = currentPos.longitude(),
                 )
 
-                when (selectedSort) {
+                when (sortForSearch) {
                     PoiSortOption.LINEAR_DISTANCE -> {
                         pois = foundPlaces.sortedWith(
                             compareBy<OsmPlace> { it.placeRank }.thenBy { poi ->
@@ -196,7 +206,7 @@ fun PoiSearchScreen() {
                         )
                     }
                     PoiSortOption.AHEAD_ON_ROUTE -> {
-                        if (viewModel?.knownRoute == null) {
+                        if (viewModelForSearch?.knownRoute == null) {
                             lastErrorMessage = errorNoRoute
                             delay(1_000)
                             isRefreshing = false
@@ -205,14 +215,14 @@ fun PoiSearchScreen() {
                                 POI(Symbol.POI("poi-${poi.osmId ?: poi.placeId}", poi.lat.toDouble(), poi.lon.toDouble(), name = poi.displayName ?: poi.name ?: "Unnamed POI"))
                             }
 
-                            val newNearestPointsOnRouteToFoundPois = viewModel?.knownRoute?.let { route ->
-                                calculatePoiDistances(route, poisForCalculation, maxDistanceFromRoute)
+                            val newNearestPointsOnRouteToFoundPois = viewModelForSearch?.knownRoute?.let { route ->
+                                calculatePoiDistances(route, poisForCalculation, maxDistanceForSearch)
                             } ?: emptyMap()
 
                             pois = foundPlaces.sortedBy { poi ->
                                 val symbol = Symbol.POI("poi-${poi.osmId ?: poi.placeId}", poi.lat.toDouble(), poi.lon.toDouble(), name = poi.displayName ?: poi.name ?: "Unnamed POI")
-                                distanceToPoi(symbol, viewModel?.sampledElevationData,
-                                    newNearestPointsOnRouteToFoundPois, currentPos, selectedSort, viewModel?.distanceAlongRoute)
+                                distanceToPoi(symbol, viewModelForSearch?.sampledElevationData,
+                                    newNearestPointsOnRouteToFoundPois, currentPos, sortForSearch, viewModelForSearch?.distanceAlongRoute)
                             }
                         }
                     }
