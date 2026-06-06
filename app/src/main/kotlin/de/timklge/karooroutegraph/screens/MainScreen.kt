@@ -50,7 +50,6 @@ enum class SettingsScreen {
     GRADIENT_CHEVRONS,
     MINIMAP,
     POINTS_OF_INTEREST,
-    TRAFFIC_INCIDENTS
 }
 
 data class MenuItem(
@@ -64,7 +63,6 @@ val menuItems = listOf(
     MenuItem(SettingsScreen.GRADIENT_CHEVRONS, R.drawable.menu_chevron, R.string.gradient_chevrons),
     MenuItem(SettingsScreen.MINIMAP, R.drawable.menu_map, R.string.minimap),
     MenuItem(SettingsScreen.POINTS_OF_INTEREST, R.drawable.menu_poi, R.string.points_of_interest_poi),
-    MenuItem(SettingsScreen.TRAFFIC_INCIDENTS, R.drawable.menu_barrier, R.string.traffic_incidents)
 )
 
 @Composable
@@ -117,11 +115,6 @@ fun MainScreen(onFinish: () -> Unit) {
         }
         SettingsScreen.POINTS_OF_INTEREST -> {
             PoiSettingsScreen(
-                onBack = { currentScreen = SettingsScreen.MENU }
-            )
-        }
-        SettingsScreen.TRAFFIC_INCIDENTS -> {
-            TrafficIncidentsScreen(
                 onBack = { currentScreen = SettingsScreen.MENU }
             )
         }

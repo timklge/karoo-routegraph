@@ -18,11 +18,7 @@ import kotlin.math.absoluteValue
 
 data class NearestPoint(val pointOnRoute: Point?, val distanceFromPointOnRoute: Float, val distanceFromRouteStart: Float, val target: Point?)
 
-enum class PoiType {
-    POI, INCIDENT
-}
-
-data class POI(val symbol: Symbol.POI, val type: PoiType = PoiType.POI, val showOnlyAtRouteDistance: Float? = null)
+data class POI(val symbol: Symbol.POI, val showOnlyAtRouteDistance: Float? = null)
 
 sealed class DistanceToPoiResult : Comparable<DistanceToPoiResult> {
     data class LinearDistance(val distance: Double) : DistanceToPoiResult()
@@ -282,7 +278,6 @@ fun getStartAndEndPoiIfNone(routeLineString: LineString?, pois: List<Symbol.POI>
                         type = Symbol.POI.Types.GENERIC,
                         name = applicationContext.getString(R.string.start_of_route)
                     ),
-                    PoiType.POI,
                     showOnlyAtRouteDistance = 0f
                 ))
             }
@@ -303,7 +298,6 @@ fun getStartAndEndPoiIfNone(routeLineString: LineString?, pois: List<Symbol.POI>
                         type = Symbol.POI.Types.GENERIC,
                         name = applicationContext.getString(R.string.end_of_route)
                     ),
-                    PoiType.POI,
                     showOnlyAtRouteDistance = routeLength
                 ))
             }

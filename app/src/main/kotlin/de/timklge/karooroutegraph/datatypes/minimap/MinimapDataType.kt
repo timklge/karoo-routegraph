@@ -48,7 +48,6 @@ import de.timklge.karooroutegraph.TileDownloadService
 import de.timklge.karooroutegraph.getSurfaceConditionPaints
 import de.timklge.karooroutegraph.pois.NearestPoint
 import de.timklge.karooroutegraph.pois.POI
-import de.timklge.karooroutegraph.pois.PoiType
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.streamDatatypeIsVisible
 import de.timklge.karooroutegraph.streamSettings
@@ -515,8 +514,7 @@ class MinimapDataType(
                                 poi.symbol,
                                 centerPosition,
                                 zoomLevel,
-                                settings.showPOILabelsOnMinimap,
-                                poi.type == PoiType.INCIDENT
+                                settings.showPOILabelsOnMinimap
                             )
                         }
 
@@ -610,7 +608,6 @@ class MinimapDataType(
         mapCenter: Point,
         zoomLevel: Float,
         showPOILabelsOnMinimap: Boolean,
-        isIncident: Boolean
     ) {
         val poiIconRes = mapPoiToIcon(poi.type)
         val poiPoint = Point.fromLngLat(poi.lng, poi.lat)
@@ -638,12 +635,6 @@ class MinimapDataType(
             val paint = Paint().apply {
                 isAntiAlias = true
                 isFilterBitmap = true
-                if (isIncident) {
-                    colorFilter = ColorMatrixColorFilter(ColorMatrix().apply {
-                        // Tint to red for incidents
-                        setScale(1f, 0.3f, 0.3f, 1f)
-                    })
-                }
             }
 
             // Draw background circle with outline

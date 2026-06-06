@@ -2,7 +2,6 @@ package de.timklge.karooroutegraph
 
 import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
-import de.timklge.karooroutegraph.incidents.IncidentsResponse
 import de.timklge.karooroutegraph.pois.NearestPoint
 import de.timklge.karooroutegraph.pois.POI
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,7 +16,6 @@ data class RouteGraphViewModel(val routeDistance: Float? = null,
                                val poiDistances: Map<POI, List<NearestPoint>>? = null,
                                val knownPoiOpeningHours: Map<String, String> = mapOf(),
                                val sampledElevationData: SampledElevationData? = null,
-                               val incidents: IncidentsResponse? = null,
                                val isImperial: Boolean = false,
                                val climbs: List<Climb>? = null,
                                val rejoin: LineString? = null,

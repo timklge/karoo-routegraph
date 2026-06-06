@@ -51,12 +51,9 @@ import de.timklge.karooroutegraph.distanceToString
 import de.timklge.karooroutegraph.getInclineIndicatorColor
 import de.timklge.karooroutegraph.getOpeningHoursStatusLabel
 import de.timklge.karooroutegraph.getSurfaceConditionPaints
-import de.timklge.karooroutegraph.getTimeUntilNextChange
-import de.timklge.karooroutegraph.isOpen
 import de.timklge.karooroutegraph.pois.NearestPoint
 import de.timklge.karooroutegraph.pois.POI
 import de.timklge.karooroutegraph.pois.POIActivity
-import de.timklge.karooroutegraph.pois.PoiType
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.streamDatatypeIsVisible
 import de.timklge.karooroutegraph.streamSettings
@@ -254,17 +251,7 @@ class VerticalRouteGraphDataType(
                     strokeWidth = 5f
                 }
 
-                val incidentPaint = Paint().apply {
-                    color = applicationContext.getColor(R.color.eleRed)
-                    style = Paint.Style.STROKE
-                    strokeWidth = 5f
-                }
-
                 val poiLinePaintDashed = Paint(poiLinePaint).apply {
-                    pathEffect = android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 0f)
-                }
-
-                val incidentLinePaintDashed = Paint(incidentPaint).apply {
                     pathEffect = android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 0f)
                 }
 
@@ -650,61 +637,59 @@ class VerticalRouteGraphDataType(
                         val distanceFromRouteStart = nearestPoint.distanceFromRouteStart
                         val text = poi.symbol.name ?: ""
                         val progressPixels = remap(distanceFromRouteStart, viewDistanceStart, viewDistanceEnd, graphBounds.bottom, graphBounds.top)
-                        val labelPriority = if (poi.type == PoiType.INCIDENT) 10 else 11
+                        val labelPriority = 11
 
                         canvas.drawLine(graphBounds.left, progressPixels, config.viewSize.first.toFloat(), progressPixels, backgroundStrokePaintDashed)
-                        canvas.drawLine(graphBounds.left, progressPixels, config.viewSize.first.toFloat(), progressPixels, if (poi.type == PoiType.INCIDENT) incidentLinePaintDashed else poiLinePaintDashed)
+                        canvas.drawLine(graphBounds.left, progressPixels, config.viewSize.first.toFloat(), progressPixels, poiLinePaintDashed)
 
-                        if (poi.type != PoiType.INCIDENT) {
-                            val poiCommands = mutableListOf<TextDrawCommand>()
-                            val availableWidth = config.viewSize.first.toFloat() - (labelStartX + 40f) - 20f
-                            poiCommands.add(TextDrawCommand(labelStartX + 40f, progressPixels + 15f, text, textPaintBold, labelPriority, leadingIcon = mapPoiToIcon(poi.symbol.type), maxWidth = availableWidth))
+                        val poiCommands = mutableListOf<TextDrawCommand>()
+                        val availableWidth = config.viewSize.first.toFloat() - (labelStartX + 40f) - 20f
+                        poiCommands.add(TextDrawCommand(labelStartX + 40f, progressPixels + 15f, text, textPaintBold, labelPriority, leadingIcon = mapPoiToIcon(poi.symbol.type), maxWidth = availableWidth))
 
-                            val isImperial = userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
+                        val isImperial = userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
 
-                            if (viewModel.distanceAlongRoute != null && nearestPoint.distanceFromRouteStart > viewModel.distanceAlongRoute){
-                                val distanceMeters = nearestPoint.distanceFromRouteStart - viewModel.distanceAlongRoute
-                                var distanceStr = ""
+                        if (nearestPoint.distanceFromRouteStart > viewModel.distanceAlongRoute){
+                            val distanceMeters = nearestPoint.distanceFromRouteStart - viewModel.distanceAlongRoute
+                            var distanceStr = ""
 
-                                if (settings.showRemainingDistanceOnVerticalRouteGraph) {
-                                    distanceStr = "In ${distanceToString(distanceMeters, isImperial, false)}"
-                                }
+                            if (settings.showRemainingDistanceOnVerticalRouteGraph) {
+                                distanceStr = "In ${distanceToString(distanceMeters, isImperial, false)}"
+                            }
 
-                                if (settings.showRemainingElevationOnVerticalRouteGraph) {
-                                    val elevationMetersRemaining = viewModel.sampledElevationData?.getTotalClimb(viewModel.distanceAlongRoute, nearestPoint.distanceFromRouteStart)
-                                    if (elevationMetersRemaining != null && !distanceIsZero(elevationMetersRemaining.toFloat(), userProfile)) {
-                                        distanceStr += " ↗ ${distanceToString(elevationMetersRemaining.toFloat(), isImperial, true)}"
-                                    }
-                                }
-
-                                if (settings.showEtaOnVerticalRouteGraph) {
-                                    val estimatedTravelTime = travelTimeEstimationService.estimateTravelTime(
-                                        routeElevationData = viewModel.sampledElevationData,
-                                        startDistance = viewModel.distanceAlongRoute.toDouble(),
-                                        endDistance = nearestPoint.distanceFromRouteStart.toDouble(),
-                                        totalWeight = userProfile.weight + 10.0,
-                                        profileFtp = userProfile.ftp.toDouble(),
-                                        lastHourAvgPower = averagePower,
-                                        surfaceConditions = surfaceConditions ?: emptyList(),
-                                        finalSegmentLength = nearestPoint.distanceFromPointOnRoute.toDouble()
-                                    )
-                                    val eta = System.currentTimeMillis() + estimatedTravelTime.toLong(DurationUnit.MILLISECONDS)
-                                    distanceStr += " ⏲\u00A0${android.text.format.DateFormat.getTimeFormat(applicationContext).format(Date(eta))}"
-
-                                    val openingHours = viewModel.knownPoiOpeningHours[poi.symbol.id]
-                                    getOpeningHoursStatusLabel(eta, openingHours, context)?.let { statusText ->
-                                        distanceStr += " ${statusText.uppercase()}"
-                                    }
-                                }
-
-                                if (distanceStr.isNotEmpty()) {
-                                    val distanceAvailableWidth = config.viewSize.first.toFloat() - (labelStartX) - 20f
-                                    poiCommands.add(TextDrawCommand(labelStartX, progressPixels + 15f, distanceStr, textPaint, labelPriority, maxWidth = distanceAvailableWidth))
+                            if (settings.showRemainingElevationOnVerticalRouteGraph) {
+                                val elevationMetersRemaining = viewModel.sampledElevationData?.getTotalClimb(viewModel.distanceAlongRoute, nearestPoint.distanceFromRouteStart)
+                                if (elevationMetersRemaining != null && !distanceIsZero(elevationMetersRemaining.toFloat(), userProfile)) {
+                                    distanceStr += " ↗ ${distanceToString(elevationMetersRemaining.toFloat(), isImperial, true)}"
                                 }
                             }
 
-                            textDrawCommands.add(TextDrawCommandGroup(poiCommands))
+                            if (settings.showEtaOnVerticalRouteGraph) {
+                                val estimatedTravelTime = travelTimeEstimationService.estimateTravelTime(
+                                    routeElevationData = viewModel.sampledElevationData,
+                                    startDistance = viewModel.distanceAlongRoute.toDouble(),
+                                    endDistance = nearestPoint.distanceFromRouteStart.toDouble(),
+                                    totalWeight = userProfile.weight + 10.0,
+                                    profileFtp = userProfile.ftp.toDouble(),
+                                    lastHourAvgPower = averagePower,
+                                    surfaceConditions = surfaceConditions ?: emptyList(),
+                                    finalSegmentLength = nearestPoint.distanceFromPointOnRoute.toDouble()
+                                )
+                                val eta = System.currentTimeMillis() + estimatedTravelTime.toLong(DurationUnit.MILLISECONDS)
+                                distanceStr += " ⏲\u00A0${android.text.format.DateFormat.getTimeFormat(applicationContext).format(Date(eta))}"
+
+                                val openingHours = viewModel.knownPoiOpeningHours[poi.symbol.id]
+                                getOpeningHoursStatusLabel(eta, openingHours, context)?.let { statusText ->
+                                    distanceStr += " ${statusText.uppercase()}"
+                                }
+                            }
+
+                            if (distanceStr.isNotEmpty()) {
+                                val distanceAvailableWidth = config.viewSize.first.toFloat() - (labelStartX) - 20f
+                                poiCommands.add(TextDrawCommand(labelStartX, progressPixels + 15f, distanceStr, textPaint, labelPriority, maxWidth = distanceAvailableWidth))
+                            }
                         }
+
+                        textDrawCommands.add(TextDrawCommandGroup(poiCommands))
                     }
 
                     canvas.drawRect(
