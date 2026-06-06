@@ -279,11 +279,12 @@ fun CustomPoiListScreen() {
                             append(distanceResult?.formatDistance(LocalContext.current, isImperial))
 
                             viewModel?.let { viewModel ->
-                                val estimatedTravelTime = if (selectedSort == PoiSortOption.AHEAD_ON_ROUTE && viewModel.distanceAlongRoute != null) travelTimeEstimationService.estimateTravelTime(
+                                val estimatedTravelTime = if (selectedSort == PoiSortOption.AHEAD_ON_ROUTE) travelTimeEstimationService.estimateTravelTime(
                                     routeElevationData = viewModel.sampledElevationData,
                                     startDistance = viewModel.distanceAlongRoute.toDouble(),
                                     endDistance = viewModel.distanceAlongRoute.toDouble() + ((distanceResult as? DistanceToPoiResult.AheadOnRouteDistance)?.distanceOnRoute ?: 0.0),
                                     totalWeight = (userProfile?.weight?.toDouble() ?: 70.0) + 10.0,
+                                    profileFtp = userProfile?.ftp?.toDouble(),
                                     lastHourAvgPower = averagePowerFlow,
                                     surfaceConditions = surfaceConditions ?: emptyList(),
                                     finalSegmentLength = (distanceResult as? DistanceToPoiResult.AheadOnRouteDistance)?.distanceFromPointOnRoute

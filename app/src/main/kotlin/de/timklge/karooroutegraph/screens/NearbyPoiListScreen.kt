@@ -234,6 +234,7 @@ fun NearbyPoiListScreen() {
                         startDistance = distanceAlongRoute?.toDouble() ?: 0.0,
                         endDistance = (distanceAlongRoute?.toDouble() ?: 0.0) +
                             ((it as? DistanceToPoiResult.AheadOnRouteDistance)?.distanceOnRoute ?: 0.0),
+                        profileFtp = userProfile?.ftp?.toDouble(),
                         totalWeight = weight,
                         lastHourAvgPower = power,
                         surfaceConditions = surface,

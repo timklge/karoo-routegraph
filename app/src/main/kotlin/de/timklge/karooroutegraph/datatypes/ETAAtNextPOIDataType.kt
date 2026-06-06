@@ -36,20 +36,20 @@ class ETAAtNextPOIDataType(
 ) : DataTypeImpl("karoo-routegraph", "etapoi") {
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun startStream(emitter: Emitter<StreamState>) {
-        data class StreamState(val state: RouteGraphViewModel, val riderWeight: Float, val powerPerHour: Double?, val surfaceConditions: List<SurfaceConditionSegment>?)
+        data class StreamState(val state: RouteGraphViewModel, val userProfile: UserProfile, val powerPerHour: Double?, val surfaceConditions: List<SurfaceConditionSegment>?)
 
         val job = CoroutineScope(Dispatchers.Default).launch {
             val averagePowerFlow = streamPowerPerHour( karooSystemProvider)
             val surfaceConditionFlow = surfaceConditionRetrievalService.flow
 
             combine(viewModelProvider.viewModelFlow, karooSystemProvider.stream<UserProfile>(), averagePowerFlow, surfaceConditionFlow) { viewModel, userProfile, averagePower, surfaceConditions ->
-                StreamState(viewModel, userProfile.weight, averagePower, surfaceConditions)
-            }.throttle(20_000L).collect { (state, riderWeight, averagePower, surfaceConditions) ->
-                val currentDistanceAlongRoute = state.distanceAlongRoute?.toDouble()
-                val totalWeight = riderWeight + 10.0f
+                StreamState(viewModel, userProfile, averagePower, surfaceConditions)
+            }.throttle(20_000L).collect { (state, userProfile, averagePower, surfaceConditions) ->
+                val currentDistanceAlongRoute = state.distanceAlongRoute.toDouble()
+                val totalWeight = userProfile.weight + 10.0f
                 val routeDistance = state.routeDistance?.toDouble()
 
-                if (currentDistanceAlongRoute == null || routeDistance == null){
+                if (routeDistance == null){
                     emitter.onNext(io.hammerhead.karooext.models.StreamState.NotAvailable)
                     return@collect
                 }
@@ -77,6 +77,7 @@ class ETAAtNextPOIDataType(
                     startDistance = currentDistanceAlongRoute,
                     endDistance = targetDistanceFromRouteStart,
                     totalWeight = totalWeight.toDouble(),
+                    profileFtp = userProfile.ftp.toDouble(),
                     lastHourAvgPower = averagePower,
                     surfaceConditions = surfaceConditions ?: emptyList(),
                     finalSegmentLength = targetFinalSegmentLength
