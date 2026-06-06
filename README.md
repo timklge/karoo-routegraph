@@ -95,12 +95,6 @@ In the settings menu, you can also select POI categories that should automatical
 
 ![POI navigation](poinav.png)
 
-### Experimental: Traffic incidents
-
-You can input a HERE Maps API key in the settings to enable traffic incident reporting. The extension will then
-fetch traffic incidents along the route and display them on the minimap, the route graphs and the main karoo map.
-You will also get a notification when loading a route if there are traffic incidents along the route.
-
 ## Credits
 
 - OpenStreetMap Data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors (<a href="https://opendatacommons.org/licenses/odbl/index.html">ODbL</a>), <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, <a href="https://openstreetmap.org/fixthemap">participate/fix mistakes</a>
@@ -110,5 +104,4 @@ You will also get a notification when loading a route if there are traffic incid
   - Offline POIs are downloaded from https://routegraph.timklge.de
 - Icons are from [boxicons.com](https://boxicons.com) ([MIT-licensed](icon_credits.txt))
 - Uses [karoo-ext](https://github.com/hammerheadnav/karoo-ext) (Apache2-licensed)
-- Uses Flexpolyline encoder / decoder by HERE Europe B. V. (MIT-licensed)
 - Uses the [ANTLR grammar](https://github.com/opening-hours/opening_hours_grammar) for OSM opening hours definitions (MIT-licensed)
