@@ -85,13 +85,16 @@ import io.hammerhead.karooext.models.Symbol
 import io.hammerhead.karooext.models.UserProfile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import java.util.Date
+import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.time.Duration
 import kotlin.time.DurationUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -105,6 +108,7 @@ fun NearbyPoiListScreen() {
     var lastErrorMessage by remember { mutableStateOf<String?>(null) }
     var showSortDialog by remember { mutableStateOf(false) }
     var selectedSort by remember { mutableStateOf(PoiSortOption.LINEAR_DISTANCE) }
+    var refreshJob by remember { mutableStateOf<Job?>(null) }
     val context = LocalContext.current
 
     val karooSystemServiceProvider = koinInject<KarooSystemServiceProvider>()
@@ -151,6 +155,9 @@ fun NearbyPoiListScreen() {
     val viewModel by routeGraphViewModelProvider.viewModelFlow.collectAsStateWithLifecycle(null)
     val temporaryPois by karooSystemServiceProvider.streamTemporaryPOIs().collectAsStateWithLifecycle(RouteGraphTemporaryPOIs())
     var nearestPointsOnRouteToFoundPois by remember { mutableStateOf<Map<POI, List<NearestPoint>>>(mapOf()) }
+    var travelTimesByPoi by remember { mutableStateOf<Map<Symbol.POI, Duration?>>(emptyMap()) }
+    var lastTravelTimeInputs by remember { mutableStateOf<List<Any?>?>(null) }
+    var lastComputedDistance by remember { mutableStateOf<Float?>(null) }
     val userProfile by karooSystemServiceProvider.stream<UserProfile>().collectAsStateWithLifecycle(null)
 
     LaunchedEffect(viewModel?.knownRoute, pois) {
@@ -159,6 +166,83 @@ fun NearbyPoiListScreen() {
         if (route != null) {
             val distances = calculatePoiDistances(route, pois.map { POI(it.poi) }, maxDistanceFromRoute)
             nearestPointsOnRouteToFoundPois = distances
+        }
+    }
+
+    // Compute travel times for every POI off the main thread
+    LaunchedEffect(
+        mappedPois,
+        nearestPointsOnRouteToFoundPois,
+        viewModel?.sampledElevationData,
+        viewModel?.distanceAlongRoute,
+        viewModel?.sampledElevationData?.interval,
+        userProfile?.weight,
+        averagePowerFlow,
+        surfaceConditions,
+        selectedSort
+    ) {
+        if (selectedSort != PoiSortOption.AHEAD_ON_ROUTE) {
+            travelTimesByPoi = emptyMap()
+            lastTravelTimeInputs = null
+            lastComputedDistance = null
+            return@LaunchedEffect
+        }
+
+        val sampledElevation = viewModel?.sampledElevationData
+        val distanceAlongRoute = viewModel?.distanceAlongRoute
+        val weight = (userProfile?.weight?.toDouble() ?: 70.0) + 10.0
+        val power = averagePowerFlow
+        val surface = surfaceConditions ?: emptyList()
+        val nearestPoints = nearestPointsOnRouteToFoundPois
+        val pois = mappedPois
+        val sort = selectedSort
+        val position = currentPosition
+
+        val nonDistanceInputs = listOf(
+            pois, nearestPoints, sampledElevation, weight, power, surface, sort
+        )
+        val distanceMovedLessThanThreshold = distanceAlongRoute != null &&
+            lastComputedDistance != null &&
+            abs(distanceAlongRoute - lastComputedDistance!!) < 500f
+
+        if (lastTravelTimeInputs == nonDistanceInputs && distanceMovedLessThanThreshold) {
+            return@LaunchedEffect
+        }
+
+        lastTravelTimeInputs = nonDistanceInputs
+        lastComputedDistance = distanceAlongRoute
+
+        travelTimesByPoi = kotlinx.coroutines.withContext(Dispatchers.Default) {
+            pois.associate { symbol ->
+                val poiWrapper = POI(symbol.poi)
+                val poiNearestPoints = nearestPoints[poiWrapper]
+                    ?: nearestPoints.entries.find { it.key.symbol == symbol.poi }?.value
+
+                val nearestPointAhead = poiNearestPoints?.sortedBy { it.distanceFromRouteStart }
+                    ?.firstOrNull { it.distanceFromRouteStart >= (distanceAlongRoute ?: 0.0f) }
+
+                val result = if (distanceAlongRoute != null) {
+                    distanceToPoi(
+                        symbol.poi, sampledElevation, nearestPoints, position, sort,
+                        distanceAlongRoute, nearestPointAhead
+                    )
+                } else null
+
+                val travelTime = result?.let {
+                    travelTimeEstimationService.estimateTravelTime(
+                        routeElevationData = sampledElevation,
+                        startDistance = distanceAlongRoute?.toDouble() ?: 0.0,
+                        endDistance = (distanceAlongRoute?.toDouble() ?: 0.0) +
+                            ((it as? DistanceToPoiResult.AheadOnRouteDistance)?.distanceOnRoute ?: 0.0),
+                        totalWeight = weight,
+                        lastHourAvgPower = power,
+                        surfaceConditions = surface,
+                        finalSegmentLength = (it as? DistanceToPoiResult.AheadOnRouteDistance)?.distanceFromPointOnRoute
+                    )
+                }
+
+                symbol.poi to travelTime
+            }
         }
     }
 
@@ -200,16 +284,21 @@ fun NearbyPoiListScreen() {
     }
 
     fun onRefresh() {
-        if (isRefreshing) return // Prevent multiple refreshes
-
+        refreshJob?.cancel()
         isRefreshing = true
         lastErrorMessage = null // Reset error message
 
-        coroutineScope.launch {
+        val categoriesForSearch = selectedCategories
+        val sortForSearch = selectedSort
+        val positionForSearch = currentPosition
+        val viewModelForSearch = viewModel
+        val maxDistanceForSearch = maxDistanceFromRoute
+
+        refreshJob = coroutineScope.launch {
             var nearbyPoiProvider: NearbyPOIProvider = overpassNearbyPOIProvider
 
             try {
-                val currentPos = currentPosition
+                val currentPos = positionForSearch
                 if (currentPos == null) {
                     lastErrorMessage = errorNoPosition
                     delay(1_000)
@@ -218,10 +307,10 @@ fun NearbyPoiListScreen() {
                 }
 
                 val onlyTownOrVillagesSelected =
-                    selectedCategories.all { it == NearbyPoiCategory.TOWN || it == NearbyPoiCategory.VILLAGE }
+                    categoriesForSearch.all { it == NearbyPoiCategory.TOWN || it == NearbyPoiCategory.VILLAGE }
 
-                val route = viewModel?.knownRoute
-                if (selectedSort != PoiSortOption.LINEAR_DISTANCE && route == null) {
+                val route = viewModelForSearch?.knownRoute
+                if (sortForSearch != PoiSortOption.LINEAR_DISTANCE && route == null) {
                     lastErrorMessage = errorNoRoute
                     delay(1_000)
                     isRefreshing = false
@@ -246,7 +335,7 @@ fun NearbyPoiListScreen() {
                     }
                     val limit = 30
 
-                    if (selectedSort == PoiSortOption.LINEAR_DISTANCE) {
+                    if (sortForSearch == PoiSortOption.LINEAR_DISTANCE) {
                         val radiusSteps = if (onlyTownOrVillagesSelected) {
                             listOf(5_000, 10_000, 20_000, 50_000)
                         } else {
@@ -255,7 +344,7 @@ fun NearbyPoiListScreen() {
 
                         for (step in radiusSteps) {
                             val newResponse = nearbyPoiProvider.requestNearbyPOIs(
-                                selectedCategories.flatMap { it.osmTag }.distinct(),
+                                categoriesForSearch.flatMap { it.osmTag }.distinct(),
                                 points = listOf(currentPos),
                                 radius = step,
                                 limit = limit
@@ -269,12 +358,12 @@ fun NearbyPoiListScreen() {
                     } else {
                         val route = route ?: return@withContext
 
-                        val routeLength = viewModel?.routeDistance?.toDouble() ?: TurfMeasurement.length(route, TurfConstants.UNIT_METERS)
-                        val radius = if (onlyTownOrVillagesSelected) 5_000 else maxDistanceFromRoute.roundToInt()
+                        val routeLength = viewModelForSearch?.routeDistance?.toDouble() ?: TurfMeasurement.length(route, TurfConstants.UNIT_METERS)
+                        val radius = if (onlyTownOrVillagesSelected) 5_000 else maxDistanceForSearch.roundToInt()
                         val lookaheadDistance = if (hasOfflineFiles) routeLength else 50_000.0
 
                         val routeAhead = try {
-                            val startDistance = ((viewModel?.distanceAlongRoute?.toDouble()
+                            val startDistance = ((viewModelForSearch?.distanceAlongRoute?.toDouble()
                                 ?: 0.0) - 2_000).coerceAtLeast(0.0) // 2 km behind
                             val endDistance = (startDistance + lookaheadDistance).coerceAtMost(routeLength) // 50 km ahead
                             TurfMisc.lineSliceAlong(
@@ -289,7 +378,7 @@ fun NearbyPoiListScreen() {
                         }
 
                         overpassResponse = nearbyPoiProvider.requestNearbyPOIs(
-                            requestedTags = selectedCategories.flatMap { it.osmTag }.distinct(),
+                            requestedTags = categoriesForSearch.flatMap { it.osmTag }.distinct(),
                             points = routeAhead.coordinates(),
                             radius = radius,
                             limit = if (hasOfflineFiles) 200 else 100
@@ -537,17 +626,7 @@ fun NearbyPoiListScreen() {
 
                                         append(result?.formatDistance(LocalContext.current, isImperial) ?: "")
 
-                                        val estimatedTravelTime = result?.let {
-                                            travelTimeEstimationService.estimateTravelTime(
-                                                routeElevationData = viewModel?.sampledElevationData,
-                                                startDistance = viewModel?.distanceAlongRoute?.toDouble() ?: 0.0,
-                                                endDistance = (viewModel?.distanceAlongRoute?.toDouble() ?: 0.0) + ((result as? DistanceToPoiResult.AheadOnRouteDistance)?.distanceOnRoute ?: 0.0),
-                                                totalWeight = (userProfile?.weight?.toDouble() ?: 70.0) + 10.0,
-                                                lastHourAvgPower = averagePowerFlow,
-                                                surfaceConditions = surfaceConditions ?: emptyList(),
-                                                finalSegmentLength = (result as? DistanceToPoiResult.AheadOnRouteDistance)?.distanceFromPointOnRoute
-                                            )
-                                        }
+                                        val estimatedTravelTime = travelTimesByPoi[poi.poi]
                                         eta = System.currentTimeMillis() + (estimatedTravelTime?.toLong(DurationUnit.MILLISECONDS) ?: 0)
                                     }
 
