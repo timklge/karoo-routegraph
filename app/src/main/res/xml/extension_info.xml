@@ -62,4 +62,11 @@
         icon="@drawable/trip"
         typeId="poiButton" />
 
+    <DataType
+        description="@string/surfacetype_description"
+        displayName="@string/surfacetype"
+        graphical="true"
+        icon="@drawable/trip"
+        typeId="surfacetype" />
+
 </ExtensionInfo>

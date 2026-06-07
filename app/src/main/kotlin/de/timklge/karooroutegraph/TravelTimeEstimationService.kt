@@ -16,7 +16,9 @@ class TravelTimeEstimationService {
         const val CDA = 0.45
         /** Rolling resistance coefficient on smooth pavement */
         const val CRR_PAVEMENT = 0.005
-        /** Rolling resistance coefficient on gravel / compacted surface */
+        /** Rolling resistance coefficient on compacted (sett / paving stones / brick) surface */
+        const val CRR_COMPACTED = 0.010
+        /** Rolling resistance coefficient on gravel / dirt surface */
         const val CRR_GRAVEL = 0.015
         /** Rolling resistance coefficient on loose / off-road surface */
         const val CRR_LOOSE = 0.050
@@ -44,6 +46,7 @@ class TravelTimeEstimationService {
         for (condition in surfaceConditions) {
             if (condition.startMeters < segEnd && condition.endMeters > segStart) {
                 val crrForCondition = when (condition.condition) {
+                    SurfaceConditionRetrievalService.SurfaceCondition.COMPACTED -> CRR_COMPACTED
                     SurfaceConditionRetrievalService.SurfaceCondition.GRAVEL -> CRR_GRAVEL
                     SurfaceConditionRetrievalService.SurfaceCondition.LOOSE  -> CRR_LOOSE
                 }

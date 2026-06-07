@@ -38,6 +38,12 @@ fun isNightMode(applicationContext: Context): Boolean {
 
 // Surface condition paints with hatched patterns
 fun getSurfaceConditionPaints(applicationContext: Context, isNightMode: Boolean) = mapOf(
+    SurfaceConditionRetrievalService.SurfaceCondition.COMPACTED to Paint().apply {
+        style = Paint.Style.FILL
+        alpha = 255 / 3
+        val patternBitmap = BitmapFactory.decodeResource(applicationContext.resources, if (isNightMode) R.drawable.cross_pattern_white else R.drawable.cross_pattern)
+        shader = android.graphics.BitmapShader(patternBitmap, android.graphics.Shader.TileMode.REPEAT, android.graphics.Shader.TileMode.REPEAT)
+    },
     SurfaceConditionRetrievalService.SurfaceCondition.GRAVEL to Paint().apply {
         style = Paint.Style.FILL
         alpha = 255 / 3
@@ -53,6 +59,12 @@ fun getSurfaceConditionPaints(applicationContext: Context, isNightMode: Boolean)
 )
 
 fun getSurfaceConditionStrokePaints(applicationContext: Context) = mapOf(
+    SurfaceConditionRetrievalService.SurfaceCondition.COMPACTED to Paint().apply {
+        style = Paint.Style.STROKE
+        alpha = 255
+        val patternBitmap = BitmapFactory.decodeResource(applicationContext.resources, R.drawable.cross_pattern_small)
+        shader = android.graphics.BitmapShader(patternBitmap, android.graphics.Shader.TileMode.REPEAT, android.graphics.Shader.TileMode.REPEAT)
+    },
     SurfaceConditionRetrievalService.SurfaceCondition.GRAVEL to Paint().apply {
         style = Paint.Style.STROKE
         alpha = 255
@@ -86,9 +98,15 @@ class SurfaceConditionRetrievalService(
         val boundingBox: BoundingBox,
     )
 
-    enum class SurfaceCondition(val redColorFactor: Float, val strokeThickness: Float) {
-        GRAVEL(redColorFactor = 0f, strokeThickness = 8f),
-        LOOSE(redColorFactor = 1f, strokeThickness = 10f),
+    enum class SurfaceCondition(val redColorFactor: Float, val strokeThickness: Float, val classificationValue: Int) {
+        COMPACTED(redColorFactor = 0f, strokeThickness = 6f, classificationValue = 1),
+        GRAVEL(redColorFactor = 0f, strokeThickness = 8f, classificationValue = 2),
+        LOOSE(redColorFactor = 1f, strokeThickness = 10f, classificationValue = 3);
+
+        companion object {
+            /** Streamable classification for "paved or unknown" surfaces (no segment covering the rider). */
+            const val PAVED_CLASSIFICATION_VALUE = 0
+        }
     }
 
     data class SurfaceConditionSegment(
@@ -174,16 +192,24 @@ class SurfaceConditionRetrievalService(
             }
         }
     }
+    val compactedSurfaces = setOf(
+        "compacted", "paving_stones", "sett", "cobblestone",
+        "unhewn_cobblestone", "pebblestone", "bricks", "brick"
+    )
     val gravelSurfaces = setOf(
-        "unpaved", "dirt", "ground", "gravel", "fine_gravel", "compacted",
-        "pebblestone", "cobblestone", "sett", "unhewn_cobblestone",
-        "rock", "rocks", "stone", "grass_paver", "clay", "woodchips", "salt", "wood"
+        "unpaved", "dirt", "ground", "gravel", "fine_gravel",
+        "rock", "rocks", "stone", "grass_paver", "clay",
+        "woodchips", "salt", "wood"
     )
     val looseSurfaces = setOf("grass", "sand", "mud", "snow", "ice")
 
     private fun getSurfaceConditionFromTags(tags: List<org.mapsforge.core.model.Tag>): SurfaceCondition? {
         val surfaceTag = tags.find { it.key.equals("surface", ignoreCase = true) }?.value?.lowercase()
         val trackTypeTag = tags.find { it.key.equals("tracktype", ignoreCase = true) }?.value?.lowercase()
+
+        if (trackTypeTag == "grade1" || surfaceTag in compactedSurfaces) {
+            return SurfaceCondition.COMPACTED
+        }
 
         if (trackTypeTag in setOf("grade2", "grade3") || surfaceTag in gravelSurfaces) {
             return SurfaceCondition.GRAVEL
