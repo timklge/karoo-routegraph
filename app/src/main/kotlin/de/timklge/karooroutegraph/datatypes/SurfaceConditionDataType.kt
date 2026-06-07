@@ -135,7 +135,7 @@ class SurfaceConditionDataType(
                         val textAlign = when (config.alignment) {
                             ViewConfig.Alignment.LEFT -> androidx.glance.text.TextAlign.Left
                             ViewConfig.Alignment.CENTER -> androidx.glance.text.TextAlign.Center
-                            ViewConfig.Alignment.RIGHT -> androidx.glance.text.TextAlign.Center
+                            ViewConfig.Alignment.RIGHT -> androidx.glance.text.TextAlign.Right
                         }
                         Text(label, GlanceModifier.fillMaxWidth(), TextStyle(ColorProvider(androidx.compose.ui.graphics.Color.Black, androidx.compose.ui.graphics.Color.White), fontSize = 24.sp, textAlign = textAlign, fontFamily = androidx.glance.text.FontFamily.Monospace))
                     }
