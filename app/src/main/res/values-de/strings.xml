@@ -19,7 +19,7 @@
     <string name="minimap_night_mode">Dunkelmodus bei Nacht</string>
     <string name="poi_button">POI-Knopf</string>
     <string name="poi_button_description">Knopf zum schnellen Öffnen der POI-Liste</string>
-    <string name="surfacetype">Oberflächentyp</string>
+    <string name="surfacetype">Oberfläche</string>
     <string name="surfacetype_description">Aktueller Oberflächentyp</string>
     <string name="surfacetype_asphalt">Asphalt</string>
     <string name="surfacetype_compacted">Verdichtet</string>
