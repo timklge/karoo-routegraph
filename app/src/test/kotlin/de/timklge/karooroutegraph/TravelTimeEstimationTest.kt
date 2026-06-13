@@ -141,18 +141,6 @@ class TravelTimeEstimationTest {
     }
 
     @Test
-    fun `compacted surface is between pavement and gravel`() {
-        val route = flatRoute(5000f)
-        val compacted = surfaceSegment(0.0, 5000.0, SurfaceConditionRetrievalService.SurfaceCondition.COMPACTED)
-        val gravel    = surfaceSegment(0.0, 5000.0, SurfaceConditionRetrievalService.SurfaceCondition.GRAVEL)
-        val tPave      = est.estimateTravelTime(route, 0.0, 5000.0, 80.0)
-        val tCompacted = est.estimateTravelTime(route, 0.0, 5000.0, 80.0, surfaceConditions = listOf(compacted))
-        val tGravel    = est.estimateTravelTime(route, 0.0, 5000.0, 80.0, surfaceConditions = listOf(gravel))
-        assertTrue(tCompacted > tPave, "Compacted ($tCompacted) should be slower than pavement ($tPave)")
-        assertTrue(tGravel > tCompacted, "Gravel ($tGravel) should be slower than compacted ($tCompacted)")
-    }
-
-    @Test
     fun `loose surface is slower than gravel`() {
         val route  = flatRoute(5000f)
         val gravel = surfaceSegment(0.0, 5000.0, SurfaceConditionRetrievalService.SurfaceCondition.GRAVEL)

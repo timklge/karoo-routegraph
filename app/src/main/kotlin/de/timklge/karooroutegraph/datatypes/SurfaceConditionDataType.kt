@@ -2,7 +2,6 @@ package de.timklge.karooroutegraph.datatypes
 
 import android.content.Context
 import android.util.Log
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceModifier
@@ -44,9 +43,8 @@ import kotlinx.coroutines.launch
 /**
  * Streams the current route surface:
  *   0 = paved / unknown
- *   1 = compacted (sett, paving stones, bricks, …)
- *   2 = gravel / dirt
- *   3 = loose (sand, grass, mud, snow, ice)
+ *   1 = gravel / dirt
+ *   2 = loose (sand, grass, mud, snow, ice)
  */
 @OptIn(ExperimentalGlanceRemoteViewsApi::class)
 class SurfaceConditionDataType(
@@ -169,8 +167,7 @@ class SurfaceConditionDataType(
                 }
                 ?.condition
 
-            return currentCondition?.classificationValue
-                ?: SurfaceCondition.PAVED_CLASSIFICATION_VALUE
+            return currentCondition?.classificationValue ?: 0
         }
 
         /**
@@ -178,7 +175,6 @@ class SurfaceConditionDataType(
          * Exposed for unit-testing.
          */
         fun getSurfaceTypeLabelRes(classification: Int): Int = when (classification) {
-            SurfaceCondition.COMPACTED.classificationValue -> R.string.surfacetype_compacted
             SurfaceCondition.GRAVEL.classificationValue -> R.string.surfacetype_gravel
             SurfaceCondition.LOOSE.classificationValue -> R.string.surfacetype_loose
             else -> R.string.surfacetype_asphalt

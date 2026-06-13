@@ -21,7 +21,6 @@
     <string name="surfacetype">Surface</string>
     <string name="surfacetype_description">Current road surface</string>
     <string name="surfacetype_asphalt">Asphalt</string>
-    <string name="surfacetype_compacted">Compacted</string>
     <string name="surfacetype_gravel">Gravel</string>
     <string name="surfacetype_loose">Loose</string>
     <string name="no_route">No route loaded</string>

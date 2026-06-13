@@ -74,7 +74,7 @@ class SurfaceConditionDataTypeTest {
     }
 
     @Test
-    fun `returns gravel (2) when rider is inside a gravel segment`() {
+    fun `returns gravel (1) when rider is inside a gravel segment`() {
         val conditions = listOf(
             segment(1_000.0, 2_000.0, SurfaceCondition.GRAVEL),
             segment(5_000.0, 6_000.0, SurfaceCondition.LOOSE),
@@ -86,11 +86,11 @@ class SurfaceConditionDataTypeTest {
                 surfaceConditions = conditions
             )
         )
-        assertEquals(2, result)
+        assertEquals(1, result)
     }
 
     @Test
-    fun `returns loose (3) when rider is inside a loose segment`() {
+    fun `returns loose (2) when rider is inside a loose segment`() {
         val conditions = listOf(
             segment(1_000.0, 2_000.0, SurfaceCondition.GRAVEL),
             segment(5_000.0, 6_000.0, SurfaceCondition.LOOSE),
@@ -102,22 +102,7 @@ class SurfaceConditionDataTypeTest {
                 surfaceConditions = conditions
             )
         )
-        assertEquals(3, result)
-    }
-
-    @Test
-    fun `returns compacted (1) when rider is inside a compacted segment`() {
-        val conditions = listOf(
-            segment(1_000.0, 2_000.0, SurfaceCondition.COMPACTED),
-        )
-        val result = SurfaceConditionDataType.classifySurface(
-            StreamData(
-                distanceAlongRoute = 1_500.0,
-                routeDistance = 10_000.0,
-                surfaceConditions = conditions
-            )
-        )
-        assertEquals(1, result)
+        assertEquals(2, result)
     }
 
     @Test
@@ -132,7 +117,7 @@ class SurfaceConditionDataTypeTest {
                 surfaceConditions = conditions
             )
         )
-        assertEquals(2, result)
+        assertEquals(1, result)
     }
 
     @Test
@@ -148,14 +133,13 @@ class SurfaceConditionDataTypeTest {
                 surfaceConditions = conditions
             )
         )
-        assertEquals(3, result)
+        assertEquals(2, result)
     }
 
     @Test
     fun `classification value matches enum classificationValue property`() {
-        assertEquals(1, SurfaceCondition.COMPACTED.classificationValue)
-        assertEquals(2, SurfaceCondition.GRAVEL.classificationValue)
-        assertEquals(3, SurfaceCondition.LOOSE.classificationValue)
+        assertEquals(1, SurfaceCondition.GRAVEL.classificationValue)
+        assertEquals(2, SurfaceCondition.LOOSE.classificationValue)
     }
 
     @Test
@@ -165,19 +149,13 @@ class SurfaceConditionDataTypeTest {
     }
 
     @Test
-    fun `getSurfaceTypeLabelRes maps 1 to compacted string`() {
-        assertEquals(de.timklge.karooroutegraph.R.string.surfacetype_compacted,
-            SurfaceConditionDataType.getSurfaceTypeLabelRes(SurfaceCondition.COMPACTED.classificationValue))
-    }
-
-    @Test
-    fun `getSurfaceTypeLabelRes maps 2 to gravel string`() {
+    fun `getSurfaceTypeLabelRes maps 1 to gravel string`() {
         assertEquals(de.timklge.karooroutegraph.R.string.surfacetype_gravel,
             SurfaceConditionDataType.getSurfaceTypeLabelRes(SurfaceCondition.GRAVEL.classificationValue))
     }
 
     @Test
-    fun `getSurfaceTypeLabelRes maps 3 to loose string`() {
+    fun `getSurfaceTypeLabelRes maps 2 to loose string`() {
         assertEquals(de.timklge.karooroutegraph.R.string.surfacetype_loose,
             SurfaceConditionDataType.getSurfaceTypeLabelRes(SurfaceCondition.LOOSE.classificationValue))
     }

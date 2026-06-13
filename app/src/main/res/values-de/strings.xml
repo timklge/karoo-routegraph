@@ -22,7 +22,6 @@
     <string name="surfacetype">Oberfläche</string>
     <string name="surfacetype_description">Aktueller Oberflächentyp</string>
     <string name="surfacetype_asphalt">Asphalt</string>
-    <string name="surfacetype_compacted">Verdichtet</string>
     <string name="surfacetype_gravel">Schotter</string>
     <string name="surfacetype_loose">Lose</string>
     <string name="shift_for_radar_swim_lane">Verschiebung für Radar</string>

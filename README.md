@@ -102,9 +102,8 @@ Use data type id `TYPE_EXT::karoo-routegraph::surfacetype`.
 
 - The `surfacetype` datatype contains a single field with the classification of the current route segment's surface as determined from the Karoo's offline map data:
   - `0.0` = paved / asphalt (also used as fallback when the segment surface is unknown)
-  - `1.0` = compacted (sett, paving stones, bricks etc.)
-  - `2.0` = gravel / dirt
-  - `3.0` = loose (sand, grass, mud, snow, ice)
+  - `1.0` = gravel / dirt
+  - `2.0` = loose (sand, grass, mud, snow, ice)
 - The stream emits `NotAvailable` when no route is loaded or the rider position along the route is unknown.
 - Requires the user to have enabled surface condition display in the routegraph extension settings (so that the map files have been read and surface segments have been calculated).
 
