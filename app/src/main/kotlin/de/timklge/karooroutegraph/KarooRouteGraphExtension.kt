@@ -10,6 +10,7 @@ import de.timklge.karooroutegraph.datatypes.ETADataType
 import de.timklge.karooroutegraph.datatypes.ElevationToNextPOIDataType
 import de.timklge.karooroutegraph.datatypes.PoiButtonDataType
 import de.timklge.karooroutegraph.datatypes.RouteGraphDataType
+import de.timklge.karooroutegraph.datatypes.SurfaceConditionDataType
 import de.timklge.karooroutegraph.datatypes.VerticalRouteGraphDataType
 import de.timklge.karooroutegraph.datatypes.minimap.MinimapDataType
 import de.timklge.karooroutegraph.datatypes.minimap.MinimapViewModelProvider
@@ -70,7 +71,8 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
             MinimapDataType(karooSystem.karooSystemService, routeGraphViewModelProvider, displayViewModelProvider, minimapViewModelProvider, tileDownloadService, locationViewModelProvider, applicationContext, surfaceConditionRetrievalService),
             PoiButtonDataType(karooSystem.karooSystemService, applicationContext),
             ETAAtNextPOIDataType(karooSystem, routeGraphViewModelProvider, travelTimeEstimationService, surfaceConditionRetrievalService),
-            ETADataType(karooSystem, routeGraphViewModelProvider, travelTimeEstimationService, surfaceConditionRetrievalService)
+            ETADataType(karooSystem, routeGraphViewModelProvider, travelTimeEstimationService, surfaceConditionRetrievalService),
+            SurfaceConditionDataType(karooSystem, routeGraphViewModelProvider, surfaceConditionRetrievalService)
         )
     }
 

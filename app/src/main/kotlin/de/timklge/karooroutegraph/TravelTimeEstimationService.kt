@@ -16,7 +16,7 @@ class TravelTimeEstimationService {
         const val CDA = 0.45
         /** Rolling resistance coefficient on smooth pavement */
         const val CRR_PAVEMENT = 0.005
-        /** Rolling resistance coefficient on gravel / compacted surface */
+        /** Rolling resistance coefficient on gravel / dirt surface */
         const val CRR_GRAVEL = 0.015
         /** Rolling resistance coefficient on loose / off-road surface */
         const val CRR_LOOSE = 0.050

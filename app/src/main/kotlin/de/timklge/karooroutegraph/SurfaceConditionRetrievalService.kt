@@ -86,9 +86,9 @@ class SurfaceConditionRetrievalService(
         val boundingBox: BoundingBox,
     )
 
-    enum class SurfaceCondition(val redColorFactor: Float, val strokeThickness: Float) {
-        GRAVEL(redColorFactor = 0f, strokeThickness = 8f),
-        LOOSE(redColorFactor = 1f, strokeThickness = 10f),
+    enum class SurfaceCondition(val redColorFactor: Float, val strokeThickness: Float, val classificationValue: Int) {
+        GRAVEL(redColorFactor = 0f, strokeThickness = 8f, classificationValue = 1),
+        LOOSE(redColorFactor = 1f, strokeThickness = 10f, classificationValue = 2),
     }
 
     data class SurfaceConditionSegment(

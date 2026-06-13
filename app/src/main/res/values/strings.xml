@@ -18,6 +18,11 @@
     <string name="minimap_night_mode">Dark mode at night</string>
     <string name="poi_button">POI Button</string>
     <string name="poi_button_description">Button to quickly open the POI list</string>
+    <string name="surfacetype">Surface</string>
+    <string name="surfacetype_description">Current road surface</string>
+    <string name="surfacetype_asphalt">Asphalt</string>
+    <string name="surfacetype_gravel">Gravel</string>
+    <string name="surfacetype_loose">Loose</string>
     <string name="no_route">No route loaded</string>
 
     <!-- MainScreen strings -->
