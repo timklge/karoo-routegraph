@@ -85,13 +85,13 @@ Uphill chevrons use the known color scheme of the karoo (green-yellow-red for in
 
 During riding, you can open a POI managment menu by clicking the button shown in the top right corner of any routegraph elevation profile datafield. This will open a menu with three pages:
 
-- On the *Custom* page, your global POIs and the POIs of the currently loaded route are shown, including distance to the POI. You can toggle the display to show the remaining distance and remaining elevation climbing along the route instead of straight-line distance.
+- On the *Custom* page, your global POIs and the POIs of the currently loaded route are shown. These include POIs created on the HH dashboard and imported via Strava / RWGPS etc. for the current route. You can toggle the display to show the remaining distance and remaining elevation climbing along the route instead of straight-line distance.
 - On the *Nearby* page, you can look up new POIs of selected categories near you (e. g. supermarkets, shelters, bike shops). You can download POIs for regions in the settings menu, so that you can look up POIs without an active internet connection during riding.
 - On the *Search* page, you can look up POIs by typing in a search query (e. g. "Brandenburg Gate" or a postal address). This requires an active internet connection.
 
-On all pages, you can use the dot menu for each POI to initiate navigation to that POI. For POIs looked up on the Nearby or Search pages, you can also choose to add that POI to the elevation profiles (and the main karoo map).
+On all pages, you can use the dot menu for each POI to initiate navigation to that POI. For POIs looked up on the Nearby or Search pages, you can also choose to add that POI to the *Custom* page. They will then also appear in the route graph data fields (elevation profiles and minimap) as well as the main karoo map.
 
-In the settings menu, you can also select POI categories that should automatically be added to the map and elevation profiles when loading up a route.
+Furthermore, in the settings menu, you can select POI categories that should automatically be added to the map and elevation profiles when loading up a route.
 
 ![POI navigation](poinav.png)
 
