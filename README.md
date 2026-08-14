@@ -12,10 +12,7 @@ climbs and refueling opportunities so that you can pace yourself accordingly.
 
 Compatible with Karoo 2 and Karoo 3 devices.
 
-<img width="200" height="333" alt="Minimap" src="minimap.png" />
-<img width="200" height="333" alt="POI navigation" src="poinav.png" />
-<img width="200" height="333" alt="Vertical Route Graph" src="vertical_routegraph.png" />
-<img width="200" height="333" alt="Surface conditions" src="routegraph_surface_conditions.png" />
+<img width="200" height="333" alt="Minimap" src="minimap.png" /> <img width="200" height="333" alt="POI navigation" src="poinav.png" /> <img width="200" height="333" alt="Vertical Route Graph" src="vertical_routegraph.png" /> <img width="200" height="333" alt="Surface conditions" src="routegraph_surface_conditions.png" />
 
 ## Installation
 
@@ -93,10 +90,7 @@ On all pages, you can use the dot menu for each POI to initiate navigation to th
 
 Furthermore, in the settings menu, you can select POI categories that should automatically be added to the map and elevation profiles when loading up a route.
 
-<img width="200" height="333" alt="POI navigation" src="poinav.png" />
-<img width="200" height="333" alt="POI download" src="poidl.png" />
-<img width="200" height="333" alt="POI settings" src="poisettings.png" />
-<img width="200" height="333" alt="POI categories" src="poicategories.png" />
+<img width="200" height="333" alt="POI navigation" src="poinav.png" /> <img width="200" height="333" alt="POI download" src="poidl.png" /> <img width="200" height="333" alt="POI settings" src="poisettings.png" /> <img width="200" height="333" alt="POI categories" src="poicategories.png" />
 
 ## Extension Developers: Surface Type Data Type
 
