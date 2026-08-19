@@ -283,7 +283,7 @@ fun CustomPoiListScreen() {
                     Text(
                         text = displayName,
                         style = MaterialTheme.typography.bodyLarge,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
 
