@@ -40,8 +40,11 @@
     <string name="surfacetype_asphalt">Asphalt</string>
     <string name="surfacetype_gravel">Schotter</string>
     <string name="surfacetype_loose">Lose</string>
+    <string name="gravelremaining">Schotter verbleibend</string>
+    <string name="gravelremaining_description">Verbleibende Distanz auf unbefestigten Oberflächen</string>
     <string name="shift_for_radar_swim_lane">Verschiebung für Radar</string>
     <string name="no_route">Keine Route geladen</string>
+    <string name="no_permissions">Keine Berechtigungen</string>
     <string name="show_eta_on_vertical_route_graph">Ankunftszeit auf vertikalem Profil anzeigen</string>
     <string name="show_remaining_elevation_on_vertical_route_graph">Verbleibende Steigung auf vertikalem Profil anzeigen</string>
     <string name="show_remaining_distance_on_vertical_route_graph">Verbleibende Strecke auf vertikalem Profil anzeigen</string>

@@ -85,4 +85,11 @@
         icon="@drawable/trip"
         typeId="surfacetype" />
 
+    <DataType
+        description="@string/gravelremaining_description"
+        displayName="@string/gravelremaining"
+        graphical="false"
+        icon="@drawable/trip"
+        typeId="gravelremaining" />
+
 </ExtensionInfo>

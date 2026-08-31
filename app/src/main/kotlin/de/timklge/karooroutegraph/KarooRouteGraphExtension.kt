@@ -23,6 +23,7 @@ import com.mapbox.turf.TurfMeasurement
 import de.timklge.karooroutegraph.datatypes.DistanceToNextPOIDataType
 import de.timklge.karooroutegraph.datatypes.ETAAtNextPOIDataType
 import de.timklge.karooroutegraph.datatypes.ETADataType
+import de.timklge.karooroutegraph.datatypes.GravelRemainingDataType
 import de.timklge.karooroutegraph.datatypes.ElevationToNextPOIDataType
 import de.timklge.karooroutegraph.datatypes.PoiButtonDataType
 import de.timklge.karooroutegraph.datatypes.RouteGraphDataType
@@ -88,7 +89,8 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
             PoiButtonDataType(karooSystem.karooSystemService, applicationContext),
             ETAAtNextPOIDataType(karooSystem, routeGraphViewModelProvider, travelTimeEstimationService, surfaceConditionRetrievalService),
             ETADataType(karooSystem, routeGraphViewModelProvider, travelTimeEstimationService, surfaceConditionRetrievalService),
-            SurfaceConditionDataType(karooSystem, routeGraphViewModelProvider, surfaceConditionRetrievalService)
+            SurfaceConditionDataType(karooSystem, routeGraphViewModelProvider, surfaceConditionRetrievalService),
+            GravelRemainingDataType(routeGraphViewModelProvider, surfaceConditionRetrievalService)
         )
     }
 
