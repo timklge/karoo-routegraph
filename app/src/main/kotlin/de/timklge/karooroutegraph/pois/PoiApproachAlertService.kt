@@ -18,7 +18,11 @@ package de.timklge.karooroutegraph.pois
 
 import android.content.Context
 import android.content.Intent
+import android.media.MediaPlayer
+import android.speech.tts.TextToSpeech
+import android.util.Log
 import com.mapbox.geojson.Point
+import de.timklge.karooroutegraph.KarooRouteGraphExtension
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.LocationViewModelProvider
 import de.timklge.karooroutegraph.R
@@ -42,6 +46,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import java.util.UUID
 import kotlin.collections.filter
 import kotlin.collections.forEach
 
@@ -55,11 +60,33 @@ class PoiApproachAlertService(
     private var alertShowJob: Job? = null
     private var alertChannel: Channel<PoiAlert> = Channel(10)
 
+    private var ttsStatus: Int? = null
+
+    private val mediaPlayer = MediaPlayer.create(applicationContext, R.raw.notification)
+
+    private val tts = TextToSpeech(applicationContext) { status ->
+        if (status == TextToSpeech.SUCCESS) {
+            Log.i(KarooRouteGraphExtension.TAG, "TTS initialized successfully")
+        } else {
+            Log.e(KarooRouteGraphExtension.TAG, "Failed to initialize TTS")
+        }
+        ttsStatus = status
+    }
+
+    private fun speak(message: String): Boolean {
+        if (ttsStatus == TextToSpeech.SUCCESS) {
+            tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString())
+            return true
+        } else {
+            return false
+        }
+    }
+
     init {
         startAlertJob()
     }
 
-    data class PoiAlert(val message: String)
+    data class PoiAlert(val message: String, val poiName: String?)
 
     fun startAlertJob() {
         val lastAlertTriggeredAt: MutableMap<Symbol.POI, Instant> = mutableMapOf()
@@ -107,6 +134,12 @@ class PoiApproachAlertService(
                     )
                 }
 
+                mediaPlayer.start()
+
+                delay(2_000L)
+
+                speak(alert.poiName ?: alert.message)
+
                 delay(30_000L)
             }
         }
@@ -136,7 +169,7 @@ class PoiApproachAlertService(
 
                 val distanceAlongRoute = viewModel.distanceAlongRoute
 
-                if (distanceAlongRoute != null && viewModel.isOnRoute == true) {
+                if (viewModel.isOnRoute == true) {
                     viewModel.poiDistances?.forEach { (poi, points) ->
                         val lastAlertShownForPoi = lastAlertTriggeredAt[poi.symbol]
                         val pointsAhead = points.filter { it.distanceFromRouteStart >= distanceAlongRoute }
@@ -162,7 +195,7 @@ class PoiApproachAlertService(
 
                             val text = applicationContext.getString(R.string.poi_in_distance, poi.symbol.name, distance ?: "")
 
-                            alertChannel.send(PoiAlert(text))
+                            alertChannel.send(PoiAlert(text, poi.symbol.name))
 
                             lastAlertTriggeredAt[poi.symbol] = currentTime
                         }
