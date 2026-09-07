@@ -547,9 +547,10 @@ class RouteGraphDataType(
                             axisStrokePaint
                         )
 
-                        // Tick value converted to the displayed unit (the spacing above already is)
+                        // Tick value converted to the displayed unit (the spacing above already is).
+                        // The "k" abbreviation keeps its metre-based threshold so feet labels stay readable.
                         val ele = ((minElevation + tickInterval * i) / unitFactor).toInt()
-                        val eleText = if ((maxElevation - minElevation) / unitFactor > 1_500) "${ele / 1000}k" else ele.toString()
+                        val eleText = if (maxElevation - minElevation > 1_500) "${ele / 1000}k" else ele.toString()
                         val textStartFromLeft = 10f
                         val textWidth = textPaint.measureText(eleText)
 
