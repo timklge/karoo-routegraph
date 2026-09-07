@@ -531,7 +531,8 @@ class RouteGraphDataType(
 
                 if (config.gridSize.first > 30) {
                     // Ticks on Y axis
-                    val unitFactor = if (!viewModel.isImperial) 1.0f else (1 / 3.28084f)
+                    // Metres per displayed elevation unit (1 for metres, 0.3048 for feet)
+                    val unitFactor = if (!viewModel.isElevationImperial) 1.0f else (1 / 3.28084f)
                     val ticks = if (config.gridSize.second < 30) 2 else 4
                     val tickInterval = ceil((maxElevation - minElevation) / ticks / unitFactor / 50.0f) * 50.0f * unitFactor
 
@@ -546,8 +547,9 @@ class RouteGraphDataType(
                             axisStrokePaint
                         )
 
-                        val ele = (minElevation + tickInterval * i).toInt()
-                        val eleText = if (maxElevation - minElevation > 1_500) "${ele / 1000}k" else ele.toString()
+                        // Tick value converted to the displayed unit (the spacing above already is)
+                        val ele = ((minElevation + tickInterval * i) / unitFactor).toInt()
+                        val eleText = if ((maxElevation - minElevation) / unitFactor > 1_500) "${ele / 1000}k" else ele.toString()
                         val textStartFromLeft = 10f
                         val textWidth = textPaint.measureText(eleText)
 
