@@ -529,46 +529,6 @@ class RouteGraphDataType(
                     }
                 }
 
-                if (config.gridSize.first > 30) {
-                    // Ticks on Y axis
-                    val unitFactor = if (!viewModel.isImperial) 1.0f else (1 / 3.28084f)
-                    val ticks = if (config.gridSize.second < 30) 2 else 4
-                    val tickInterval = ceil((maxElevation - minElevation) / ticks / unitFactor / 50.0f) * 50.0f * unitFactor
-
-                    for (i in 0..ticks){
-                        val y = remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom, clamp = false).toFloat()
-
-                        canvas.drawLine(
-                            0f,
-                            y,
-                            10f,
-                            y,
-                            axisStrokePaint
-                        )
-
-                        val ele = (minElevation + tickInterval * i).toInt()
-                        val eleText = if (maxElevation - minElevation > 1_500) "${ele / 1000}k" else ele.toString()
-                        val textStartFromLeft = 10f
-                        val textWidth = textPaint.measureText(eleText)
-
-                        canvas.drawRoundRect(
-                            textStartFromLeft - 5,
-                            remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom, clamp = false) - 17.5f,
-                            textStartFromLeft + textWidth + 5,
-                            remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom, clamp = false) + 12.5f,
-                            5f, 5f,
-                            backgroundFillPaintInvSolid
-                        )
-
-                        canvas.drawText(
-                            eleText,
-                            10f,
-                            remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom, clamp = false) + 5f,
-                            textPaint
-                        )
-                    }
-                }
-
                 if (viewModel.poiDistances != null){
                     val previousPOIs = mutableSetOf<RectF>()
 
@@ -640,6 +600,50 @@ class RouteGraphDataType(
 
                             previousPOIs.add(currentPOI)
                         }
+                    }
+                }
+
+                if (config.gridSize.first > 30) {
+                    // Ticks on Y axis. Drawn after the POI markers so the labels'
+                    // translucent boxes cover the marker lines rather than the reverse.
+                    // Metres per displayed elevation unit (1 for metres, 0.3048 for feet)
+                    val unitFactor = if (!viewModel.isElevationImperial) 1.0f else (1 / 3.28084f)
+                    val ticks = if (config.gridSize.second < 30) 2 else 4
+                    val tickInterval = ceil((maxElevation - minElevation) / ticks / unitFactor / 50.0f) * 50.0f * unitFactor
+
+                    for (i in 0..ticks){
+                        val y = remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom, clamp = false).toFloat()
+
+                        canvas.drawLine(
+                            0f,
+                            y,
+                            10f,
+                            y,
+                            axisStrokePaint
+                        )
+
+                        // Tick value converted to the displayed unit (the spacing above already is).
+                        // The "k" abbreviation keeps its metre-based threshold so feet labels stay readable.
+                        val ele = ((minElevation + tickInterval * i) / unitFactor).toInt()
+                        val eleText = if (maxElevation - minElevation > 1_500) "${ele / 1000}k" else ele.toString()
+                        val textStartFromLeft = 10f
+                        val textWidth = textPaint.measureText(eleText)
+
+                        canvas.drawRoundRect(
+                            textStartFromLeft - 5,
+                            remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom, clamp = false) - 17.5f,
+                            textStartFromLeft + textWidth + 5,
+                            remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom, clamp = false) + 12.5f,
+                            5f, 5f,
+                            backgroundFillPaintInvSolid
+                        )
+
+                        canvas.drawText(
+                            eleText,
+                            10f,
+                            remap(minElevation + tickInterval * i, maxElevation, minElevation, graphBounds.top, graphBounds.bottom, clamp = false) + 5f,
+                            textPaint
+                        )
                     }
                 }
 

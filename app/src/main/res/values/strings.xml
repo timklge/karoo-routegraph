@@ -39,7 +39,10 @@
     <string name="surfacetype_asphalt">Asphalt</string>
     <string name="surfacetype_gravel">Gravel</string>
     <string name="surfacetype_loose">Loose</string>
+    <string name="gravelremaining">Gravel remaining</string>
+    <string name="gravelremaining_description">Remaining distance on offroad surfaces</string>
     <string name="no_route">No route loaded</string>
+    <string name="no_permissions">No permissions</string>
 
     <!-- MainScreen strings -->
     <string name="device_status_warning">Could not read device status. Is your Karoo updated?</string>
