@@ -35,6 +35,7 @@ By default, route graph datafields also feature a POI button in the top right co
 - Elevation to POI: Shows the remaining climbing to the next POI along the route. Note that this is the elevation along the route and not the straight-line elevation.
 - ETA at POI: Shows the estimated time of arrival at the next POI along the route. The ETA is calculated based on your average power output over the last hour. If you don't have a powermeter, this uses a rough approximation based on your speed and the route gradient.
 - ETA at end of route: Shows the estimated time of arrival at the end of the route.
+- Gravel remaining: Shows the remaining distance on offroad surfaces (gravel, dirt, loose surfaces like sand or grass) along the route. Requires surface condition display to be enabled in the settings.
 
 Additionally, you can enable chevrons on the map to indicate gradients. The chevrons are drawn on top of the route (see third screenshot). Find more information below.
 

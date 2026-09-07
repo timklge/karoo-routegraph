@@ -141,9 +141,12 @@ class SurfaceConditionRetrievalService(
                 do {
                     if (!hasExternalStoragePermission()) {
                         Log.w(KarooRouteGraphExtension.TAG, "Skip map scanning, no external storage permission")
+                        hasPermissionsStateFlow.update { false }
                         delay(MAPFILE_SCAN_INTERVAL_MS)
                         continue
                     }
+
+                    hasPermissionsStateFlow.update { true }
 
                     val mapDirectoryOnExternalStorage = File(File(Environment.getExternalStorageDirectory(), "offline"), "maps")
                     if (!mapDirectoryOnExternalStorage.exists() || !mapDirectoryOnExternalStorage.isDirectory) {
@@ -334,6 +337,9 @@ class SurfaceConditionRetrievalService(
 
     private val stateFlow: MutableStateFlow<List<SurfaceConditionSegment>?> = MutableStateFlow(null)
     val flow: Flow<List<SurfaceConditionSegment>?> = stateFlow
+
+    private val hasPermissionsStateFlow = MutableStateFlow(true)
+    val hasPermissionsFlow: Flow<Boolean> = hasPermissionsStateFlow
 
     fun startSurfaceConditionUpdateJob() {
         var lastKnownPolyline: String? = null
