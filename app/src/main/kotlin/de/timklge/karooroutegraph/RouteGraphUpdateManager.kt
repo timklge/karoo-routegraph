@@ -154,6 +154,7 @@ class RouteGraphUpdateManager(
             .collect { (settings, navigationStateEvent: OnNavigationState.NavigationState, userProfile, globalPOIs, locationAndRemainingRouteDistance, temporaryPOIs: RouteGraphTemporaryPOIs, onRoute, poiSettings) ->
                 try {
                     val isImperial = userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
+                    val isElevationImperial = userProfile.preferredUnit.elevation == UserProfile.PreferredUnit.UnitType.IMPERIAL
                     val navigatingToDestinationPolyline = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingToDestination)?.polyline?.let { LineString.fromPolyline(it, 5) }
                     val elevationPolyline: LineString? = when (navigationStateEvent) {
                         is OnNavigationState.NavigationState.NavigatingRoute -> {
@@ -453,6 +454,7 @@ class RouteGraphUpdateManager(
                             sampledElevationData = sampledElevationData,
                             climbs = knownClimbs,
                             isImperial = isImperial,
+                            isElevationImperial = isElevationImperial,
                             navigatingToDestination = navigationStateEvent is OnNavigationState.NavigationState.NavigatingToDestination,
                             rejoin = (navigationStateEvent as? OnNavigationState.NavigationState.NavigatingRoute)?.rejoinPolyline?.let { LineString.fromPolyline(it, 5) },
                             locationAndRemainingRouteDistance = locationAndRemainingRouteDistance,

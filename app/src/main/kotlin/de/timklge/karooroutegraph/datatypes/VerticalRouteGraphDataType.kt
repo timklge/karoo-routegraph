@@ -499,8 +499,9 @@ class VerticalRouteGraphDataType(
                             }
 
                             val isImperial = userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
+                            val isElevationImperial = userProfile.preferredUnit.elevation == UserProfile.PreferredUnit.UnitType.IMPERIAL
 
-                            val climbGain = distanceToString(climb.totalGain(viewModel.sampledElevationData).toFloat(), isImperial, true)
+                            val climbGain = distanceToString(climb.totalGain(viewModel.sampledElevationData).toFloat(), isElevationImperial, true)
                             val climbLength = distanceToString(climb.length, isImperial, false)
 
                             val climbAverageIncline = (climb.getAverageIncline(viewModel.sampledElevationData) * 100).roundToInt()
@@ -663,6 +664,7 @@ class VerticalRouteGraphDataType(
                         poiCommands.add(TextDrawCommand(labelStartX + 40f, progressPixels + 15f, text, textPaintBold, labelPriority, leadingIcon = mapPoiToIcon(poi.symbol.type), maxWidth = availableWidth))
 
                         val isImperial = userProfile.preferredUnit.distance == UserProfile.PreferredUnit.UnitType.IMPERIAL
+                        val isElevationImperial = userProfile.preferredUnit.elevation == UserProfile.PreferredUnit.UnitType.IMPERIAL
 
                         if (nearestPoint.distanceFromRouteStart > viewModel.distanceAlongRoute){
                             val distanceMeters = nearestPoint.distanceFromRouteStart - viewModel.distanceAlongRoute
@@ -675,7 +677,7 @@ class VerticalRouteGraphDataType(
                             if (settings.showRemainingElevationOnVerticalRouteGraph) {
                                 val elevationMetersRemaining = viewModel.sampledElevationData?.getTotalClimb(viewModel.distanceAlongRoute, nearestPoint.distanceFromRouteStart)
                                 if (elevationMetersRemaining != null && !distanceIsZero(elevationMetersRemaining.toFloat(), userProfile)) {
-                                    distanceStr += " ↗ ${distanceToString(elevationMetersRemaining.toFloat(), isImperial, true)}"
+                                    distanceStr += " ↗ ${distanceToString(elevationMetersRemaining.toFloat(), isElevationImperial, true)}"
                                 }
                             }
 
