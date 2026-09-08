@@ -24,6 +24,7 @@ import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.RouteGraphViewModelProvider
 import de.timklge.karooroutegraph.SurfaceConditionRetrievalService
 import de.timklge.karooroutegraph.SurfaceConditionRetrievalService.SurfaceConditionSegment
+import de.timklge.karooroutegraph.isNightMode
 import de.timklge.karooroutegraph.throttle
 import io.hammerhead.karooext.extension.DataTypeImpl
 import io.hammerhead.karooext.internal.Emitter
@@ -97,11 +98,20 @@ class GravelRemainingDataType(
         }
 
         val viewJob = CoroutineScope(Dispatchers.Default).launch {
-            surfaceConditionRetrievalService.hasPermissionsFlow.collect { hasPermissions ->
-                if (hasPermissions) {
+            combine(
+                surfaceConditionRetrievalService.surfaceConditionsEnabledFlow,
+                surfaceConditionRetrievalService.hasPermissionsFlow
+            ) { enabled, hasPermissions ->
+                when {
+                    !enabled -> context.getString(R.string.surface_conditions_not_enabled)
+                    !hasPermissions -> context.getString(R.string.no_permissions)
+                    else -> null
+                }
+            }.collect { message ->
+                if (message == null) {
                     emitter.onNext(ShowCustomStreamState("", null))
                 } else {
-                    emitter.onNext(ShowCustomStreamState(context.getString(R.string.no_permissions), Color.RED))
+                    emitter.onNext(ShowCustomStreamState(message, if (isNightMode(context)) Color.WHITE else Color.BLACK))
                 }
             }
         }

@@ -46,6 +46,7 @@ import org.mapsforge.core.model.LatLong
 import org.mapsforge.map.reader.MapFile
 import java.io.File
 import java.time.Instant
+import kotlin.time.Duration.Companion.milliseconds
 
 fun isNightMode(applicationContext: Context): Boolean {
     val nightModeFlags = applicationContext.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
@@ -142,7 +143,7 @@ class SurfaceConditionRetrievalService(
                     if (!hasExternalStoragePermission()) {
                         Log.w(KarooRouteGraphExtension.TAG, "Skip map scanning, no external storage permission")
                         hasPermissionsStateFlow.update { false }
-                        delay(MAPFILE_SCAN_INTERVAL_MS)
+                        delay(MAPFILE_SCAN_INTERVAL_MS.milliseconds)
                         continue
                     }
 
@@ -151,7 +152,7 @@ class SurfaceConditionRetrievalService(
                     val mapDirectoryOnExternalStorage = File(File(Environment.getExternalStorageDirectory(), "offline"), "maps")
                     if (!mapDirectoryOnExternalStorage.exists() || !mapDirectoryOnExternalStorage.isDirectory) {
                         Log.w(KarooRouteGraphExtension.TAG, "Map directory does not exist: ${mapDirectoryOnExternalStorage.absolutePath}")
-                        delay(MAPFILE_SCAN_INTERVAL_MS)
+                        delay(MAPFILE_SCAN_INTERVAL_MS.milliseconds)
                         continue
                     }
 
@@ -338,8 +339,11 @@ class SurfaceConditionRetrievalService(
     private val stateFlow: MutableStateFlow<List<SurfaceConditionSegment>?> = MutableStateFlow(null)
     val flow: Flow<List<SurfaceConditionSegment>?> = stateFlow
 
-    private val hasPermissionsStateFlow = MutableStateFlow(true)
+    private val hasPermissionsStateFlow = MutableStateFlow(false)
     val hasPermissionsFlow: Flow<Boolean> = hasPermissionsStateFlow
+
+    val surfaceConditionsEnabledFlow: Flow<Boolean> =
+        context.streamSettings(karooSystemServiceProvider.karooSystemService).map { it.indicateSurfaceConditionsOnGraph }
 
     fun startSurfaceConditionUpdateJob() {
         var lastKnownPolyline: String? = null
