@@ -94,7 +94,11 @@ fun ElevationProfileScreen(
     var showNavigateButtonOnGraphs by remember { mutableStateOf(initialSettings.showNavigateButtonOnGraphs) }
     var shiftForRadarSwimLane by remember { mutableStateOf(initialSettings.shiftForRadarSwimLane) }
     var indicateSurfaceConditionsOnGraph by remember { mutableStateOf(initialSettings.indicateSurfaceConditionsOnGraph) }
-    var hasStoragePermission by remember { mutableStateOf(false) }
+    var hasStoragePermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        )
+    }
     var elevationProfileZoomLevels by remember { mutableStateOf(initialSettings.elevationProfileZoomLevels) }
     var onlyHighlightClimbsAtZoomLevel by remember { mutableStateOf(initialSettings.onlyHighlightClimbsAtZoomLevel) }
     var showAddZoomLevelDialog by remember { mutableStateOf(false) }
@@ -105,10 +109,6 @@ fun ElevationProfileScreen(
     var showRemainingDistanceOnVerticalRouteGraph by remember { mutableStateOf(initialSettings.showRemainingDistanceOnVerticalRouteGraph) }
     val surfaceConditionViewModelProvider = koinInject<SurfaceConditionViewModelProvider>()
     val surfaceConditionViewModel by surfaceConditionViewModelProvider.viewModelFlow.collectAsStateWithLifecycle(SurfaceConditionViewModel())
-
-    fun checkStoragePermission(): Boolean {
-        return ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
-    }
 
     val userProfile by karooSystemServiceProvider.karooSystemService.streamUserProfile().collectAsStateWithLifecycle(null)
 
@@ -137,10 +137,6 @@ fun ElevationProfileScreen(
                 updateSettings()
             }
         }
-    }
-
-    LaunchedEffect(Unit) {
-        hasStoragePermission = checkStoragePermission()
     }
 
     LaunchedEffect(Unit) {
