@@ -69,7 +69,6 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.R
-import de.timklge.karooroutegraph.SurfaceConditionViewModel
 import de.timklge.karooroutegraph.SurfaceConditionViewModelProvider
 import de.timklge.karooroutegraph.streamUserProfile
 import io.hammerhead.karooext.models.UserProfile
@@ -108,7 +107,7 @@ fun ElevationProfileScreen(
     var showRemainingElevationOnVerticalRouteGraph by remember { mutableStateOf(initialSettings.showRemainingElevationOnVerticalRouteGraph) }
     var showRemainingDistanceOnVerticalRouteGraph by remember { mutableStateOf(initialSettings.showRemainingDistanceOnVerticalRouteGraph) }
     val surfaceConditionViewModelProvider = koinInject<SurfaceConditionViewModelProvider>()
-    val surfaceConditionViewModel by surfaceConditionViewModelProvider.viewModelFlow.collectAsStateWithLifecycle(SurfaceConditionViewModel())
+    val surfaceConditionViewModel by surfaceConditionViewModelProvider.viewModelFlow.collectAsStateWithLifecycle(surfaceConditionViewModelProvider.viewModelFlow.value)
 
     val userProfile by karooSystemServiceProvider.karooSystemService.streamUserProfile().collectAsStateWithLifecycle(null)
 
