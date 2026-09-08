@@ -43,6 +43,7 @@
     <string name="gravelremaining_description">Remaining distance on offroad surfaces</string>
     <string name="no_route">No route loaded</string>
     <string name="no_permissions">No permissions</string>
+    <string name="surface_conditions_not_enabled">Not enabled</string>
 
     <!-- MainScreen strings -->
     <string name="device_status_warning">Could not read device status. Is your Karoo updated?</string>
