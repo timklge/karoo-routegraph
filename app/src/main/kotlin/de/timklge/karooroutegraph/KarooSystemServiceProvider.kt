@@ -18,6 +18,7 @@ package de.timklge.karooroutegraph
 
 import android.content.Context
 import android.util.Log
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import de.timklge.karooroutegraph.KarooRouteGraphExtension.Companion.TAG
@@ -41,6 +42,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.scan
@@ -126,26 +128,38 @@ class KarooSystemServiceProvider(private val context: Context) {
         }
     }
 
+    private fun readSettingsSafely(preferences: Preferences): RouteGraphSettings {
+        return try {
+            readSettings(preferences[settingsKey])
+        } catch(e: Throwable){
+            Log.e(TAG, "Failed to read preferences", e)
+            jsonWithUnknownKeys.decodeFromString<RouteGraphSettings>(RouteGraphSettings.defaultSettings)
+        }
+    }
+
+    private fun readViewSettingsSafely(preferences: Preferences): RouteGraphPoiSettings {
+        return try {
+            readViewSettings(preferences[viewSettingsKey])
+        } catch(e: Throwable){
+            Log.e(TAG, "Failed to read preferences", e)
+            jsonWithUnknownKeys.decodeFromString<RouteGraphPoiSettings>(RouteGraphPoiSettings.defaultSettings)
+        }
+    }
+
+    suspend fun currentSettings(): RouteGraphSettings {
+        return readSettingsSafely(context.dataStore.data.first())
+    }
+
+    suspend fun currentViewSettings(): RouteGraphPoiSettings {
+        return readViewSettingsSafely(context.dataStore.data.first())
+    }
+
     fun streamSettings(): Flow<RouteGraphSettings> {
-        return context.dataStore.data.map { settingsJson ->
-            try {
-                readSettings(settingsJson[settingsKey])
-            } catch(e: Throwable){
-                Log.e(TAG, "Failed to read preferences", e)
-                jsonWithUnknownKeys.decodeFromString<RouteGraphSettings>(RouteGraphSettings.defaultSettings)
-            }
-        }.distinctUntilChanged()
+        return context.dataStore.data.map { readSettingsSafely(it) }.distinctUntilChanged()
     }
 
     fun streamViewSettings(): Flow<RouteGraphPoiSettings> {
-        return context.dataStore.data.map { settingsJson ->
-            try {
-                readViewSettings(settingsJson[viewSettingsKey])
-            } catch(e: Throwable){
-                Log.e(TAG, "Failed to read preferences", e)
-                jsonWithUnknownKeys.decodeFromString<RouteGraphPoiSettings>(RouteGraphPoiSettings.defaultSettings)
-            }
-        }.distinctUntilChanged()
+        return context.dataStore.data.map { readViewSettingsSafely(it) }.distinctUntilChanged()
     }
 
     fun streamTemporaryPOIs(): Flow<RouteGraphTemporaryPOIs> {

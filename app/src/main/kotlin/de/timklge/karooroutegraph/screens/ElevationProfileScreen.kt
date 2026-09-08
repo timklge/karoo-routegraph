@@ -71,7 +71,6 @@ import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.R
 import de.timklge.karooroutegraph.SurfaceConditionViewModel
 import de.timklge.karooroutegraph.SurfaceConditionViewModelProvider
-import de.timklge.karooroutegraph.streamSettings
 import de.timklge.karooroutegraph.streamUserProfile
 import io.hammerhead.karooext.models.UserProfile
 import kotlinx.coroutines.launch
@@ -90,21 +89,22 @@ fun ElevationProfileScreen(
 ) {
     val ctx = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    var showNavigateButtonOnGraphs by remember { mutableStateOf(true) }
-    var shiftForRadarSwimLane by remember { mutableStateOf(true) }
-    var indicateSurfaceConditionsOnGraph by remember { mutableStateOf(true) }
+    val karooSystemServiceProvider = koinInject<KarooSystemServiceProvider>()
+    val initialSettings = remember { runBlocking { karooSystemServiceProvider.currentSettings() } }
+    var showNavigateButtonOnGraphs by remember { mutableStateOf(initialSettings.showNavigateButtonOnGraphs) }
+    var shiftForRadarSwimLane by remember { mutableStateOf(initialSettings.shiftForRadarSwimLane) }
+    var indicateSurfaceConditionsOnGraph by remember { mutableStateOf(initialSettings.indicateSurfaceConditionsOnGraph) }
     var hasStoragePermission by remember { mutableStateOf(false) }
-    var elevationProfileZoomLevels by remember { mutableStateOf(listOf(2, 20, 50, 100)) }
-    var onlyHighlightClimbsAtZoomLevel by remember { mutableStateOf<Int?>(null) }
+    var elevationProfileZoomLevels by remember { mutableStateOf(initialSettings.elevationProfileZoomLevels) }
+    var onlyHighlightClimbsAtZoomLevel by remember { mutableStateOf(initialSettings.onlyHighlightClimbsAtZoomLevel) }
     var showAddZoomLevelDialog by remember { mutableStateOf(false) }
     var newZoomLevelText by remember { mutableStateOf("") }
     var zoomLevelError by remember { mutableStateOf("") }
-    var showEtaOnVerticalRouteGraph by remember { mutableStateOf(true) }
-    var showRemainingElevationOnVerticalRouteGraph by remember { mutableStateOf(true) }
-    var showRemainingDistanceOnVerticalRouteGraph by remember { mutableStateOf(true) }
+    var showEtaOnVerticalRouteGraph by remember { mutableStateOf(initialSettings.showEtaOnVerticalRouteGraph) }
+    var showRemainingElevationOnVerticalRouteGraph by remember { mutableStateOf(initialSettings.showRemainingElevationOnVerticalRouteGraph) }
+    var showRemainingDistanceOnVerticalRouteGraph by remember { mutableStateOf(initialSettings.showRemainingDistanceOnVerticalRouteGraph) }
     val surfaceConditionViewModelProvider = koinInject<SurfaceConditionViewModelProvider>()
     val surfaceConditionViewModel by surfaceConditionViewModelProvider.viewModelFlow.collectAsStateWithLifecycle(SurfaceConditionViewModel())
-    val karooSystemServiceProvider = koinInject<KarooSystemServiceProvider>()
 
     fun checkStoragePermission(): Boolean {
         return ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
@@ -144,13 +144,12 @@ fun ElevationProfileScreen(
     }
 
     LaunchedEffect(Unit) {
-        ctx.streamSettings(karooSystemServiceProvider.karooSystemService).collect { settings ->
+        karooSystemServiceProvider.streamSettings().collect { settings ->
             showNavigateButtonOnGraphs = settings.showNavigateButtonOnGraphs
             shiftForRadarSwimLane = settings.shiftForRadarSwimLane
             indicateSurfaceConditionsOnGraph = settings.indicateSurfaceConditionsOnGraph
             elevationProfileZoomLevels = settings.elevationProfileZoomLevels
             onlyHighlightClimbsAtZoomLevel = settings.onlyHighlightClimbsAtZoomLevel
-            indicateSurfaceConditionsOnGraph = settings.indicateSurfaceConditionsOnGraph
             showEtaOnVerticalRouteGraph = settings.showEtaOnVerticalRouteGraph
             showRemainingElevationOnVerticalRouteGraph = settings.showRemainingElevationOnVerticalRouteGraph
             showRemainingDistanceOnVerticalRouteGraph = settings.showRemainingDistanceOnVerticalRouteGraph

@@ -85,6 +85,7 @@ import de.timklge.karooroutegraph.streamPbfDownloadStore
 import de.timklge.karooroutegraph.updatePbfDownloadStore
 import de.timklge.karooroutegraph.updatePbfDownloadStoreStatus
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.koin.compose.koinInject
 import java.text.Collator
 import kotlin.collections.component1
@@ -123,15 +124,17 @@ fun PoiSettingsScreen(
     val coroutineScope = rememberCoroutineScope()
     val karooSystemServiceProvider = koinInject<KarooSystemServiceProvider>()
     val nearbyPOIPbfDownloadService = koinInject<NearbyPOIPbfDownloadService>()
-    var enableOfflinePoiStorage by remember { mutableStateOf(false) }
-    var autoAddPoisToMap by remember { mutableStateOf(false) }
-    var autoAddToElevationProfileAndMinimap by remember { mutableStateOf(false) }
-    var autoAddPoiCategories by remember { mutableStateOf(emptySet<NearbyPoiCategory>()) }
-    var recentlyUsedCategories by remember { mutableStateOf(emptyList<NearbyPoiCategory>()) }
+    val initialSettings = remember { runBlocking { karooSystemServiceProvider.currentSettings() } }
+    val initialViewSettings = remember { runBlocking { karooSystemServiceProvider.currentViewSettings() } }
+    var enableOfflinePoiStorage by remember { mutableStateOf(initialViewSettings.enableOfflinePoiStorage) }
+    var autoAddPoisToMap by remember { mutableStateOf(initialViewSettings.autoAddPoisToMap) }
+    var autoAddToElevationProfileAndMinimap by remember { mutableStateOf(initialViewSettings.autoAddToElevationProfileAndMinimap) }
+    var autoAddPoiCategories by remember { mutableStateOf(initialViewSettings.autoAddPoiCategories) }
+    var recentlyUsedCategories by remember { mutableStateOf(initialViewSettings.recentlyUsedCategories) }
     var showAutoAddPoiCategoriesDialog by remember { mutableStateOf(false) }
     var showDownloadPoisDialog by remember { mutableStateOf(false) }
-    var poiDistanceToRouteMaxMeters by remember { mutableDoubleStateOf(1000.0) }
-    var poiApproachAlertAtDistance by remember { mutableDoubleStateOf(500.0) }
+    var poiDistanceToRouteMaxMeters by remember { mutableDoubleStateOf(initialSettings.poiDistanceToRouteMaxMeters) }
+    var poiApproachAlertAtDistance by remember { mutableDoubleStateOf(initialSettings.poiApproachAlertAtDistance ?: 500.0) }
 
     suspend fun updateSettings(){
         karooSystemServiceProvider.saveSettings { settings ->
