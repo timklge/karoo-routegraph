@@ -107,7 +107,8 @@ fun ElevationProfileScreen(
     var showRemainingElevationOnVerticalRouteGraph by remember { mutableStateOf(initialSettings.showRemainingElevationOnVerticalRouteGraph) }
     var showRemainingDistanceOnVerticalRouteGraph by remember { mutableStateOf(initialSettings.showRemainingDistanceOnVerticalRouteGraph) }
     val surfaceConditionViewModelProvider = koinInject<SurfaceConditionViewModelProvider>()
-    val surfaceConditionViewModel by surfaceConditionViewModelProvider.viewModelFlow.collectAsStateWithLifecycle(surfaceConditionViewModelProvider.viewModelFlow.value)
+    val surfaceConditionViewModel by surfaceConditionViewModelProvider.viewModelFlow
+        .collectAsStateWithLifecycle(remember { surfaceConditionViewModelProvider.viewModelFlow.value })
 
     val userProfile by karooSystemServiceProvider.karooSystemService.streamUserProfile().collectAsStateWithLifecycle(null)
 
