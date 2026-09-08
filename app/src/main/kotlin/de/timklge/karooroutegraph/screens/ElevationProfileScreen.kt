@@ -170,7 +170,7 @@ fun ElevationProfileScreen(
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                         .background(MaterialTheme.colorScheme.background)
-                        .padding(start = 10.dp, top = 0.dp, bottom = 10.dp, end = 10.dp),
+                        .padding(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
