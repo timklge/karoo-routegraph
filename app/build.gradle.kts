@@ -91,10 +91,9 @@ tasks.register("generateManifest") {
             "description" to "Open-source extension that provides an elevation graph datafield depicting the complete current route, including climbs and POIs (e. g. checkpoints and refueling stops). Also provides a minimap datafield and a POI navigation datafield to look up upcoming POIs of certain categories on the route (e. g. supermarkets).",
             "releaseNotes" to "* Show elevation in the profile's elevation unit; fix imperial Y-axis labels (thx @Aryeh95!)\n* Add remaining distance on gravel data field\n* Play notification sound and POI name TTS over BT when showing approach alert\n* Fix settings screens briefly show default settings",
             "screenshotUrls" to listOf(
-                "https://github.com/timklge/karoo-routegraph/releases/latest/download/horizontal_routegraph.png",
+                "https://github.com/timklge/karoo-routegraph/releases/latest/download/vertical_routegraph.png",
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/minimap.png",
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/poinav.png",
-                "https://github.com/timklge/karoo-routegraph/releases/latest/download/vertical_routegraph.png",
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/routegraph_surface_conditions.png",
                 "https://github.com/timklge/karoo-routegraph/releases/latest/download/chevrons.png",
             ),
