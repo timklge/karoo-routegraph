@@ -40,14 +40,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -143,17 +142,12 @@ fun MainMenuScreen(
     onMenuItemClick: (SettingsScreen) -> Unit,
     onFinish: () -> Unit
 ) {
-    var karooConnected by remember { mutableStateOf(false) }
-    val ctx = LocalContext.current
-    val karooSystem = KarooSystemServiceProvider(ctx).karooSystemService
+    val karooSystemServiceProvider = koinInject<KarooSystemServiceProvider>()
+    var karooConnected by remember { mutableStateOf(karooSystemServiceProvider.connectionState.value) }
 
-    DisposableEffect(Unit) {
-        karooSystem.connect { connected ->
+    LaunchedEffect(Unit) {
+        karooSystemServiceProvider.connectionState.collect { connected ->
             karooConnected = connected
-        }
-
-        onDispose {
-            karooSystem.disconnect()
         }
     }
 

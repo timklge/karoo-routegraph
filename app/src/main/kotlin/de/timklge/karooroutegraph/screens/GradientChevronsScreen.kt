@@ -42,14 +42,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import de.timklge.karooroutegraph.GradientIndicatorFrequency
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.R
-import de.timklge.karooroutegraph.streamSettings
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.koin.compose.koinInject
 import kotlin.math.roundToInt
 
@@ -58,11 +57,11 @@ import kotlin.math.roundToInt
 fun GradientChevronsScreen(
     onBack: () -> Unit
 ) {
-    val ctx = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    var showGradientIndicatorsOnMap by remember { mutableStateOf(false) }
-    var gradientIndicatorFrequency by remember { mutableStateOf(GradientIndicatorFrequency.HIGH) }
     val karooSystem = koinInject<KarooSystemServiceProvider>()
+    val initialSettings = remember { runBlocking { karooSystem.currentSettings() } }
+    var showGradientIndicatorsOnMap by remember { mutableStateOf(initialSettings.showGradientIndicatorsOnMap) }
+    var gradientIndicatorFrequency by remember { mutableStateOf(initialSettings.gradientIndicatorFrequency) }
 
     suspend fun updateSettings() {
         karooSystem.saveSettings { settings ->
@@ -74,7 +73,7 @@ fun GradientChevronsScreen(
     }
 
     LaunchedEffect(Unit) {
-        ctx.streamSettings(karooSystem.karooSystemService).collect { settings ->
+        karooSystem.streamSettings().collect { settings ->
             showGradientIndicatorsOnMap = settings.showGradientIndicatorsOnMap
             gradientIndicatorFrequency = settings.gradientIndicatorFrequency
         }

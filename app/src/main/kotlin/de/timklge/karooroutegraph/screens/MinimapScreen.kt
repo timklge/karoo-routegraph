@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.R
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,8 +54,9 @@ fun MinimapScreen(
     onBack: () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
-    var minimapNightMode by remember { mutableStateOf(true) }
-    var showPOIsOnMinimap by remember { mutableStateOf(true) }
+    val initialSettings = remember { runBlocking { karooSystemServiceProvider.currentSettings() } }
+    var minimapNightMode by remember { mutableStateOf(initialSettings.minimapNightMode) }
+    var showPOIsOnMinimap by remember { mutableStateOf(initialSettings.showPOILabelsOnMinimap) }
 
     suspend fun updateSettings(){
         karooSystemServiceProvider.saveSettings { settings ->
