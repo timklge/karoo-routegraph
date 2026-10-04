@@ -16,7 +16,11 @@
 
 package de.timklge.karooroutegraph.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -33,6 +37,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -47,9 +52,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import de.timklge.karooroutegraph.KarooSystemServiceProvider
 import de.timklge.karooroutegraph.R
 import org.koin.compose.koinInject
@@ -80,6 +87,11 @@ val menuItems = listOf(
     MenuItem(SettingsScreen.POINTS_OF_INTEREST, R.drawable.menu_poi, R.string.points_of_interest_poi),
 )
 
+private val fileAccessPermissions = listOf(
+    Manifest.permission.READ_EXTERNAL_STORAGE,
+    Manifest.permission.WRITE_EXTERNAL_STORAGE
+)
+
 @Composable
 fun FixedBackButton(modifier: Modifier = Modifier, onBack: () -> Unit) {
     Image(
@@ -95,7 +107,20 @@ fun FixedBackButton(modifier: Modifier = Modifier, onBack: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(onFinish: () -> Unit) {
+    val context = LocalContext.current
     var currentScreen by remember { mutableStateOf(SettingsScreen.MENU) }
+    var hasFileAccessPermission by remember {
+        mutableStateOf(
+            fileAccessPermissions.all {
+                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+            }
+        )
+    }
+    val fileAccessPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        hasFileAccessPermission = permissions.values.all { it }
+    }
 
     BackHandler {
         if (currentScreen != SettingsScreen.MENU) {
@@ -105,33 +130,76 @@ fun MainScreen(onFinish: () -> Unit) {
         }
     }
 
-    when (currentScreen) {
-        SettingsScreen.MENU -> {
-            MainMenuScreen(
-                onMenuItemClick = { screen -> currentScreen = screen },
-                onFinish = onFinish
-            )
+    if (!hasFileAccessPermission) {
+        FileAccessPermissionScreen {
+            fileAccessPermissionLauncher.launch(fileAccessPermissions.toTypedArray())
         }
-        SettingsScreen.ELEVATION_PROFILE -> {
-            ElevationProfileScreen(
-                onBack = { currentScreen = SettingsScreen.MENU }
-            )
+    } else {
+        when (currentScreen) {
+            SettingsScreen.MENU -> {
+                MainMenuScreen(
+                    onMenuItemClick = { screen -> currentScreen = screen },
+                    onFinish = onFinish
+                )
+            }
+            SettingsScreen.ELEVATION_PROFILE -> {
+                ElevationProfileScreen(
+                    onBack = { currentScreen = SettingsScreen.MENU }
+                )
+            }
+            SettingsScreen.GRADIENT_CHEVRONS -> {
+                GradientChevronsScreen(
+                    onBack = { currentScreen = SettingsScreen.MENU }
+                )
+            }
+            SettingsScreen.MINIMAP -> {
+                MinimapScreen(
+                    karooSystemServiceProvider = koinInject(),
+                    onBack = { currentScreen = SettingsScreen.MENU }
+                )
+            }
+            SettingsScreen.POINTS_OF_INTEREST -> {
+                PoiSettingsScreen(
+                    onBack = { currentScreen = SettingsScreen.MENU }
+                )
+            }
         }
-        SettingsScreen.GRADIENT_CHEVRONS -> {
-            GradientChevronsScreen(
-                onBack = { currentScreen = SettingsScreen.MENU }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FileAccessPermissionScreen(onRequestPermission: () -> Unit) {
+    Scaffold(
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.app_name)) }) }
+    ) { contentPadding ->
+        Column(
+            modifier = Modifier
+                .padding(contentPadding)
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = stringResource(R.string.file_access_permission_required),
+                style = MaterialTheme.typography.bodyLarge
             )
-        }
-        SettingsScreen.MINIMAP -> {
-            MinimapScreen(
-                karooSystemServiceProvider = koinInject(),
-                onBack = { currentScreen = SettingsScreen.MENU }
+
+            Text(
+                text = stringResource(R.string.app_restart),
+                style = MaterialTheme.typography.bodyLarge
             )
-        }
-        SettingsScreen.POINTS_OF_INTEREST -> {
-            PoiSettingsScreen(
-                onBack = { currentScreen = SettingsScreen.MENU }
-            )
+
+            FilledTonalButton(
+                onClick = onRequestPermission,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp)
+            ) {
+                Text(stringResource(R.string.grant_permission))
+            }
         }
     }
 }

@@ -43,6 +43,14 @@ val gprKey = if(env.containsKey("GPR_KEY")) env["GPR_KEY"] else getLocalProperty
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        maven {
+            url = uri("https://maven.pkg.github.com/timklge/valhalla-mobile")
+            credentials {
+                username = gprUser
+                password = gprKey
+            }
+        }
+
         google()
         mavenCentral()
         // karoo-ext from Github Packages

@@ -137,4 +137,8 @@ dependencies {
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
+
+    implementation("io.github.rallista:valhalla-mobile:0.6.3")
+    implementation("io.github.rallista:valhalla-models:0.5.2")
+    implementation("io.github.rallista:valhalla-models-config:0.5.2")
 }

@@ -61,6 +61,7 @@
     <string name="add">Add</string>
     <string name="show_navigate_button">Show navigate button on graphs</string>
     <string name="indicate_surface_conditions">Indicate surface conditions on graph</string>
+    <string name="file_access_permission_required">Access to the karoo storage is required. The storage contains routing and elevation data.</string>
     <string name="storage_permission_required">Storage permission required to read surface condition data</string>
     <string name="grant_permission">Grant Permission</string>
     <string name="map_files_found">%1$d map files found.</string>
@@ -189,4 +190,5 @@
     <string name="closed_opening_soon">🔴 Opens at %1s</string>
     <string name="open_now">🟢 Now open</string>
     <string name="closed_now">🔴 Now closed</string>
+    <string name="app_restart">Please restart the app after granting permission</string>
 </resources>

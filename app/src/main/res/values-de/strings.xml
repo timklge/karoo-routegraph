@@ -66,6 +66,7 @@
     <string name="add">Hinzufügen</string>
     <string name="show_navigate_button">Navigations-Knopf in Graphen anzeigen</string>
     <string name="indicate_surface_conditions">Oberflächen im Graphen anzeigen</string>
+    <string name="file_access_permission_required">Für die Nutzung von RouteGraph werden Dateizugriffsberechtigungen auf den Karoo-Speicher benötigt. Der Speicher enthält das heruntergeladene Kartenmaterial inklusive Höhendaten, die für die Anzeige der Graphen ausgelesen werden.</string>
     <string name="storage_permission_required">Speicherberechtigung erforderlich, um Oberflächendaten zu lesen</string>
     <string name="grant_permission">Berechtigung erteilen</string>
     <string name="map_files_found">%1$d Kartendateien gefunden.</string>
@@ -190,4 +191,6 @@
     <string name="closed_opening_soon">🔴 Öffnet um %1s</string>
     <string name="open_now">🟢 Jetzt geöffnet</string>
     <string name="closed_now">🔴 Jetzt geschlossen</string>
+
+    <string name="app_restart">Bitte die App anschließend neu starten.</string>
 </resources>

@@ -36,6 +36,7 @@ import de.timklge.karooroutegraph.pois.PoiApproachAlertService
 import de.timklge.karooroutegraph.screens.RouteGraphPoiSettings
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.screens.RouteGraphTemporaryPOIs
+import de.timklge.karooroutegraph.valhalla.ValhallaService
 import io.hammerhead.karooext.extension.KarooExtension
 import io.hammerhead.karooext.internal.Emitter
 import io.hammerhead.karooext.models.DataType
@@ -78,6 +79,8 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     private val routeGraphUpdateManager: RouteGraphUpdateManager by inject()
     private val autoAddedPOIsViewModelProvider: AutoAddedPOIsViewModelProvider by inject()
     private val travelTimeEstimationService: TravelTimeEstimationService by inject()
+    private val valhallaService: ValhallaService by inject()
+    private val riddenRouteProvider: RiddenRouteProvider by inject()
 
     override val types by lazy {
         listOf(
@@ -307,10 +310,12 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     override fun onCreate() {
         super.onCreate()
         routeGraphUpdateManager.start()
+        riddenRouteProvider.start()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         routeGraphUpdateManager.stop()
+        riddenRouteProvider.stop()
     }
 }
