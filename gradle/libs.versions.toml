@@ -13,6 +13,9 @@ androidxComposeMaterial = "1.4.0"
 glance = "1.1.1"
 kotlinxSerializationJson = "1.11.0"
 mockk = "1.14.9"
+karooExtTesting = "0.1.0"
+robolectric = "4.17"
+androidxTestCore = "1.7.0"
 osm4j = "1.4.1"
 okhttp = "5.3.2"
 antlr4 = "4.13.2"
@@ -52,6 +55,10 @@ androidx-glance-preview = { group = "androidx.glance", name = "glance-preview", 
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+karoo-ext-testing = { module = "com.github.nikosavola.karoo-ext-testing:karoo-ext-testing", version.ref = "karooExtTesting" }
+karoo-ext-testing-robolectric = { module = "com.github.nikosavola.karoo-ext-testing:karoo-ext-testing-robolectric", version.ref = "karooExtTesting" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+androidx-test-core = { module = "androidx.test:core", version.ref = "androidxTestCore" }
 osm4j-core = { module = "de.topobyte:osm4j-core", version.ref = "osm4j" }
 osm4j-pbf = { module = "de.topobyte:osm4j-pbf", version.ref = "osm4j" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
