@@ -24,6 +24,7 @@ plugins {
 }
 
 android {
+    testOptions { unitTests { isIncludeAndroidResources = true } }
     namespace = "de.timklge.karooroutegraph"
     compileSdk = 36
 
@@ -137,4 +138,8 @@ dependencies {
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
+    testImplementation(libs.karoo.ext.testing)
+    testImplementation(libs.karoo.ext.testing.robolectric)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
 }
