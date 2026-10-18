@@ -17,14 +17,15 @@
 package de.timklge.karooroutegraph
 
 import android.util.Log
+import androidx.core.graphics.toColorInt
 import com.mapbox.geojson.Point
 import com.mapbox.turf.TurfConstants
 import com.mapbox.turf.TurfMeasurement
 import de.timklge.karooroutegraph.datatypes.DistanceToNextPOIDataType
 import de.timklge.karooroutegraph.datatypes.ETAAtNextPOIDataType
 import de.timklge.karooroutegraph.datatypes.ETADataType
-import de.timklge.karooroutegraph.datatypes.GravelRemainingDataType
 import de.timklge.karooroutegraph.datatypes.ElevationToNextPOIDataType
+import de.timklge.karooroutegraph.datatypes.GravelRemainingDataType
 import de.timklge.karooroutegraph.datatypes.PoiButtonDataType
 import de.timklge.karooroutegraph.datatypes.RouteGraphDataType
 import de.timklge.karooroutegraph.datatypes.SurfaceConditionDataType
@@ -36,15 +37,18 @@ import de.timklge.karooroutegraph.pois.PoiApproachAlertService
 import de.timklge.karooroutegraph.screens.RouteGraphPoiSettings
 import de.timklge.karooroutegraph.screens.RouteGraphSettings
 import de.timklge.karooroutegraph.screens.RouteGraphTemporaryPOIs
+import de.timklge.karooroutegraph.valhalla.ValhallaPathPredictor
 import de.timklge.karooroutegraph.valhalla.ValhallaService
 import io.hammerhead.karooext.extension.KarooExtension
 import io.hammerhead.karooext.internal.Emitter
 import io.hammerhead.karooext.models.DataType
 import io.hammerhead.karooext.models.HardwareType
+import io.hammerhead.karooext.models.HidePolyline
 import io.hammerhead.karooext.models.HideSymbols
 import io.hammerhead.karooext.models.MapEffect
 import io.hammerhead.karooext.models.OnLocationChanged
 import io.hammerhead.karooext.models.OnMapZoomLevel
+import io.hammerhead.karooext.models.ShowPolyline
 import io.hammerhead.karooext.models.ShowSymbols
 import io.hammerhead.karooext.models.StreamState
 import io.hammerhead.karooext.models.Symbol
@@ -63,6 +67,10 @@ import kotlin.time.Duration.Companion.seconds
 class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.VERSION_NAME) {
     companion object {
         const val TAG = "karoo-routegraph"
+
+        private const val PREDICTED_PATH_ID = "predictedPath"
+        private const val PREDICTED_PATH_WIDTH = 6
+        private val PREDICTED_PATH_COLOR = "#FF9800".toColorInt()
     }
 
     private val karooSystem: KarooSystemServiceProvider by inject()
@@ -81,6 +89,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
     private val travelTimeEstimationService: TravelTimeEstimationService by inject()
     private val valhallaService: ValhallaService by inject()
     private val riddenRouteProvider: RiddenRouteProvider by inject()
+    private val pathPredictor: ValhallaPathPredictor by inject()
 
     override val types by lazy {
         listOf(
@@ -142,7 +151,12 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 val currentDistanceAlongRoute: Float,
             )
 
-            combine(karooSystem.streamTemporaryPOIs(), autoAddedPOIsViewModelProvider.viewModelFlow, karooSystem.streamViewSettings(), routeGraphViewModelProvider.viewModelFlow) { temporaryPois, autoAddedPois, settings, viewModel ->
+            combine(
+                karooSystem.streamTemporaryPOIs(),
+                autoAddedPOIsViewModelProvider.viewModelFlow,
+                karooSystem.streamViewSettings(),
+                routeGraphViewModelProvider.viewModelFlow
+            ) { temporaryPois, autoAddedPois, settings, viewModel ->
                 StreamData(
                     temporaryPois,
                     autoAddedPois,
@@ -152,42 +166,50 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                     viewModel.routeDistance,
                     viewModel.distanceAlongRoute
                 )
-            }.distinctUntilChanged().throttle(10_000).collect { (temporaryPOIs, autoAddedPois, settings, lastKnownPositionOnMainRoute, isOnRoute, routeDistance, currentDistanceAlongRoute) ->
-                Log.d(TAG, "Temporary POIs: ${temporaryPOIs.poisByOsmId.size}, Auto-added POIs: ${autoAddedPois.autoAddedPoisByOsmId.size}")
+            }.distinctUntilChanged().throttle(10_000)
+                .collect { (temporaryPOIs, autoAddedPois, settings, lastKnownPositionOnMainRoute, isOnRoute, routeDistance, currentDistanceAlongRoute) ->
+                    Log.d(
+                        TAG,
+                        "Temporary POIs: ${temporaryPOIs.poisByOsmId.size}, Auto-added POIs: ${autoAddedPois.autoAddedPoisByOsmId.size}"
+                    )
 
-                val newSymbols = buildSet {
-                    addAll(temporaryPOIs.poisByOsmId.values)
-                    if (settings.autoAddPoisToMap) addAll(autoAddedPois.autoAddedPoisByOsmId.values)
+                    val newSymbols = buildSet {
+                        addAll(temporaryPOIs.poisByOsmId.values)
+                        if (settings.autoAddPoisToMap) addAll(autoAddedPois.autoAddedPoisByOsmId.values)
 
-                    // Add POI for last known position on route when not on route
-                    if (lastKnownPositionOnMainRoute != null && routeDistance != null && isOnRoute == false && currentDistanceAlongRoute != 0.0f) {
-                        add(Symbol.POI(
-                            id = "last_known_position",
-                            lat = lastKnownPositionOnMainRoute.latitude(),
-                            lng = lastKnownPositionOnMainRoute.longitude(),
-                            name = "Last known position on route",
-                            type = Types.CONTROL
-                        ))
+                        // Add POI for last known position on route when not on route
+                        if (lastKnownPositionOnMainRoute != null && routeDistance != null && isOnRoute == false && currentDistanceAlongRoute != 0.0f) {
+                            add(
+                                Symbol.POI(
+                                    id = "last_known_position",
+                                    lat = lastKnownPositionOnMainRoute.latitude(),
+                                    lng = lastKnownPositionOnMainRoute.longitude(),
+                                    name = "Last known position on route",
+                                    type = Types.CONTROL
+                                )
+                            )
+                        }
                     }
+
+                    val removedSymbosl = lastDrawnTemporaryPOIs - newSymbols
+                    if (removedSymbosl.isNotEmpty()) {
+                        Log.d(TAG, "Removing temporary/auto-added POI symbols: $removedSymbosl")
+                        emitter.onNext(HideSymbols(removedSymbosl.map { it.id }))
+                    }
+
+                    emitter.onNext(ShowSymbols(newSymbols.toList()))
+
+                    lastDrawnTemporaryPOIs = newSymbols
+
                 }
-
-                val removedSymbosl = lastDrawnTemporaryPOIs - newSymbols
-                if (removedSymbosl.isNotEmpty()) {
-                    Log.d(TAG, "Removing temporary/auto-added POI symbols: $removedSymbosl")
-                    emitter.onNext(HideSymbols(removedSymbosl.map { it.id }))
-                }
-
-                emitter.onNext(ShowSymbols(newSymbols.toList()))
-
-                lastDrawnTemporaryPOIs = newSymbols
-
-            }
         }
+
 
         mapScope.launch {
             val zoomLevelFlow = karooSystem.stream<OnMapZoomLevel>()
             val locationFlow = karooSystem.stream<OnLocationChanged>()
-            val distanceToDestinationFlow = karooSystem.streamDataFlow(DataType.Type.DISTANCE_TO_DESTINATION)
+            val distanceToDestinationFlow =
+                karooSystem.streamDataFlow(DataType.Type.DISTANCE_TO_DESTINATION)
 
             data class StreamData(
                 val settings: RouteGraphSettings,
@@ -197,102 +219,151 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
                 val isOnRoute: Boolean
             )
 
-            val redrawInterval = if (karooSystem.karooSystemService.hardwareType == HardwareType.K2) {
-                15.seconds
-            } else {
-                10.seconds
-            }
-
-            combine(applicationContext.streamSettings(karooSystem.karooSystemService), locationFlow, zoomLevelFlow, routeGraphViewModelProvider.viewModelFlow, distanceToDestinationFlow) { settings, location, mapZoom, viewModel, distanceToDestination ->
-                val isOnRoute = (distanceToDestination as? StreamState.Streaming)?.dataPoint?.values?.get(DataType.Field.ON_ROUTE) == 0.0
-
-                StreamData(settings, location, mapZoom, viewModel, isOnRoute)
-            }.throttle(redrawInterval.inWholeMilliseconds).collect { (settings, location, mapZoom, viewModel, isOnRoute) ->
-                Log.d(TAG, "Location: $location, MapZoom: $mapZoom, Settings: $settings, IsOnRoute: $isOnRoute")
-
-                if (settings.showGradientIndicatorsOnMap) {
-                    val boundingBox =
-                        calculateBoundingBox(location.lat, location.lng, mapZoom.zoomLevel)
-                    val mapDiagonal = TurfMeasurement.distance(
-                        Point.fromLngLat(boundingBox.minLng, boundingBox.minLat),
-                        Point.fromLngLat(boundingBox.maxLng, boundingBox.maxLat),
-                        TurfConstants.UNIT_METERS
-                    )
-
-                    Log.d(TAG, "Drawing gradient indicators, Diagonal: $mapDiagonal")
-
-                    val distanceAlongRoute = (viewModel.distanceAlongRoute?.minus(mapDiagonal))?.coerceAtLeast(0.0)?.toFloat() ?: 0.0f
-                    val endDistance = (distanceAlongRoute + mapDiagonal * 2).toFloat()
-
-                    if (viewModel.sampledElevationData != null && viewModel.knownRoute != null) {
-                        Log.d(TAG, "Range: $distanceAlongRoute - $endDistance")
-
-                        val wantedStepInMeters = mapDiagonal.toFloat() / settings.gradientIndicatorFrequency.stepsPerDisplayDiagonal
-
-                        val calculatedSymbols = viewModel.sampledElevationData.getGradientIndicators(viewModel.knownRoute, wantedStepInMeters) { distance ->
-                            distance in distanceAlongRoute..endDistance
-                        }.toMutableSet()
-
-                        val filteredSymbols = buildSet {
-                            calculatedSymbols.forEach { symbol ->
-                                val hasSymbolAtThatLocation = this.any { existingSymbol: GradientIndicator ->
-                                    TurfMeasurement.distance(symbol.position, existingSymbol.position, TurfConstants.UNIT_METERS) < wantedStepInMeters * 0.9
-                                }
-
-                                if (!hasSymbolAtThatLocation) add(symbol)
-                            }
-                        }
-
-                        currentSymbols = filteredSymbols.toMutableSet()
-                    } else {
-                        currentSymbols = mutableSetOf()
-                    }
-
-                    val removedSymbols = lastDrawnGradientIndicators - currentSymbols
-
-                    if (removedSymbols.isNotEmpty()) {
-                        Log.d(TAG, "Removing symbols: $removedSymbols")
-                        emitter.onNext(HideSymbols(removedSymbols.map { it.id }))
-                    }
-
-                    if (currentSymbols.isNotEmpty()) {
-                        Log.d(TAG, "Drawing symbols: $currentSymbols")
-
-                    val icons = currentSymbols.mapNotNull { gradientIndicator ->
-                        val knownRoute = viewModel.knownRoute ?: return@mapNotNull null
-
-                        val position = TurfMeasurement.along(
-                            knownRoute,
-                            gradientIndicator.distance.toDouble(),
-                            TurfConstants.UNIT_METERS
-                        )
-
-                        val nextPosition = TurfMeasurement.along(
-                            viewModel.knownRoute,
-                            gradientIndicator.distance.toDouble() + 10.0,
-                            TurfConstants.UNIT_METERS
-                        )
-
-                        val bearing = TurfMeasurement.bearing(
-                            position,
-                            nextPosition
-                        )
-
-                        Symbol.Icon(
-                            id = gradientIndicator.id,
-                            lat = position.latitude(),
-                            lng = position.longitude(),
-                            iconRes = gradientIndicator.drawableRes,
-                            orientation = bearing.toFloat(),
-                        )
-                    }
-                    emitter.onNext(ShowSymbols(icons))
+            val redrawInterval =
+                if (karooSystem.karooSystemService.hardwareType == HardwareType.K2) {
+                    15.seconds
+                } else {
+                    10.seconds
                 }
 
-                    lastDrawnGradientIndicators = currentSymbols
+            combine(
+                applicationContext.streamSettings(karooSystem.karooSystemService),
+                locationFlow,
+                zoomLevelFlow,
+                routeGraphViewModelProvider.viewModelFlow,
+                distanceToDestinationFlow
+            ) { settings, location, mapZoom, viewModel, distanceToDestination ->
+                val isOnRoute =
+                    (distanceToDestination as? StreamState.Streaming)?.dataPoint?.values?.get(
+                        DataType.Field.ON_ROUTE
+                    ) == 0.0
+
+                StreamData(settings, location, mapZoom, viewModel, isOnRoute)
+            }.throttle(redrawInterval.inWholeMilliseconds)
+                .collect { (settings, location, mapZoom, viewModel, isOnRoute) ->
+                    Log.d(
+                        TAG,
+                        "Location: $location, MapZoom: $mapZoom, Settings: $settings, IsOnRoute: $isOnRoute"
+                    )
+
+                    if (settings.showGradientIndicatorsOnMap) {
+                        val boundingBox =
+                            calculateBoundingBox(location.lat, location.lng, mapZoom.zoomLevel)
+                        val mapDiagonal = TurfMeasurement.distance(
+                            Point.fromLngLat(boundingBox.minLng, boundingBox.minLat),
+                            Point.fromLngLat(boundingBox.maxLng, boundingBox.maxLat),
+                            TurfConstants.UNIT_METERS
+                        )
+
+                        Log.d(TAG, "Drawing gradient indicators, Diagonal: $mapDiagonal")
+
+                        val distanceAlongRoute =
+                            (viewModel.distanceAlongRoute?.minus(mapDiagonal))?.coerceAtLeast(
+                                0.0
+                            )?.toFloat() ?: 0.0f
+                        val endDistance = (distanceAlongRoute + mapDiagonal * 2).toFloat()
+
+                        if (viewModel.sampledElevationData != null && viewModel.knownRoute != null) {
+                            Log.d(TAG, "Range: $distanceAlongRoute - $endDistance")
+
+                            val wantedStepInMeters =
+                                mapDiagonal.toFloat() / settings.gradientIndicatorFrequency.stepsPerDisplayDiagonal
+
+                            val calculatedSymbols =
+                                viewModel.sampledElevationData.getGradientIndicators(
+                                    viewModel.knownRoute,
+                                    wantedStepInMeters
+                                ) { distance ->
+                                    distance in distanceAlongRoute..endDistance
+                                }.toMutableSet()
+
+                            val filteredSymbols = buildSet {
+                                calculatedSymbols.forEach { symbol ->
+                                    val hasSymbolAtThatLocation =
+                                        this.any { existingSymbol: GradientIndicator ->
+                                            TurfMeasurement.distance(
+                                                symbol.position,
+                                                existingSymbol.position,
+                                                TurfConstants.UNIT_METERS
+                                            ) < wantedStepInMeters * 0.9
+                                        }
+
+                                    if (!hasSymbolAtThatLocation) add(symbol)
+                                }
+                            }
+
+                            currentSymbols = filteredSymbols.toMutableSet()
+                        } else {
+                            currentSymbols = mutableSetOf()
+                        }
+
+                        val removedSymbols = lastDrawnGradientIndicators - currentSymbols
+
+                        if (removedSymbols.isNotEmpty()) {
+                            Log.d(TAG, "Removing symbols: $removedSymbols")
+                            emitter.onNext(HideSymbols(removedSymbols.map { it.id }))
+                        }
+
+                        if (currentSymbols.isNotEmpty()) {
+                            Log.d(TAG, "Drawing symbols: $currentSymbols")
+
+                            val icons = currentSymbols.mapNotNull { gradientIndicator ->
+                                val knownRoute = viewModel.knownRoute ?: return@mapNotNull null
+
+                                val position = TurfMeasurement.along(
+                                    knownRoute,
+                                    gradientIndicator.distance.toDouble(),
+                                    TurfConstants.UNIT_METERS
+                                )
+
+                                val nextPosition = TurfMeasurement.along(
+                                    viewModel.knownRoute,
+                                    gradientIndicator.distance.toDouble() + 10.0,
+                                    TurfConstants.UNIT_METERS
+                                )
+
+                                val bearing = TurfMeasurement.bearing(
+                                    position,
+                                    nextPosition
+                                )
+
+                                Symbol.Icon(
+                                    id = gradientIndicator.id,
+                                    lat = position.latitude(),
+                                    lng = position.longitude(),
+                                    iconRes = gradientIndicator.drawableRes,
+                                    orientation = bearing.toFloat(),
+                                )
+                            }
+                            emitter.onNext(ShowSymbols(icons))
+                        }
+
+                        lastDrawnGradientIndicators = currentSymbols
+                    } else {
+                        emitter.onNext(HideSymbols(lastDrawnGradientIndicators.map { it.id }))
+                        lastDrawnGradientIndicators = mutableSetOf()
+                    }
+                }
+        }
+
+        mapScope.launch {
+            pathPredictor.predictedPath.collect { predictedPath ->
+                if (predictedPath != null) {
+                    Log.d(
+                        TAG,
+                        "Drawing predicted path: ${predictedPath.coordinates().size} points"
+                    )
+                    emitter.onNext(HidePolyline(PREDICTED_PATH_ID))
+                    emitter.onNext(
+                        ShowPolyline(
+                            PREDICTED_PATH_ID,
+                            predictedPath.toPolyline(5),
+                            PREDICTED_PATH_COLOR,
+                            PREDICTED_PATH_WIDTH
+                        )
+                    )
                 } else {
-                    emitter.onNext(HideSymbols(lastDrawnGradientIndicators.map { it.id }))
-                    lastDrawnGradientIndicators = mutableSetOf()
+                    emitter.onNext(HidePolyline(PREDICTED_PATH_ID))
                 }
             }
         }
@@ -300,6 +371,7 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         emitter.setCancellable {
             emitter.onNext(HideSymbols(lastDrawnGradientIndicators.map { "incline-${it.distance}" }))
             emitter.onNext(HideSymbols(lastDrawnTemporaryPOIs.map { it.id }))
+            emitter.onNext(HidePolyline(PREDICTED_PATH_ID))
 
             Log.d(TAG, "Stopping map effect")
 
@@ -311,11 +383,13 @@ class KarooRouteGraphExtension : KarooExtension("karoo-routegraph", BuildConfig.
         super.onCreate()
         routeGraphUpdateManager.start()
         riddenRouteProvider.start()
+        pathPredictor.start()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         routeGraphUpdateManager.stop()
         riddenRouteProvider.stop()
+        pathPredictor.stop()
     }
 }

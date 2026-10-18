@@ -20,6 +20,8 @@ import android.content.Context
 import android.util.Log
 import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
+import com.mapbox.turf.TurfConstants
+import com.mapbox.turf.TurfMeasurement
 import io.hammerhead.karooext.models.DataType
 import io.hammerhead.karooext.models.RideState
 import io.hammerhead.karooext.models.StreamState
@@ -42,7 +44,10 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.util.Locale
 import kotlin.time.Duration.Companion.seconds
+
+private const val VALUES_PER_POINT = 4
 
 class RiddenRouteProvider(
     private val karooSystemServiceProvider: KarooSystemServiceProvider,
@@ -50,23 +55,18 @@ class RiddenRouteProvider(
 ) {
     companion object {
         private const val TAG = "RiddenRouteProvider"
-        private const val VALUES_PER_POINT = 4
         private const val MIN_POINT_DISTANCE_METERS = 10.0
         private val SAVE_INTERVAL = 60.seconds
     }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val riddenTrackFile = File(context.filesDir, "ridden_track")
-    private val riddenRoutePoints = mutableListOf<Double>()
+    private val riddenRoutePoints = DoubleArrayBuffer()
     private val persistenceMutex = Mutex()
 
     fun getRiddenPoints(numberOfLastPoints: Int? = null): List<Pair<Double, Point>> {
         val points = synchronized(riddenRoutePoints) {
-            if (numberOfLastPoints != null) {
-                riddenRoutePoints.takeLast(numberOfLastPoints * VALUES_PER_POINT)
-            } else {
-                riddenRoutePoints.toList()
-            }
+            riddenRoutePoints.snapshot(numberOfLastPoints, VALUES_PER_POINT)
         }
 
         val result = mutableListOf<Pair<Double, Point>>()
@@ -77,7 +77,9 @@ class RiddenRouteProvider(
             val longitude = points[i + 2]
             val altitude = points[i + 3]
 
-            result.add(distance to Point.fromLngLat(longitude, latitude, altitude))
+            val point = Point.fromLngLat(longitude, latitude, altitude)
+
+            result.add(distance to point)
         }
 
         return result
@@ -114,16 +116,30 @@ class RiddenRouteProvider(
                 }.collect { point ->
                     if (point != null) {
                         synchronized(riddenRoutePoints) {
-                            val lastPointDistance = riddenRoutePoints.getOrNull(
-                                riddenRoutePoints.size - VALUES_PER_POINT,
-                            )
-                            if (lastPointDistance == null ||
-                                point[0] - lastPointDistance >= MIN_POINT_DISTANCE_METERS
+                            val lastPointPosition = if (riddenRoutePoints.size >= VALUES_PER_POINT) Point.fromLngLat(
+                                riddenRoutePoints.getOrNull(riddenRoutePoints.size - 2) ?: error("Latitude value missing"),
+                                riddenRoutePoints.getOrNull(riddenRoutePoints.size - 3) ?: error("Longitude value missing"),
+                            ) else null
+
+                            val distanceToLastPoint = if (lastPointPosition != null) {
+                                TurfMeasurement.distance(
+                                    lastPointPosition,
+                                    Point.fromLngLat(point[2], point[1]),
+                                    TurfConstants.UNIT_METERS,
+                                )
+                            } else {
+                                null
+                            }
+
+                            if (distanceToLastPoint == null ||
+                                distanceToLastPoint >= MIN_POINT_DISTANCE_METERS
                             ) {
-                                riddenRoutePoints.add(point[0])
-                                riddenRoutePoints.add(point[1])
-                                riddenRoutePoints.add(point[2])
-                                riddenRoutePoints.add(point[3])
+                                riddenRoutePoints.addPoint(
+                                    point[0],
+                                    point[1],
+                                    point[2],
+                                    point[3],
+                                )
                             }
                         }
                     }
@@ -174,13 +190,12 @@ class RiddenRouteProvider(
                         Log.w(TAG, "Ignoring incomplete trailing values in ${riddenTrackFile.name}")
                     }
                     val pointValues = valuesToRead - valuesToRead % VALUES_PER_POINT
-                    val loadedPoints = ArrayList<Double>(pointValues.toInt())
+                    val loadedPoints = DoubleArray(pointValues.toInt())
                     repeat(pointValues.toInt()) {
-                        loadedPoints.add(input.readDouble())
+                        loadedPoints[it] = input.readDouble()
                     }
                     synchronized(riddenRoutePoints) {
-                        riddenRoutePoints.clear()
-                        riddenRoutePoints.addAll(loadedPoints)
+                        riddenRoutePoints.replaceWith(loadedPoints)
                     }
                 }
                 val restoredPointCount = synchronized(riddenRoutePoints) {
@@ -195,7 +210,7 @@ class RiddenRouteProvider(
 
     private suspend fun persistRiddenRoute() {
         persistenceMutex.withLock {
-            val points = synchronized(riddenRoutePoints) { riddenRoutePoints.toList() }
+            val points = synchronized(riddenRoutePoints) { riddenRoutePoints.toDoubleArray() }
             val temporaryFile = File(riddenTrackFile.parentFile, "${riddenTrackFile.name}.tmp")
             try {
                 FileOutputStream(temporaryFile).use { fileOutput ->
@@ -217,6 +232,54 @@ class RiddenRouteProvider(
                     Log.w(TAG, "Failed to remove temporary ridden track file")
                 }
             }
+        }
+    }
+
+    private class DoubleArrayBuffer {
+        private var values = DoubleArray(0)
+        var size: Int = 0
+            private set
+
+        fun addPoint(distance: Double, latitude: Double, longitude: Double, altitude: Double) {
+            ensureCapacity(size + VALUES_PER_POINT)
+            values[size++] = distance
+            values[size++] = latitude
+            values[size++] = longitude
+            values[size++] = altitude
+        }
+
+        fun getOrNull(index: Int): Double? =
+            if (index in 0 until size) values[index] else null
+
+        fun snapshot(numberOfLastPoints: Int?, valuesPerPoint: Int): DoubleArray {
+            require(numberOfLastPoints == null || numberOfLastPoints >= 0)
+            val valuesToCopy = if (numberOfLastPoints == null) {
+                size
+            } else {
+                minOf(size, numberOfLastPoints.coerceAtMost(size / valuesPerPoint) * valuesPerPoint)
+            }
+            return values.copyOfRange(size - valuesToCopy, size)
+        }
+
+        fun toDoubleArray(): DoubleArray = values.copyOf(size)
+
+        fun replaceWith(newValues: DoubleArray) {
+            values = newValues
+            size = newValues.size
+        }
+
+        fun clear() {
+            size = 0
+        }
+
+        private fun ensureCapacity(minimumCapacity: Int) {
+            if (minimumCapacity <= values.size) return
+            val expandedCapacity = if (values.isEmpty()) {
+                minimumCapacity.coerceAtLeast(16)
+            } else {
+                maxOf(minimumCapacity, values.size * 2)
+            }
+            values = values.copyOf(expandedCapacity)
         }
     }
 }

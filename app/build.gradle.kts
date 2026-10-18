@@ -115,6 +115,7 @@ tasks.named("assemble") {
 
 
 dependencies {
+    // implementation(files("libs/valhalla-debug.aar"))
     implementation(libs.mapbox.sdk.turf)
     implementation(libs.hammerhead.karoo.ext)
     implementation(libs.androidx.core.ktx)
@@ -138,7 +139,8 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
 
-    implementation("io.github.rallista:valhalla-mobile:0.6.3")
+    implementation("io.github.rallista:valhalla-mobile:0.6.4")
     implementation("io.github.rallista:valhalla-models:0.5.2")
     implementation("io.github.rallista:valhalla-models-config:0.5.2")
+
 }

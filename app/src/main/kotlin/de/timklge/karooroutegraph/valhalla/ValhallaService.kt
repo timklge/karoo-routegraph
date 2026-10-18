@@ -20,17 +20,29 @@ import android.content.Context
 import android.os.Environment
 import android.util.Log
 import com.mapbox.geojson.LineString
+import com.mapbox.geojson.Point
 import com.valhalla.config.models.ValhallaConfig
 import com.valhalla.valhalla.Valhalla
 import com.valhalla.valhalla.config.ValhallaConfigFactory
 import de.timklge.karooroutegraph.KarooRouteGraphExtension
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import java.io.File
+
+private val json = Json
+
+@Serializable
+private data class TraceAttributesRequest(
+    @SerialName("encoded_polyline") val encodedPolyline: String,
+    val costing: String,
+)
 
 class ValhallaService(private val appContext: Context) {
     val mapDirectoryOnExternalStorage = File(File(Environment.getExternalStorageDirectory(), "offline"), "nav")
 
     lateinit var config: ValhallaConfig
-    lateinit var valhalla: Valhalla
+    private var valhalla: Valhalla? = null
 
     init {
         try {
@@ -41,7 +53,7 @@ class ValhallaService(private val appContext: Context) {
 
             // val response = valhalla.locateRaw("""{"verbose":true,"locations":[{"lat":51.0346852875883,"lon":3.703615769246603}],"costing":"bicycle","costing_options":{"bicycle":{"bicycle_type":"road"}},"directions_options":{"units":"miles"},"id":"12abc3afe23984fe"}""")
 
-            val response = valhalla.statusRaw("""{"verbose":true}""")
+            val response = valhalla?.statusRaw("""{"verbose":true}""")
 
             // Fetch a route from Valhalla
             // val response = valhalla.route(request)
@@ -51,9 +63,23 @@ class ValhallaService(private val appContext: Context) {
         }
     }
 
-    fun mapMatch(polyline: LineString) {
-        val tracedAttributes = valhalla.traceAttributesRaw("""{"encoded_polyline":"${polyline.toPolyline(6)}","costing":"bicycle","elevation_interval":50.0}""")
+    fun mapMatch(polyline: LineString): String? {
+        val request = TraceAttributesRequest(
+            encodedPolyline = polyline.toPolyline(6),
+            costing = "bicycle",
+        )
+        val tracedAttributes = valhalla?.traceAttributesRaw(json.encodeToString(request))
 
         Log.i(KarooRouteGraphExtension.TAG, "Traced attributes: $tracedAttributes")
+
+        return tracedAttributes
+    }
+
+    /**
+     * Uses the Valhalla locate API to get detailed information (shape, attributes, connected nodes)
+     * about the edges and nodes near the given point.
+     */
+    fun locate(point: Point): String? {
+        return valhalla?.locateRaw("""{"verbose":true,"locations":[{"lat":${point.latitude()},"lon":${point.longitude()}}],"costing":"bicycle"}""")
     }
 }

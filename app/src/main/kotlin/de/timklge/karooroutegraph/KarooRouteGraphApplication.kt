@@ -23,6 +23,7 @@ import de.timklge.karooroutegraph.pois.NominatimProvider
 import de.timklge.karooroutegraph.pois.OfflineNearbyPOIProvider
 import de.timklge.karooroutegraph.pois.OverpassPOIProvider
 import de.timklge.karooroutegraph.pois.PoiApproachAlertService
+import de.timklge.karooroutegraph.valhalla.ValhallaPathPredictor
 import de.timklge.karooroutegraph.valhalla.ValhallaService
 import de.timklge.karooroutegraph.valhalla.ValhallaTileChecker
 import org.koin.android.ext.koin.androidContext
@@ -48,6 +49,7 @@ val appModule = module {
     singleOf(::RouteGraphUpdateManager) { createdAtStart() }
     singleOf(::RiddenRouteProvider) { createdAtStart() }
     singleOf(::ValhallaTileChecker) { createdAtStart() }
+    singleOf(::ValhallaPathPredictor) { createdAtStart() }
     singleOf(::OfflineNearbyPOIProvider) { createdAtStart() }
     singleOf(::AutoAddedPOIsViewModelProvider) { createdAtStart() }
     singleOf(::SurfaceConditionViewModelProvider) { createdAtStart() }
